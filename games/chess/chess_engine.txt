@@ -1,0 +1,336 @@
+@name chess_engine
+
+#-- variables
+@persist [PieceValue ValuePiece Offsets]:table
+
+#-- evaluator
+@persist [EvalSubIndex EvalSubCount EvalIndex EvalLegalCount EvalInCheck EvalPieceCount] EvalList:table EvalSubList:array
+@persist [GameTurn] [KingPosW KingPosB EnPassant] [CastleW CastleB]:string History:string
+
+
+#---------------------------#
+#--       Variables       --#
+#---------------------------#
+
+#-- for quick math were going to represent the pieces as numbers
+#-- black will be negative and white will be positive
+
+#-- strint -> int lookup
+PieceValue = table(
+    "P" = 1, "p" = -1,
+    "N" = 2, "n" = -2,
+    "K" = 3, "k" = -3,
+    "B" = 4, "b" = -4,
+    "R" = 5, "r" = -5,
+    "Q" = 6, "q" = -6,
+    "." = 0
+)
+
+#-- int -> string lookup
+ValuePiece = PieceValue:flip()
+
+#-- these are the offsets we add to any given square index (1-64) to reach a new square
+#-- north = -16, south = 16, east = 1, west = -1
+
+#-- int offsets for moves
+Offsets = table(
+    1 = array(-16, -32, -17, -15),                 #-- P
+    2 = array(-31, -14, 18, 33, 31, 14, -18, -33), #-- N
+    3 = array(-16, 1, 16, -1, -15, 17, 15, -17),   #-- K
+    4 = array(-15, 17, 15, -17),                   #-- B
+    5 = array(-16, 1, 16, -1),                     #-- R
+    6 = array(-16, 1, 16, -1, -15, 17, 15, -17)    #-- Q
+)
+
+
+#---------------------------#
+#--       Functions       --#
+#---------------------------#
+
+#-- elo algorithm
+function number elo_get_expected(A, B) {
+    return 1 / (1 + 10^((B - A)/400))
+}
+
+function number elo_update_rating(E, A, C) {
+    return round(C + 32*(A - E))
+}
+
+#-- nicely print board to console
+function void array:chess_print() {
+    local Colors = array(
+        -1 = vec( 35,  35,  35),
+         0 = vec(125, 125, 125),
+         1 = vec(255, 255, 255)
+    )
+
+    printColor(vec(255, 175, 0), "\n\n      Chess!\n")
+    for (N = 1, 64, 8) {
+        printColor(
+            vec(255, 175, 0), (9 - ceil(N / 8)) + " ",
+            Colors[sign(This[N + 0, number]), vector], ValuePiece[This[N + 0, number], string] + " ",
+            Colors[sign(This[N + 1, number]), vector], ValuePiece[This[N + 1, number], string] + " ",
+            Colors[sign(This[N + 2, number]), vector], ValuePiece[This[N + 2, number], string] + " ",
+            Colors[sign(This[N + 3, number]), vector], ValuePiece[This[N + 3, number], string] + " ",
+            Colors[sign(This[N + 4, number]), vector], ValuePiece[This[N + 4, number], string] + " ",
+            Colors[sign(This[N + 5, number]), vector], ValuePiece[This[N + 5, number], string] + " ",
+            Colors[sign(This[N + 6, number]), vector], ValuePiece[This[N + 6, number], string] + " ",
+            Colors[sign(This[N + 7, number]), vector], ValuePiece[This[N + 7, number], string] + " "
+        )
+    }
+    printColor(vec(255, 175, 0), "  A B C D E F G H\nHistory: " + History)
+}
+
+#-- create board from fen notation
+function array fenToBoard( Fen:string ) {
+    #-- "rnbkqbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBKQBNR/ w KQkq"
+    local Exp = Fen:explode("/")
+    local Str = ""
+
+    for (F = 1, 8) {
+        local RStr = Exp[F, string]
+        for (R = 1, RStr:length()) {
+            local Rep = RStr[R]:toNumber()
+            if (Rep) { Str += ".":repeat(Rep) } else { Str += RStr[R] }
+
+            if (RStr[R] == "K") { KingPosW = Str:length() }
+            if (RStr[R] == "k") { KingPosB = Str:length() }
+        }
+    }
+
+    local Data = Exp:popString():trim():explode(" ")
+
+    GameTurn = Data[1, string] == "w" ? 1 : -1
+    CastleW = Data[2, string]:sub(1, 2)
+    CastleB = Data[2, string]:sub(3, 4)
+
+    local Board = array()
+    for (I = 1, 64) {
+        Board[I, number] = PieceValue[Str[I], number]
+    }
+
+    return Board
+}
+
+#-- encode board as fen notation
+function string array:boardToFen(AI) {
+    local Fen = ""
+
+    for (F = 0, 7) {
+        local Rep = 0
+        local New = ""
+
+        for (R = 0, 7) {
+            local Index = R + F*8 + 1
+            local Value = This[Index, number]
+
+            if (!Value) { Rep++ }
+            else {
+                if (Rep) { New += Rep }
+                New += ValuePiece[Value, string]
+                Rep = 0
+            }
+        }
+
+        if (Rep) { New += Rep }
+
+        Fen += New + "/"
+    }
+
+    if (AI) { Fen = Fen:left(Fen:length() -1) }
+
+    return format(Fen:trim() + " %s %s%s", GameTurn == 1 ? "w" : "b", CastleW, CastleB)
+}
+
+#-- return list of moves possible moves at an index
+function array array:moves_at_index(Index, KingSafety) {
+    local MoveArray = array()
+
+    #-- index data
+    local ThisPiece = KingSafety ?: This[Index, number]
+    local ThisTeam = sign(This[Index, number])
+    local ThisBit = Index + ((Index - 1) && -8) - 1
+
+    #-- move data
+    local Abs = abs(ThisPiece)
+    local Negate = (KingSafety & Abs == 1) ? ThisTeam : (ThisPiece == -1 ? -1 : 1)
+    local CanDouble = ThisTeam == 1 ? inrange(Index, 49, 56) : inrange(Index, 9, 16)
+
+    #-- castling is a special case
+    if (!KingSafety & Abs == 3) {
+        local Castle = ThisTeam > 0 ? CastleW : CastleB
+
+        if (Castle[1] != "X") {
+            local Blocked = 0
+            for (NextIndex = Index + 1, Index + 3) {
+                if (NextIndex != Index + 3 & This[NextIndex, number]) { Blocked = 1, break }
+            }
+
+            if (!Blocked) { MoveArray:pushNumber(Index + 2) }
+        }
+
+        if (Castle[2] != "X") {
+            local Blocked = 0
+            for (NextIndex = Index - 1, Index - 4, -1) {
+                if (NextIndex != Index - 4 & This[NextIndex, number]) { Blocked = 1, break }
+            }
+
+            if (!Blocked) { if (!Blocked) { MoveArray:pushNumber(Index - 2) } }
+        }
+    }
+
+    foreach (K, BitShift:number = Offsets[Abs, array]) {
+        local ThatBit = ThisBit
+
+        while ( 1 ) {
+            ThatBit += BitShift*Negate
+
+            #-- break if the index isn't valid
+            if (ThatBit && 0x88) { break }
+
+            #-- convert 0x88 back to 0x40
+            local ThatIndex = ((ThatBit + (ThatBit && 7)) >> 1) + 1
+            local ThatPiece = This[ThatIndex, number]
+            local ThatTeam = sign(ThatPiece)
+
+            #-- can't attack friendlies
+            if (ThatPiece & ThatTeam == ThisTeam) { break }
+
+            #-- pawn
+            if (Abs == 1) {
+                if (K > 2 & !ThatPiece & ThatIndex != EnPassant) { break }
+                if (K < 3 & ThatPiece) { break }
+                if (K == 2 & (!CanDouble | This[Index - 8*Negate, number])) { break }
+            }
+
+            #-- if not checking king safety, add every move
+            if (!KingSafety) {
+                MoveArray:pushNumber(ThatIndex)
+            }
+
+            #-- break if index contains an enemy
+            if (ThatPiece & ThatTeam != ThisTeam) {
+                #-- if checking king safety and king hits specified piece, add move
+                if (KingSafety & KingSafety == ThatPiece) { MoveArray:pushNumber(ThatIndex) }
+                break
+            }
+
+            #-- pawns, knights and kings only loop once
+            if (Abs < 4) { break }
+        }
+    }
+
+    return MoveArray
+}
+
+#-- evaluate every possible move on the board
+#[
+    Key:
+        1 = empty legal
+        2 = attack legal
+        3 = castle legal
+        4 = empty illegal
+        5 = attack illegal
+        6 = castle illegal
+]#
+function number array:evaluate(Side) {
+    #while (perf(99) & EvalIndex <= 64) {
+    while (opcounter() < maxquota() & EvalIndex <= 64) {
+        if (!EvalSubIndex) {
+            EvalIndex++
+
+            if (sign(This[EvalIndex, number]) == Side) {
+                EvalSubList = This:moves_at_index(EvalIndex, 0)
+                EvalSubCount = EvalSubList:count()
+
+                if (EvalSubCount) {
+                    EvalLegalCount += EvalSubCount
+                    EvalList[EvalIndex, array] = array()
+                }
+
+                EvalPieceCount++
+            }
+            else {
+                EvalSubList = array()
+                EvalSubCount = 0
+            }
+        }
+
+        if (EvalSubIndex < EvalSubCount) {
+            EvalSubIndex++
+
+            local BoardClone = This:clone()
+            local KingPos = Side > 0 ? KingPosW : KingPosB
+
+            local MoveTo = EvalSubList[EvalSubIndex, number]
+            local Attack = BoardClone[MoveTo, number]
+
+            local LegalValue = abs(sign(Attack)) + 1
+
+            if (EvalIndex == KingPos) {
+                local Diff = MoveTo - KingPos
+                if (abs(Diff) == 2) {
+                    if (sign(Diff) > 0) {
+                        BoardClone[MoveTo - 1, number] = BoardClone[MoveTo + 1, number]
+                        BoardClone[MoveTo + 1, number] = 0
+                    }
+                    else {
+                        BoardClone[MoveTo + 1, number] = BoardClone[MoveTo - 2, number]
+                        BoardClone[MoveTo - 2, number] = 0
+                    }
+                    LegalValue = 3
+                }
+                KingPos = MoveTo
+            }
+            if (MoveTo == EnPassant & BoardClone[EvalIndex, number] == Side) {
+                BoardClone[EnPassant + 8*Side, number] = 0
+                LegalValue = 2
+            }
+
+            BoardClone[MoveTo, number] = BoardClone[EvalIndex, number]
+            BoardClone[EvalIndex, number] = 0
+
+            EvalList[EvalIndex, array][MoveTo, number] = LegalValue
+
+            for (PieceType = 1, 6) {
+                if (BoardClone:moves_at_index(KingPos, PieceType * -Side):count()) {
+                    EvalList[EvalIndex, array][MoveTo, number] = LegalValue + 3
+                    EvalLegalCount--
+
+                    break
+                }
+            }
+        }
+
+        if (EvalSubIndex == EvalSubCount) {
+            EvalSubIndex = 0
+        }
+    }
+
+    return EvalIndex == 65
+}
+
+#-- start evaluation
+function void startEvaluation(Timer:string) {
+    timer(Timer, 0)
+
+    EvalSubIndex = EvalIndex = EvalSubCount = EvalLegalCount = 0
+    EvalSubList = array()
+    EvalList = table()
+
+    EvalPieceCount = 0
+}
+
+#-- call after doing a move to see if enemy is in check
+function number array:enemy_in_check(From, To) {
+    local OtherSide = -sign(This[To, number])
+    local KingPos = OtherSide > 0 ? KingPosW : KingPosB
+
+    for (PieceType = 1, 6) {
+        if (This:moves_at_index(KingPos, PieceType * -OtherSide):count()) {
+            return KingPos
+        }
+    }
+
+    return 0
+}

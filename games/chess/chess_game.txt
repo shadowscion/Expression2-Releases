@@ -1,0 +1,935 @@
+#----------------------------------------------
+#-- E2 Chess by shadowscion
+
+@name chess_game
+@model models/hunter/plates/plate3x3.mdl
+
+#-- ui
+@persist [Colors Models]:array [Material]:string [Entity Owner]:entity [HoloIndex BoardScale Animated]
+@persist [LastClick] [PlayerActive PlayerW PlayerB]:entity CacheW CacheB Animations:table Indicator:vector
+
+#-- filesystem
+@persist [FileSystem] [FileName FileTask]:string [FileContents StatsW StatsB]:table Replay:array
+
+#-- game
+@persist [GameBoard GameHolos GameHoloCache]:array [MoveFromPosition] [EnemyInCheck Draw] [Bot BotSounds] [BotTaunt BotRespond]:array
+
+@trigger none
+
+
+#[
+    Chat commands:
+        - !print       (print the game to console)
+        - !reset       (create a new game and reset the players and bot)
+        - !newgame     (create a new game with the same players)
+        - !join white  (join current game as white)
+        - !join black  (join current game as black)
+        - !join vs bot (join the game as white vs a bot)
+        - !leave       (leave the game)
+
+        - !printstats
+        - !save <name>
+        - !load <name>
+        - !replay <name>
+        - !clear <name>  (removes game from save table)
+
+    Controls:
+        - Aim at a square and hold mouse2 to select it, release mouse2 on a new square to move
+
+    Interface:
+        - Legal moves (a legal move is a move that does not put or leave your king in check)
+          will be highlighted in brighter colors, while illegal moves will be darker
+        - A king in check will be highlighted
+
+    Features:
+        - Castling: https://en.wikipedia.org/wiki/Castling
+        - EnPassant: https://en.wikipedia.org/wiki/En_passant
+        - Promotion: https://en.wikipedia.org/wiki/Promotion_%28chess%29 (doesn't support under promotion)
+
+        - Check/Checkmate detection
+        - ELO rating system
+        - Game saving, loading, and replaying
+        - 50 move rule (draw after 50 consecutive non-pawn/non-capture moves)
+]#
+
+
+if (first()) {
+
+    #-- include engine
+    #include "chess_engine"
+
+
+    #---------------------------#
+    #--      UI Options       --#
+    #---------------------------#
+    BoardScale = 1                  #-- scales the ui
+    Animated   = 1                  #-- animates the ui
+    BotSounds  = 1                  #-- enables bot voice
+    FileSystem = 1                  #-- enables game saving/loading and player statistics
+    FileName   = "chess_data.txt"   #-- file to save data to
+
+    Material = "phoenix_storms/fender_white"
+
+    Colors = array(
+        1 = hsv2rgb(204, 0.76, 0.86),   #-- legal move color
+        2 = hsv2rgb(5, 0.77, 0.753),    #-- legal capture color
+        3 = hsv2rgb(224,0.62,0.61),     #-- legal castle color
+        4 = hsv2rgb(204, 0.76, 0.86/3), #-- illegal move color
+        5 = hsv2rgb(5, 0.77, 0.753/3),  #-- illegal capture color
+        6 = hsv2rgb(224,0.62,0.61/3),   #-- illegal castle color
+
+        10 = vec(255, 255, 255),        #-- light square color
+        11 = vec(30, 30, 30),           #-- dark square color
+        12 = vec(50, 50, 50),           #-- dark piece color
+        13 = vec(241, 196, 15),         #-- click color
+        14 = vec(239, 78, 72),          #-- check color
+
+        15 = vec(137, 196, 244)         #-- en passant square color
+    )
+
+    Models = array(
+        PieceValue["r", number] = "models/props_phx/games/chess/black_rook.mdl",
+        PieceValue["n", number] = "models/props_phx/games/chess/black_knight.mdl",
+        PieceValue["b", number] = "models/props_phx/games/chess/black_bishop.mdl",
+        PieceValue["q", number] = "models/props_phx/games/chess/black_queen.mdl",
+        PieceValue["k", number] = "models/props_phx/games/chess/black_king.mdl",
+        PieceValue["p", number] = "models/props_phx/games/chess/black_pawn.mdl",
+        PieceValue["R", number] = "models/props_phx/games/chess/white_rook.mdl",
+        PieceValue["N", number] = "models/props_phx/games/chess/white_knight.mdl",
+        PieceValue["B", number] = "models/props_phx/games/chess/white_bishop.mdl",
+        PieceValue["Q", number] = "models/props_phx/games/chess/white_queen.mdl",
+        PieceValue["K", number] = "models/props_phx/games/chess/white_king.mdl",
+        PieceValue["P", number] = "models/props_phx/games/chess/white_pawn.mdl"
+    )
+
+    BotTaunt = array(
+        "vo/npc/barney/ba_goingdown.wav",
+        "vo/npc/barney/ba_gotone.wav",
+        "vo/npc/barney/ba_laugh01.wav",
+        "vo/npc/barney/ba_laugh02.wav",
+        "vo/npc/barney/ba_laugh03.wav",
+        "vo/npc/barney/ba_laugh04.wav",
+        "vo/npc/barney/ba_ohyeah.wav",
+        "vo/npc/barney/ba_downyougo.wav"
+    )
+
+    BotRespond = array(
+        "vo/npc/barney/ba_no01.wav",
+        "vo/npc/barney/ba_no02.wav",
+        "vo/npc/barney/ba_ohshit03.wav",
+        "vo/npc/barney/ba_damnit.wav",
+        "vo/npc/barney/ba_pain01.wav",
+        "vo/npc/barney/ba_pain02.wav",
+        "vo/npc/barney/ba_pain03.wav",
+        "vo/npc/barney/ba_pain04.wav",
+        "vo/npc/barney/ba_pain05.wav"
+    )
+
+
+    #---------------------------#
+    #--      UI Functions     --#
+    #---------------------------#
+
+    function setE2Name() {
+        setName(
+            format("White: %s\nRating: %d\nGames: %d\nWins: %d\nBlack: %s\nRating %d\nGames: %d\nWins: %d",
+                StatsW["un", string], StatsW["rt", number], StatsW["gp", number], StatsW["wi", number],
+                StatsB["un", string], StatsB["rt", number], StatsB["gp", number], StatsB["wi", number]
+            )
+        )
+    }
+
+    function holo(N,P,Pos:vector,Scale:vector,Ang:angle,Model:string,Material:string,Color:vector) {
+        local Parent = holoEntity(P) ?: Entity
+
+        holoCreate(N, Parent:toWorld(Pos), Scale / 12, Parent:toWorld(Ang))
+        holoParent(N, Parent)
+        holoModel(N, Model)
+        holoMaterial(N, Material)
+        holoColor(N, Color)
+    }
+
+    function vector linePlaneIntersection( Player:entity, PlanePos:vector, Normal:vector ) {
+        local LineP1 = Player:shootPos()
+        local LineP2 = LineP1 + Player:eye()
+
+        local X = Normal:dot(PlanePos - LineP1) / Normal:dot(LineP2 - LineP1)
+        return LineP1 + X*(LineP2 - LineP1)
+    }
+
+    function number getSquareColor(Index) {
+        return ((floor((Index - 1) / 8) + mod(Index - 1, 8)) % 2 == 0) + 9
+    }
+
+    function number smoothstep(Frac) {
+        return 6*Frac^5 - 15*Frac^4 + 10*Frac^3
+    }
+
+    function vector getCachePos(Team) {
+        if (Team > 0) { CacheW++ } else { CacheB++ }
+        local Index = Team > 0 ? CacheW : CacheB
+        return vec(mod(Index - 1, 8)*16 - 56, (floor((Index - 1) / 8)*16 + 88) * Team, 0)*BoardScale
+    }
+
+    function addAnimation(FromSquare, ToSquare, Team) {
+        if (Animated) {
+            if (!Animations:count()) { timer("animate", 0) }
+
+            local Anim = table(
+                "indicator"   = Entity:toLocal(holoEntity(9999):pos()),
+                "from_piece"  = GameHolos[FromSquare, number],
+                "to_piece"    = GameHolos[ToSquare, number],
+                "from_square" = Entity:toLocal(holoEntity(FromSquare):pos()),
+                "to_square"   = Entity:toLocal(holoEntity(ToSquare):pos()),
+                "lerp"        = 0,
+                "jump"        = abs(GameBoard[FromSquare, number]) == 2,
+                "team"        = Team
+            )
+
+            if (Anim["to_piece", number]) {
+                Anim["cache_pos", vector] = getCachePos(Team)
+            }
+
+            GameHolos[ToSquare, number] = GameHolos[FromSquare, number]
+            GameHolos[FromSquare, number] = 0
+
+            Animations:pushTable(Anim)
+        }
+        else {
+            holoPos(GameHolos[FromSquare, number], holoEntity(ToSquare):pos())
+            if (GameHolos[ToSquare, number]) {
+                holoPos(GameHolos[ToSquare, number], Entity:toWorld(getCachePos(Team)))
+            }
+
+            GameHolos[ToSquare, number] = GameHolos[FromSquare, number]
+            GameHolos[FromSquare, number] = 0
+        }
+    }
+
+
+    #---------------------------#
+    #--         Setup         --#
+    #---------------------------#
+
+    GameBoard = fenToBoard("rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR/ w KQkq")
+
+    Entity = entity()
+    Owner = owner()
+
+    Entity:setAlpha(0)
+
+    runOnChat(1)
+    runOnHTTP(1)
+
+    if (FileSystem) {
+        runOnFile(1)
+        timer("filesystem", 500)
+    }
+
+    timer("spawngame", 500)
+}
+
+
+#---------------------------#
+#--     Create Board      --#
+#---------------------------#
+
+if (clk("spawngame")) {
+    timer("spawngame", 15)
+
+    LastClick = curtime()
+
+    while (perf(95) & holoRemainingSpawns() > 3 & HoloIndex < 64) {
+        HoloIndex++
+
+        #-- board
+        if (!holoEntity(HoloIndex)) {
+            local Y = floor((HoloIndex - 1) / 8)
+            local X = mod(HoloIndex - 1, 8)
+
+            holo(HoloIndex, 0, vec((Y - 3.5)*16*BoardScale, (X - 3.5)*16*BoardScale, 0), vec(15.5)*BoardScale, ang(), "plane", Material, Colors[getSquareColor(HoloIndex), vector])
+
+            if (HoloIndex == 1) {
+                #-- base
+                holo(HoloIndex+500, 0, vec(0, 0, -1), vec(8*16*BoardScale, 8*16*BoardScale, 1), ang(), "", "", vec())
+                holoDisableShading(HoloIndex+500, 1)
+
+                #-- move indicator
+                holo(9999, 0, vec(0,0,-20), vec(6, 6, 18)/3*BoardScale, ang(180, 0, 0), "cone", Material, Colors[13, vector])
+                holo(9998, 9999, vec(), (vec(6, 6, 18)/3 * vec(-1.15, -1.15, -1.05))*BoardScale, ang(180, 0, 0), "cone", "", vec())
+
+                holoDisableShading(9999, 1)
+                holoDisableShading(9998, 1)
+            }
+        }
+        else {
+            holoColor(HoloIndex, Colors[getSquareColor(HoloIndex), vector])
+        }
+
+        #-- pieces
+        local Piece = GameBoard[HoloIndex, number]
+        if (Piece) {
+            local Side = sign(Piece)
+            holo(HoloIndex+1000, HoloIndex, vec(), vec(8)*BoardScale, ang(0, Side > 0 ? -180 : 0, 0), Models[Piece, string], Material, Colors[Side > 0 ? 10 : 12, vector])
+
+            GameHolos[HoloIndex, number] = HoloIndex+1000
+            GameHoloCache[GameHoloCache:count() + 1, number] = HoloIndex+1000
+        }
+    }
+
+    if (HoloIndex == 64) {
+        stoptimer("spawngame")
+        if (!Replay:count()) { startEvaluation("evaluate") }
+    }
+}
+
+
+#---------------------------#
+#--     Evaluate board    --#
+#---------------------------#
+
+if (clk("evaluate")) {
+    timer("evaluate", 15)
+
+    LastClick = curtime()
+
+    if (GameBoard:evaluate(GameTurn)) {
+        if (!EvalLegalCount) {
+            soundPlay("checkmate", 1.5, "vo/k_lab/kl_fiddlesticks.wav")
+
+            #-- update stats
+            if (FileSystem) {
+                local Winner = GameTurn == 1 ? 0 : 1
+                local NewRatingW = elo_update_rating(elo_get_expected(StatsW["rt", number], StatsB["rt", number]), Winner, StatsW["rt", number])
+                local NewRatingB = elo_update_rating(elo_get_expected(StatsB["rt", number], StatsW["rt", number]), !Winner, StatsB["rt", number])
+
+                StatsW["rt", number] = NewRatingW
+                StatsB["rt", number] = NewRatingB
+                StatsW["gp", number] = StatsW["gp", number] + 1
+                StatsB["gp", number] = StatsB["gp", number] + 1
+
+                if (Winner) { StatsW["wi", number] = StatsW["wi", number] + 1 } else { StatsB["wi", number] = StatsB["wi", number] + 1 }
+
+                setE2Name()
+
+                FileTask = "upd_ratings"
+                timer("filesystem", 0)
+            }
+            GameTurn = 0
+        }
+        elseif (Draw > 50 | (Bot & Draw > 15)) {
+            soundPlay("draw", 0, "garrysmod/content_downloaded.wav")
+            soundPitch("draw", 56)
+
+            if (FileSystem) {
+                local NewRatingW = elo_update_rating(elo_get_expected(StatsW["rt", number], StatsB["rt", number]), 0.5, StatsW["rt", number])
+                local NewRatingB = elo_update_rating(elo_get_expected(StatsB["rt", number], StatsW["rt", number]), 0.5, StatsB["rt", number])
+
+                StatsW["rt", number] = NewRatingW
+                StatsB["rt", number] = NewRatingB
+                StatsW["gp", number] = StatsW["gp", number] + 1
+                StatsB["gp", number] = StatsB["gp", number] + 1
+                StatsW["dr", number] = StatsW["dr", number] + 1
+                StatsB["dr", number] = StatsB["dr", number] + 1
+
+                setE2Name()
+
+                FileTask = "upd_ratings"
+                timer("filesystem", 0)
+            }
+            GameTurn = 0
+        }
+
+        stoptimer("evaluate")
+    }
+}
+
+
+#---------------------------#
+#--       User Input      --#
+#---------------------------#
+
+if (keyClk(PlayerActive)) {
+    local Key = (GameTurn & (PlayerW & (PlayerB | Bot))) ? keyClkPressed() : ""
+    local Down = PlayerActive:keyPressed(Key)
+
+    if (Key == "mouse_right") {
+        if (Down & curtime() - LastClick > 0.5) {
+            local ClickPosUI = floor(Entity:toLocal(linePlaneIntersection(PlayerActive, Entity:pos(), Entity:up())) / (16*BoardScale)):setZ(0) + vec(4, 4, 0)
+
+            if (inrange(ClickPosUI, vec(), vec(7,7,0))) {
+                MoveFromPosition = ClickPosUI:y() + ClickPosUI:x()*8 + 1
+
+                if (sign(GameBoard[MoveFromPosition, number]) == GameTurn) {
+                    holoColor(MoveFromPosition, Colors[13, vector])
+                    foreach (K, SquareColor:number = EvalList[MoveFromPosition, array]) {
+                        holoColor(K, Colors[SquareColor, vector])
+                    }
+
+                    holoEntity(MoveFromPosition):soundPlay("click_square", 0, "^buttons/button24.wav")
+                }
+                else {
+                    MoveFromPosition = 0
+                }
+            }
+            else {
+                MoveFromPosition = 0
+            }
+
+            LastClick = curtime()
+        }
+
+        if (!Down) {
+            if (MoveFromPosition) {
+                #-- reset highlighted squares
+                if (MoveFromPosition == EnemyInCheck) { holoColor(MoveFromPosition, Colors[14, vector]) } else { holoColor(MoveFromPosition, Colors[getSquareColor(MoveFromPosition), vector]) }
+
+                foreach (K, SquareColor:number = EvalList[MoveFromPosition, array]) {
+                    holoColor(K, Colors[getSquareColor(K), vector])
+                }
+                if (EnPassant) { holoColor(EnPassant + GameTurn*8, Colors[15, vector]) }
+
+                #-- get a target square
+                local ClickPosUI = floor(Entity:toLocal(linePlaneIntersection(PlayerActive, Entity:pos(), Entity:up())) / (16*BoardScale)):setZ(0) + vec(4, 4, 0)
+
+                if (inrange(ClickPosUI, vec(), vec(7,7,0))) {
+                    local MoveToPosition = ClickPosUI:y() + ClickPosUI:x()*8 + 1
+                    local MoveToValue = EvalList[MoveFromPosition, array][MoveToPosition, number]
+
+                    if (MoveToValue & MoveToValue < 4) {
+                        #-- reset highlighted squares
+                        if (EnemyInCheck) { holoColor(EnemyInCheck, Colors[getSquareColor(EnemyInCheck), vector]) }
+
+                        #-- castling, en passant, promotion, and king positions
+                        local Capture = GameBoard[MoveToPosition, number]
+                        local NewEnPassant = 0
+                        local MoveFromValue = GameBoard[MoveFromPosition, number]
+                        local PieceType = abs(MoveFromValue)
+
+                        Draw++
+
+                        #-- animate holos
+                        addAnimation(MoveFromPosition, MoveToPosition, GameTurn)
+
+                        local RecordMove = format("%s%02d%02d", GameTurn > 0 ? "w" : "b", MoveFromPosition, MoveToPosition)
+
+                        if (PieceType == 1) {
+                            #-- en passant
+                            if (abs(MoveToPosition - MoveFromPosition) == 16) {
+                                NewEnPassant = MoveToPosition + 8*GameTurn
+                            }
+                            if (MoveToPosition == EnPassant) {
+                                GameBoard[EnPassant + 8*GameTurn, number] = 0
+
+                                addAnimation(0, EnPassant + 8*GameTurn, GameTurn)
+                                RecordMove += format("e%02d", EnPassant + 8*GameTurn)
+                            }
+                            #-- promotion
+                            if (MoveToPosition > 56 | MoveToPosition < 9) {
+                                GameBoard[MoveFromPosition, number] = GameTurn*6
+                                Animations[Animations:count(), table]["model", number] = GameBoard[MoveFromPosition, number]
+                                RecordMove += format("p%d", 6)
+                            }
+                            Draw = 0
+                        }
+                        elseif (PieceType == 5) {
+                            #-- update castling rights if moving rooks
+                            if (MoveFromValue == 5) { if (MoveFromPosition == 57) { CastleW = CastleW[1] + "X" } elseif (MoveFromPosition == 64) { CastleW = "X" + CastleW[2] } }
+                            else { if (MoveFromPosition == 1) { CastleB = CastleB[1] + "X" } elseif (MoveFromPosition == 8) { CastleB = "X" + CastleB[2] } }
+                        }
+                        elseif (PieceType == 3) {
+                            #-- update king positions and castling rights if moving king
+                            if (MoveFromValue == 3) {
+                                KingPosW = MoveToPosition
+                                CastleW = "XX"
+                            }
+                            else {
+                                KingPosB = MoveToPosition
+                                CastleB = "XX"
+                            }
+
+                            #-- castling
+                            local Diff = MoveToPosition - MoveFromPosition
+                            if (abs(Diff) == 2) {
+                                if (sign(Diff) > 0) {
+                                    GameBoard[MoveToPosition - 1, number] = GameBoard[MoveToPosition + 1, number]
+                                    GameBoard[MoveToPosition + 1, number] = 0
+
+                                    addAnimation(MoveToPosition + 1, MoveToPosition - 1, GameTurn)
+                                    RecordMove += format("c%02d%02d", MoveToPosition + 1, MoveToPosition - 1)
+                                }
+                                else {
+                                    GameBoard[MoveToPosition + 1, number] = GameBoard[MoveToPosition - 2, number]
+                                    GameBoard[MoveToPosition - 2, number] = 0
+
+                                    addAnimation(MoveToPosition - 2, MoveToPosition + 1, GameTurn)
+                                    RecordMove += format("c%02d%02d", MoveToPosition - 2, MoveToPosition + 1)
+                                }
+                            }
+                        }
+                        if (Capture) { Draw = 0 }
+                        if (Capture == 5) { if (MoveToPosition == 57) { CastleW = CastleW[1] + "X" } elseif (MoveToPosition == 64) { CastleW = "X" + CastleW[2] } }
+                        elseif (Capture == -5) { if (MoveToPosition == 1) { CastleB = CastleB[1] + "X" } elseif (MoveToPosition == 8) { CastleB = "X" + CastleB[2] } }
+
+                        #-- apply move changes to game board
+                        GameBoard[MoveToPosition, number] = GameBoard[MoveFromPosition, number]
+                        GameBoard[MoveFromPosition, number] = 0
+
+                        if (EnPassant) { holoColor(EnPassant + GameTurn*8, Colors[getSquareColor(EnPassant + GameTurn*8), vector]) }
+                        EnPassant = NewEnPassant
+                        if (EnPassant) { holoColor(EnPassant - GameTurn*8, Colors[15, vector]) }
+
+                        EnemyInCheck = GameBoard:enemy_in_check(MoveFromPosition, MoveToPosition)
+                        if (EnemyInCheck) {
+                            holoColor(EnemyInCheck, Colors[14, vector])
+                            holoEntity(EnemyInCheck):soundPlay("in_check", 0, "^friends/friend_join.wav")
+                            soundPitch("in_check", 56)
+                        }
+
+                        History += RecordMove + "|"
+
+                        #-- switch game turns
+                        GameTurn = -GameTurn
+
+                        switch (GameTurn) {
+                            case 1, PlayerActive = PlayerW break
+                            case -1, if (Bot) { PlayerActive = noentity(), timer("bot_turn", 0) } else { PlayerActive = PlayerB } break
+                        }
+
+                        if (!Bot) { startEvaluation("evaluate") }
+
+                        holoEntity(MoveToPosition):soundPlay("made_move", 0, "^buttons/button9.wav")
+                    }
+                    else {
+                        Entity:soundPlay("no_move", 0, "^buttons/button18.wav")
+                    }
+                }
+                else {
+                    soundPlay("no_move", 0, "^buttons/button18.wav")
+                }
+            }
+        }
+    }
+}
+
+
+#---------------------------#
+#--       Bot Request     --#
+#---------------------------#
+
+if (clk("bot_turn")) {
+    timer("bot_turn", 15)
+    if (httpCanRequest()) {
+        print(_HUD_PRINTCONSOLE, "PYBOT: Polling...")
+
+        httpRequest("http://shadowscion.pythonanywhere.com/ai?game=stdchess&input=" + httpUrlEncode(GameBoard:boardToFen(1)))
+        stoptimer("bot_turn")
+    }
+}
+
+if (httpClk()) {
+    local Result = httpData():trim()
+
+    print(_HUD_PRINTCONSOLE, "PYBOT: Receiving... " + Result)
+
+    if (Result == "Mate") {
+
+    }
+    else {
+        local MoveFromPosition = Result:sub(1, 2):toNumber()
+        local MoveToPosition = Result:sub(3, 4):toNumber()
+        local MoveFromValue = GameBoard[MoveFromPosition, number]
+        local PieceType = abs(MoveFromValue)
+        local Capture = GameBoard[MoveToPosition, number]
+        local NewEnPassant = 0
+
+        Draw++
+
+        addAnimation(MoveFromPosition, MoveToPosition, GameTurn)
+
+        local RecordMove = format("%s%02d%02d", GameTurn > 0 ? "w" : "b", MoveFromPosition, MoveToPosition)
+
+        if (EnemyInCheck) { holoColor(EnemyInCheck, Colors[getSquareColor(EnemyInCheck), vector]) }
+
+        if (PieceType == 1) {
+            #-- en passant
+            if (abs(MoveToPosition - MoveFromPosition) == 16) {
+                NewEnPassant = MoveToPosition - 8
+            }
+
+            #-- promotion
+            if (MoveToPosition > 56) {
+                GameBoard[MoveFromPosition, number] = -6
+                Animations[Animations:count(), table]["model", number] = -6
+                RecordMove += format("p%d", 6)
+            }
+            Draw = 0
+        }
+        elseif (PieceType == 5) {
+            if (MoveFromPosition == 1) { CastleB = CastleB[1] + "X" } else { CastleB = "X" + CastleB[2] } #-- update when taking rook
+        }
+        elseif (PieceType == 3) {
+            KingPosB = MoveToPosition,
+            CastleB = "XX"
+        }
+
+        if (Capture) { Draw = 0 }
+
+        #-- do move
+        GameBoard[MoveToPosition, number] = GameBoard[MoveFromPosition, number]
+        GameBoard[MoveFromPosition, number] = 0
+
+        if (EnPassant) { holoColor(EnPassant - 8, Colors[getSquareColor(EnPassant - 8), vector]) }
+        EnPassant = NewEnPassant
+        if (EnPassant) { holoColor(EnPassant + 8, Colors[15, vector]) }
+
+        EnemyInCheck = GameBoard:enemy_in_check(MoveFromPosition, MoveToPosition)
+        if (EnemyInCheck) {
+            holoColor(EnemyInCheck, Colors[14, vector])
+            holoEntity(EnemyInCheck):soundPlay("in_check", 0, "^friends/friend_join.wav")
+            soundPitch("in_check", 56)
+        }
+
+        History += RecordMove + "|"
+
+        #-- switch game turns
+        GameTurn = -GameTurn
+        PlayerActive = PlayerW
+
+        startEvaluation("evaluate")
+    }
+}
+
+
+#---------------------------#
+#--       Animations      --#
+#---------------------------#
+
+if (clk("animate")) {
+    timer("animate", 15)
+
+    #-- current animation
+    local Anim = Animations[1, table]
+
+    #-- advance timestep
+    Anim["lerp", number] = min(Anim["lerp", number] + min(0.0625, Animations:count()*0.03125), 1)
+
+    local Lerp = smoothstep(Anim["lerp", number])
+
+    #-- move holos
+    if (Anim["from_piece", number]) {
+        if (Anim["model", number]) {
+            holoModel(Anim["from_piece", number], Models[Anim["model", number], string])
+            Anim["model", number] = 0
+        }
+        if (Anim["jump", number]) {
+            holoPos(Anim["from_piece", number], Entity:toWorld(mix(Anim["to_square", vector], Anim["from_square", vector], Lerp):setZ(sin(Lerp*180)*30*BoardScale)))
+        }
+        else {
+            holoPos(Anim["from_piece", number], Entity:toWorld(mix(Anim["to_square", vector], Anim["from_square", vector], Lerp)))
+        }
+        holoPos(9999, Entity:toWorld(mix(Anim["to_square", vector]:setZ(holoEntity(Anim["from_piece", number]):height()*BoardScale), Indicator, Lerp)))
+    }
+    if (Anim["to_piece", number]) {
+        holoPos(Anim["to_piece", number], Entity:toWorld(mix(Anim["cache_pos", vector], Anim["to_square", vector], Lerp):setZ(sin(Lerp*180)*30*BoardScale)))
+
+        if (!Anim["sound", number]) {
+            if (BotSounds & Bot) {
+                if (Anim["team", number] == -1) {
+                    holoEntity(Anim["to_piece", number]):soundPlay("taunt", 0, BotTaunt[randint(1, BotTaunt:count()), string])
+                }
+                else {
+                    holoEntity(Anim["to_piece", number]):soundPlay("respond", 0, BotRespond[randint(1, BotRespond:count()), string])
+                }
+            }
+            else {
+                holoEntity(Anim["to_piece", number]):soundPlay("made_capture", 0, "^ambient/water/drip4.wav")
+                soundPitch("made_capture", 56)                
+            }
+            Anim["sound", number] = 1
+        }
+    }
+
+    #-- end animation
+    if (Anim["lerp", number] == 1) {
+        Indicator = Entity:toLocal(holoEntity(9999):pos())
+        Animations:remove(1)
+    }
+
+    if (!Animations:count()) { stoptimer("animate") }
+}
+
+
+#---------------------------#
+#--      ChatCommands     --#
+#---------------------------#
+
+if (chatClk()) {
+    local LastSaid = lastSaid()
+    local LastSpoke = lastSpoke()
+
+    #-- owner chat commands
+    if (LastSpoke == Owner) {
+        switch (LastSaid) {
+            case "!reset",
+                GameBoard = fenToBoard("rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR/ w KQkq")
+
+                foreach (K, V:number = GameHoloCache) { holoDelete(V) }
+
+                GameHolos:clear()
+                GameHoloCache:clear()
+
+                HoloIndex = CacheW = CacheB = Bot = Draw = EnPassant = 0
+
+                History = ""
+
+                runOnKeys(PlayerW, 0)
+                runOnKeys(PlayerB, 0)
+                PlayerActive = PlayerW = PlayerB = noentity()
+
+                if (FileSystem) {
+                    StatsW = table()
+                    StatsB = table()
+                    setE2Name()
+                }
+
+                holoPos(9999, Entity:toWorld(vec(0, 0, -20)))
+
+                timer("spawngame", 200)
+            break
+
+            case "!print", GameBoard:chess_print(), hideChat(1), break
+            case "!printstats", printTable(FileContents), hideChat(1), break
+
+            default,
+                if (FileSystem) {
+                    if (LastSaid:find("!save")) {
+                        FileTask = "save_game " + LastSaid:replace("!save", ""):trim()
+                        timer("filesystem", 0)
+                        hideChat(1)
+                    }
+                    elseif (LastSaid:find("!load")) {
+                        FileTask = "load_game " + LastSaid:replace("!load", ""):trim()
+                        timer("filesystem", 0)
+                        hideChat(1)
+                    }
+                    elseif (LastSaid:find("!replay")) {
+                        FileTask = "replay_game " + LastSaid:replace("!replay", ""):trim()
+                        timer("filesystem", 0)
+                        hideChat(1)
+                    }
+                    elseif (LastSaid:find("!clear")) {
+                        FileTask = "clear_game " + LastSaid:replace("!clear", ""):trim()
+                        timer("filesystem", 0)
+                        hideChat(1)
+                    }
+                }
+            break
+        }
+    }
+
+    #-- player chat commands
+    if (LastSpoke == PlayerW | LastSpoke == PlayerB) {
+        switch (LastSaid) {
+            case "!leave",
+                if (LastSpoke == PlayerW) { PlayerW = noentity(), runOnKeys(LastSpoke, 0), StatsW = table() }
+                if (LastSpoke == PlayerB) { PlayerB = noentity(), runOnKeys(LastSpoke, 0), StatsB = table() }
+                setE2Name()
+            break
+
+            case "!newgame",
+                GameBoard = fenToBoard("rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR/ w KQkq")
+
+                foreach (K, V:number = GameHoloCache) { holoDelete(V) }
+
+                GameHolos:clear()
+                GameHoloCache:clear()
+
+                HoloIndex = CacheW = CacheB = Draw = EnPassant = 0
+
+                History = ""
+
+                if (GameTurn > 0) { PlayerActive = PlayerW } elseif (GameTurn < 0) { PlayerActive = PlayerB } else { PlayerActive = noentity() }
+
+                if (FileSystem) { setE2Name() }
+
+                holoPos(9999, Entity:toWorld(vec(0, 0, -20)))
+
+                timer("spawngame", 200)
+            break
+
+            default, break
+        }
+    }
+
+    #-- join game
+    if (!PlayerW | (!PlayerB & !Bot)) {
+        switch (LastSaid) {
+            case "!join vs bot", PlayerW = LastSpoke, runOnKeys(PlayerW, 1), Bot = 1, FileTask = "get_ratings", timer("filesystem", 0), break
+            case "!join white", PlayerW = LastSpoke, runOnKeys(PlayerW, 1), FileTask = "get_ratings", timer("filesystem", 0), break
+            case "!join black", PlayerB = LastSpoke, runOnKeys(PlayerB, 1), FileTask = "get_ratings", timer("filesystem", 0), break
+            default, break
+        }
+
+        if (GameTurn > 0) { PlayerActive = PlayerW } elseif (GameTurn < 0) { PlayerActive = PlayerB } else { PlayerActive = noentity() }
+    }
+}
+
+
+#---------------------------#
+#--       FileSystem      --#
+#---------------------------#
+
+if (FileSystem) {
+    if (fileClk(FileName)) {
+        if (fileStatus() == _FILE_OK) {
+            print(_HUD_PRINTCONSOLE, "CHESS: Save file found.")
+
+            FileContents = vonDecodeTable(fileRead())
+
+            switch (FileTask) {
+                case "get_ratings",
+                    if (PlayerW) {
+                        StatsW = FileContents["stats", table][PlayerW:steamID(), table]:clone() ?: table(
+                            "rt" = 1000,
+                            "un" = PlayerW:name(),
+                            "gp" = 0
+                        )
+                        StatsW["un", string] = PlayerW:name()
+                    }
+
+                    if (Bot | PlayerB) {
+                        StatsB = FileContents["stats", table][Bot ? "bot" : PlayerB:steamID(), table]:clone() ?: table(
+                            "rt" = 1000,
+                            "un" = Bot ? "PYBOT" : PlayerB:name(),
+                            "gp" = 0
+                        )
+
+                        StatsB["un", string] = Bot ? "PYBOT" : PlayerB:name()
+                    }
+
+                    FileTask = "upd_ratings"
+                    timer("filesystem", 0)
+
+                    setE2Name()
+                break,
+
+                case "upd_ratings",
+                    if (PlayerW) { FileContents["stats", table][PlayerW:steamID(), table] = StatsW:clone() }
+                    if (Bot | PlayerB) { FileContents["stats", table][Bot ? "bot" : PlayerB:steamID(), table] = StatsB:clone() }
+                    fileWrite(FileName, vonEncode(FileContents) ?: " ")
+                break,
+
+                default,
+                    local Arguments = FileTask:explode(" ")
+                    local Command = Arguments[1, string]
+
+                    if (Command == "save_game") {
+                        FileContents["games", table][Arguments[2, string], table] = table(
+                            "bd" = GameBoard:boardToFen(0),
+                            "hs" = History,
+                            "pw" = PlayerW:steamID(),
+                            "pb" = Bot ? "bot" : PlayerB:steamID()
+                        )
+                        fileWrite(FileName, vonEncode(FileContents) ?: " ")
+                    }
+                    elseif (Command == "load_game" | Command == "replay_game") {
+                        if (FileContents["games", table]:exists(Arguments[2, string])) {
+
+                            local Data = FileContents["games", table][Arguments[2, string], table]
+
+                            if (Command == "load_game") {
+                                GameBoard = fenToBoard(Data["bd", string])
+                            }
+                            else {
+                                GameBoard = fenToBoard("rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR/ w KQkq")
+                            }
+
+                            foreach (K, V:number = GameHoloCache) { holoDelete(V) }
+
+                            GameHolos:clear()
+                            GameHoloCache:clear()
+
+                            HoloIndex = CacheW = CacheB = Bot = EnPassant = 0
+
+                            History = Data["hs", string]
+
+                            runOnKeys(PlayerW, 0)
+                            runOnKeys(PlayerB, 0)
+                            PlayerActive = PlayerW = PlayerB = noentity()
+
+                            StatsW = table()
+                            StatsB = table()
+                            setE2Name()
+
+                            holoPos(9999, Entity:toWorld(vec(0, 0, -20)))
+
+                            if (Command == "replay_game") { Replay = History:explode("|"), timer("replaygame", 200) }
+
+                            timer("spawngame", 200)
+                        }
+                    }
+                    elseif (Command == "clear_game") {
+                        FileContents["games", table]:removeTable(Arguments[2, string])
+                        fileWrite(FileName, vonEncode(FileContents) ?: " ")
+                    }
+                break
+            }
+        }
+        else {
+            print(_HUD_PRINTCONSOLE, "CHESS: No save file found, creating one.")
+
+            FileContents = table(
+                "games" = table(),
+                "stats" = table(
+                    "bot" = table(
+                        "rt" = 1000,    #-- rating
+                        "un" = "PYBOT", #-- username
+                        "gp" = 0        #-- games played
+                    )
+                )
+            )
+
+            fileWrite(FileName, vonEncode(FileContents))
+            timer("filesystem", 0)
+        }
+    }
+
+    if (clk("filesystem")) {
+        timer("filesystem", 100)
+
+        if (fileCanWrite() & fileCanLoad()) {
+            fileLoad(FileName)
+            stoptimer("filesystem")
+        }
+    }
+
+    if (clk("replaygame")) {
+        timer("replaygame", 15)
+
+        if (HoloIndex == 64 & Replay:count()) {
+            local S = Replay[1, string]
+            local Side = S[1] == "w" ? 1 : -1
+
+            local DoMove = S:matchFirst("%a%d%d%d%d")
+            if (DoMove != "") {
+                addAnimation(DoMove:sub(2, 3):toNumber(), DoMove:sub(4, 5):toNumber(), Side)
+
+                local DoCastle = S:matchFirst("c%d%d%d%d")
+                local DoPromote = S:matchFirst("p%d")
+                local DoEnPassant = S:matchFirst("e%d%d")
+
+                if (DoCastle != "") { addAnimation(DoCastle:sub(2, 3):toNumber(), DoCastle:sub(4, 5):toNumber(), Side) }
+                if (DoPromote != "") { Animations[Animations:count(), table]["model", number] = DoPromote[2]:toNumber()*Side }
+                if (DoEnPassant != "") { addAnimation(0, DoEnPassant:sub(2, 3):toNumber(), Side) }
+            }
+
+            Replay:remove(1)
+        }
+        if (Replay:count() == 0) {
+            stoptimer("replaygame")
+        }
+    }
+}
+
+

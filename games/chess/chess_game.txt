@@ -18,6 +18,8 @@
 
 
 #[
+    Wiremod Release Thread: http://www.wiremod.com/forum/finished-contraptions/35195-e2-chess.html
+
     Chat commands:
         - !print       (print the game to console)
         - !reset       (create a new game and reset the players and bot)

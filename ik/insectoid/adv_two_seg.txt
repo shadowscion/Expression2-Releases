@@ -1,0 +1,93 @@
+@name ik/insectoid/adv_two_seg
+@inputs Target:vector
+@outputs 
+@persist [SegmentLengthA SegmentLengthB] Entity:entity
+@trigger none
+
+#-- by shadowscion
+
+#-- i don't claim to be a math expert, nor am i a math teacher
+#-- this is just a brief implementation of basic trig using holograms
+#-- if something is unclear i suggest you read about trig based inverse kinematics and the law of cosines
+
+#-- this is a more advanced example of two-segment inverse kinematics for use on insect-like creations
+#-- this does take into consideration things like the angles of the base entity, which means 
+#-- it will work when inverted or climbing steep inclines
+
+#-- this can be achieved in multiple ways but for simplicity's sake, this one will be using two holograms 
+#-- to individually control the angles of the first segment
+#-- this can be applied to any sized leg, as it only has to do with the angles of the first segment
+
+if (first()) {
+    
+    #-- first we will configure the length of this leg
+    SegmentLengthA = 75
+    SegmentLengthB = 50
+    
+    Entity = entity()
+    
+    #-- segment 1
+    holoCreate(1)
+    holoParent(1, Entity)
+    holoDisableShading(1, 1)
+    holoColor(1, vec4(255, 255, 0, 125))
+    holoScale(1, vec(0.25, 1.5, 0.25))
+    
+    holoCreate(2)
+    holoParent(2, 1)
+    holoDisableShading(2, 1)
+    holoColor(2, vec4(0, 0, 255, 200))
+    holoScale(2, vec(0.25, 0.25, 1.5))
+    
+    #-- segment 2
+    holoCreate(3)
+    holoParent(3, 2)
+    holoPos(3, holoEntity(2):toWorld(vec(0, 0, SegmentLengthA))) #-- offset the second segment
+    holoModel(3, "sphere")
+    holoDisableShading(3, 1)
+    holoColor(3, vec4(255, 0, 0, 125))
+  
+    #-- foot (not actually required, it just helps us visualize)
+    holoCreate(4)
+    holoParent(4, 3)
+    holoPos(4, holoEntity(3):toWorld(vec(0, 0, SegmentLengthB))) #-- offset the foot
+    holoModel(4, "sphere")
+    holoDisableShading(4, 1)
+    holoColor(4, vec4(0, 255, 0, 125))
+
+    #-- this is our basic cosine-rule function, i'm not a math teacher so google it if you want to know how and why it does what it does
+    function number icos(A, B, C) {
+        return acos((A^2 + B^2 - C^2) / (2*A*B))    
+    }
+    
+}
+
+#-- setup
+interval(60) #-- i have found 60ms to be a good balance between performance and cpu/ops
+
+
+#-------------------------
+#-- segment 1
+local PosA = holoEntity(1):pos()
+
+#-- this is our triangle's third length, the distance between the origin and the target
+local SegmentLengthC = min(PosA:distance(Target), SegmentLengthA + SegmentLengthB) #-- clamp this to the total leg length to prevent NaN errors
+
+#-- since we now have two holograms for the first segment, we only have to calculate and rotate one axis at a time
+#-- this is done most easily using the atan function
+local YawAxis = Entity:toLocalAxis(Target - PosA) #-- localized to the entity
+local YawOffset = atan(YawAxis:y(), YawAxis:x())
+
+holoAng(1, Entity:toWorld(ang(0, YawOffset, 0))) #-- local angles, so use toWorld
+
+local PitchAxis = holoEntity(1):toLocalAxis(Target - PosA) #-- localized to the yaw hologram
+local PitchOffset = atan(PitchAxis:x(), PitchAxis:z()) - icos(SegmentLengthC, SegmentLengthA, SegmentLengthB)
+
+holoAng(2, holoEntity(1):toWorld(ang(PitchOffset, 0, 0))) #-- local angles, so use toWorld
+
+
+#-------------------------
+#-- segment 2
+#-- the same as the basic version, just toWorld to the pitch hologram instead
+holoAng(3, holoEntity(2):toWorld(ang(-icos(SegmentLengthB, SegmentLengthA, SegmentLengthC) + 180, 0, 0)))
+

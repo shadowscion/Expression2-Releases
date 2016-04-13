@@ -1,0 +1,100 @@
+@name ik/insectoid/basic_three_seg_type2
+@inputs Target:vector
+@outputs 
+@persist [SegmentLengthA SegmentLengthB SegmentLengthC] Entity:entity
+@trigger none
+
+#-- by shadowscion
+
+#-- i don't claim to be a math expert, nor am i a math teacher
+#-- this is just a brief implementation of basic trig using holograms
+#-- if something is unclear i suggest you read about trig based inverse kinematics and the law of cosines
+
+#-- this is a basic example of three-segment inverse kinematics for use on insect-like creations
+#-- this does not take into consideration things like the angles of the base entity, which means 
+#-- it will not work when inverted or climbing steep inclines, and wont be suitable for humanoid configurations
+
+#-- this variation is a bit hacky but it works
+
+
+if (first()) {
+    
+    #-- first we will configure the length of this leg
+    SegmentLengthA = 65 
+    SegmentLengthB = 55
+    SegmentLengthC = 45
+    
+    Entity = entity()
+    
+    #-- segment 1
+    holoCreate(1)
+    holoParent(1, Entity)
+    holoModel(1, "sphere")
+    holoDisableShading(1, 1)
+    holoColor(1, vec4(255, 0, 0, 125))
+    
+    #-- segment 2
+    holoCreate(2)
+    holoParent(2, 1)
+    holoPos(2, holoEntity(1):toWorld(vec(0, 0, SegmentLengthA))) #-- offset the second segment
+    holoModel(2, "sphere")
+    holoDisableShading(2, 1)
+    holoColor(2, vec4(0, 0, 255, 125))
+    
+    #-- segment 3
+    holoCreate(3)
+    holoParent(3, 2)
+    holoPos(3, holoEntity(2):toWorld(vec(0, 0, SegmentLengthB))) #-- offset the third segment
+    holoModel(3, "sphere")
+    holoDisableShading(3, 1)
+    holoColor(3, vec4(255, 255, 0, 125))    
+  
+    #-- foot (not actually required, it just helps us visualize)
+    holoCreate(4)
+    holoParent(4, 3)
+    holoPos(4, holoEntity(3):toWorld(vec(0, 0, SegmentLengthC))) #-- offset the foot
+    holoModel(4, "sphere")
+    holoDisableShading(4, 1)
+    holoColor(4, vec4(255, 255, 0, 125))
+
+    #-- this is our basic cosine-rule function, i'm not a math teacher so google it if you want to know how and why it does what it does
+    function number icos(A, B, C) {
+        return acos((A^2 + B^2 - C^2) / (2*A*B))    
+    }
+
+}
+
+#-- setup
+interval(60) #-- i have found 60ms to be a good balance between performance and cpu/ops
+
+
+#-------------------------
+#-- segment 1
+local PosA = holoEntity(1):pos()
+
+#-- this is our triangle's third length, the distance between the origin and the target
+#-- it's the same as with the two-segment version, but here we subtract the middle length
+local SegmentLengthD = min(PosA:distance(Target) - SegmentLengthC, SegmentLengthA + SegmentLengthB) #-- clamp this to the total leg length to prevent NaN errors
+
+#local Dist = min(Hip:distance(Vec) - IK_L2, LEGL)
+#-- this aims directly at the target position
+local DefaultAngle = (Target - PosA):toAngle() + ang(0, 0, 0) 
+
+#-- this uses cosine rule to figure out what angle we need to offset by given our triangle's information
+local OffsetAngle = -icos(SegmentLengthD, SegmentLengthA, SegmentLengthB) + 90
+
+#-- add the two angles
+holoAng(1, DefaultAngle + ang(OffsetAngle, 0, 0))
+
+
+#-------------------------
+#-- segment 2
+local SegmentLengthD = min(PosA:distance(Target) - SegmentLengthC, SegmentLengthA + SegmentLengthB) #-- clamp this to the total leg length to prevent NaN errors
+holoAng(2, holoEntity(1):toWorld(ang(-icos(SegmentLengthB, SegmentLengthA, SegmentLengthD) + 180, 0, 0)))
+
+
+#-------------------------
+#-- segment 3
+local SegmentLengthD = min(holoEntity(2):pos():distance(Target), SegmentLengthB + SegmentLengthC) #-- clamp this to the total leg length to prevent NaN errors
+holoAng(3, holoEntity(2):toWorld(ang(icos(SegmentLengthC, SegmentLengthB, SegmentLengthD) + 180, 0, 0)))
+

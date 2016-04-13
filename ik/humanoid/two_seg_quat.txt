@@ -1,0 +1,87 @@
+@name ik/humanoid/two_seg_quat
+@inputs Target:vector
+@outputs 
+@persist [SegmentLengthA SegmentLengthB] Entity:entity
+@trigger none
+
+#-- by shadowscion
+
+#-- i don't claim to be a math expert, nor am i a math teacher
+#-- this is just a brief implementation of basic trig using holograms
+#-- if something is unclear i suggest you read about trig based inverse kinematics and the law of cosines
+
+#-- this is an example of two-segment inverse kinematics for use on humanoid creations
+#-- using quaternions instead of multiple holograms to solve the roll issue
+
+if (first()) {
+    
+    #-- first we will configure the length of this leg
+    SegmentLengthA = 75
+    SegmentLengthB = 50
+    
+    Entity = entity()
+    
+    #-- segment 1
+    holoCreate(1)
+    holoParent(1, Entity)
+    holoDisableShading(1, 1)
+    holoColor(1, vec4(255, 0, 0, 125))
+    holoScale(1, vec(0.25, 1.5, 0.25))
+    
+    #-- segment 2
+    holoCreate(2)
+    holoParent(2, 1)
+    holoPos(2, holoEntity(1):toWorld(vec(0, 0, SegmentLengthA))) #-- offset the second segment
+    holoDisableShading(2, 1)
+    holoColor(2, vec4(255, 255, 0, 125))
+    holoScale(2, vec(0.25, 0.25, 1.5))
+  
+    #-- foot (not actually required, it just helps us visualize)
+    holoCreate(3)
+    holoParent(3, 2)
+    holoPos(3, holoEntity(2):toWorld(vec(0, 0, SegmentLengthB))) #-- offset the foot
+    holoDisableShading(3, 1)
+    holoColor(3, vec4(0, 255, 0, 125))
+    holoScale(3, vec(0.25, 0.25, 1.5))
+
+    #-- this is our basic cosine-rule function, i'm not a math teacher so google it if you want to know how and why it does what it does
+    function number icos(A, B, C) {
+        return acos((A^2 + B^2 - C^2) / (2*A*B))    
+    }
+    
+}
+
+
+#-- setup
+interval(60) #-- i have found 60ms to be a good balance between performance and cpu/ops
+
+
+#-------------------------
+#-- segment 1
+local PosA = holoEntity(1):pos()
+local Axis = Entity:toLocalAxis(Target - PosA)
+
+#-- this is our triangle's third length, the distance between the origin and the target
+local SegmentLengthC = min(Axis:length(), SegmentLengthA + SegmentLengthB) #-- clamp this to the total leg length to prevent NaN errors
+
+#-- Convert the normal to an angle, bot lock the roll to the bearing between the entity
+#-- Leg orientation depends on which vector you check the bearing from (first vector)
+local AxisAngle = Axis:toAngle():setRoll(-bearing(Target, Entity:angles(), PosA)) #-- forward knee
+#local AxisAngle = Axis:toAngle():setRoll(-bearing(PosA, Entity:angles(), Target)) #-- reverse knee
+
+#-- Convert the corrected angle into a quaternion and add (*) a rotation quaternion to it
+local AxisQuat = quat(AxisAngle) * qRotation(vec(0, 1, 0), 90 + icos(SegmentLengthC, SegmentLengthA, SegmentLengthB))
+
+#-- Convert back to an angle and apply it to the hologram relative to the base entity
+holoAng(1, Entity:toWorld(AxisQuat:toAngle()))
+
+
+#-------------------------
+#-- segment 2
+#-- then continue the IK normally
+holoAng(2, holoEntity(1):toWorld(ang(icos(SegmentLengthB, SegmentLengthA, SegmentLengthC) + 180, 0, 0)))
+
+
+#-------------------------
+#-- for feet i usually just match the base entity's angle
+holoAng(3, Entity:angles())

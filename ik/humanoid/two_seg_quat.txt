@@ -48,7 +48,7 @@ if (first()) {
     function number icos(A, B, C) {
         return acos((A^2 + B^2 - C^2) / (2*A*B))    
     }
-    
+
 }
 
 
@@ -85,3 +85,27 @@ holoAng(2, holoEntity(1):toWorld(ang(icos(SegmentLengthB, SegmentLengthA, Segmen
 #-------------------------
 #-- for feet i usually just match the base entity's angle
 holoAng(3, Entity:angles())
+
+
+#[
+
+    #-- Turning it into an easily usable function
+    
+    function quat_ik(NHip, NKnee, NFoot, LengthA, LengthB, Base:entity, Target:vector) {
+        local Origin = holoEntity(NHip):pos()
+        local AxisLocal = Base:toLocalAxis(Target - Origin)
+
+        local AxisAngle = AxisLocal:toAngle():setRoll(-bearing(Target, Base:angles(), Origin)) #-- forward knee
+        #local AxisAngle = AxisLocal:toAngle():setRoll(-bearing(Origin, Base:angles(), Target)) #-- reverse knee
+
+        local LengthC = min(AxisLocal:length(), LengthA + LengthB)
+        local AxisQuat = quat(AxisAngle) * qRotation(vec(0, 1, 0), 90 + icos(LengthC, LengthA, LengthB))
+        
+        holoAng(NHip, Base:toWorld(AxisQuat:toAngle()))
+        holoAng(NKnee, holoEntity(NHip):toWorld(ang(icos(LengthB, LengthA, LengthC) + 180, 0, 0)))
+        holoAng(NFoot, Base:angles())
+    }
+
+    quat_ik(1, 2, 3, SegmentLengthA, SegmentLengthB, Entity, Target)
+
+]#

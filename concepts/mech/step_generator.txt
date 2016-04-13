@@ -22,7 +22,15 @@ if (first()) {
     StepPoint0 = StepPoint1 = StepPoint2 = StepOutput = Entity:toWorld(StepOffset)
     StepMode = "check"
 
-    holoCreate(1)
+    #-- debugging holos
+    for (I = 1, 4) { 
+        holoCreate(I)
+        holoModel(I, "sphere")
+        holoScaleUnits(I, vec(6))
+        holoColor(I, hsv2rgb(90*I, 1, 1))
+        holoAlpha(I, 200)   
+        holoDisableShading(I, 1)
+    }
 
     rangerHitEntities(0)
     rangerPersist(1)
@@ -49,12 +57,15 @@ if (StepMode == "check") {
         if (Ranger:hit()) {
             #-- set the new step's origin to the previous step's end position
             StepPoint0 = StepOutput
+            holoPos(1, StepPoint0)
 
             #-- set the new step's end position to the ranger hitpos
             StepPoint2 = Ranger:position()
+            holoPos(2, StepPoint2)
 
             #-- average the two and add some height to get a middle point
             StepPoint1 = (StepPoint0 + StepPoint2)*0.5 + vec(0, 0, min(StepPoint0:distance(StepPoint2), 35))
+            holoPos(3, StepPoint1)
 
             #-- set the step mode to execute
             StepMode = "execute"
@@ -70,8 +81,7 @@ elseif (StepMode == "execute") {
 
     #-- set the bezier curve value, if your editor doesn't have this function, update wiremod
     StepOutput = bezier(StepPoint0, StepPoint1, StepPoint2, StepProgress)
-
-    holoPos(1, StepOutput)
+    holoPos(4, StepOutput)
 
     #-- reset the step when it's finished
     if (StepProgress == 1) {

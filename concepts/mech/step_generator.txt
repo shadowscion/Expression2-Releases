@@ -1,0 +1,81 @@
+@name step_generator
+@inputs 
+@persist [StepPoint0 StepPoint1 StepPoint2 StepOffset StepOutput]:vector 
+@persist [StepProgress StepCycle StepFreq] StepMode:string Entity:entity 
+@trigger none
+
+#-- by shadowscion
+
+#-- a very basic step generator using an incrementing value
+#-- does not include gait timing or any collision detection other than a simple ranger
+
+#-- the problem with this sort of thing is it's very specific to individual contraptions
+#-- and therefor the cycle rates and other things are mostly trial and error
+
+if (first()) {
+
+    StepFreq = 20 #-- how quickly steps are taken
+    StepOffset = vec() #-- where, relative to the base entity, the foot should rest (z value doesn't matter)
+
+    Entity = entity()
+
+    StepPoint0 = StepPoint1 = StepPoint2 = StepOutput = Entity:toWorld(StepOffset)
+    StepMode = "check"
+
+    holoCreate(1)
+
+    rangerHitEntities(0)
+    rangerPersist(1)
+
+}
+
+interval(60)
+
+#-- increment the step cycle
+StepCycle++
+
+#-- reset the step cycle
+if (StepCycle > StepFreq) { StepCycle = 0 }
+
+#-- calculate step variables
+if (StepMode == "check") {
+
+    #-- this is where you check for gait ordering, but for this example we only have one leg
+    if (StepCycle == 0) {
+
+        #-- from the step offset (and add the velocity of the entity to give the step some length), send a ranger to the ground
+        local Ranger = rangerOffset(500, Entity:toWorld(StepOffset) + Entity:vel():setZ(0) / 1.5, vec(0, 0, -1))
+
+        if (Ranger:hit()) {
+            #-- set the new step's origin to the previous step's end position
+            StepPoint0 = StepOutput
+
+            #-- set the new step's end position to the ranger hitpos
+            StepPoint2 = Ranger:position()
+
+            #-- average the two and add some height to get a middle point
+            StepPoint1 = (StepPoint0 + StepPoint2)*0.5 + vec(0, 0, min(StepPoint0:distance(StepPoint2), 35))
+
+            #-- set the step mode to execute
+            StepMode = "execute"
+        }
+    }
+}
+
+#-- execute step
+elseif (StepMode == "execute") {
+
+    #-- increment the step lerp (0-1) value
+    StepProgress = min(StepProgress + 0.1, 1)
+
+    #-- set the bezier curve value, if your editor doesn't have this function, update wiremod
+    StepOutput = bezier(StepPoint0, StepPoint1, StepPoint2, StepProgress)
+
+    holoPos(1, StepOutput)
+
+    #-- reset the step when it's finished
+    if (StepProgress == 1) {
+        StepProgress = 0
+        StepMode = "check"
+    }
+}

@@ -54,8 +54,9 @@ if (first()) {
     function number icos(A, B, C) {
         return acos((A^2 + B^2 - C^2) / (2*A*B))    
     }
-    
+
 }
+
 
 #-- setup
 interval(60) #-- i have found 60ms to be a good balance between performance and cpu/ops
@@ -94,3 +95,27 @@ holoAng(3, holoEntity(2):toWorld(ang(-icos(SegmentLengthB, SegmentLengthA, Segme
 #-------------------------
 #-- for feet i usually just match the base entity's angle
 holoAng(4, Entity:angles())
+
+
+#[
+
+    #-- Turning it into an easily usable function
+    
+    function two_seg_ik(NHipA, NHipB, NKnee, NFoot, LengthA, LengthB, Base:entity, Target:vector) {
+        local AxisWorld = Target - holoEntity(NHipA):pos()
+        local AxisLocal = Base:toLocalAxis(AxisWorld)
+
+        holoAng(NHipA, Base:toWorld(ang(0, 0, atan(AxisLocal:z(), AxisLocal:y()) + 90)))
+
+        local AxisLocal = holoEntity(NHipA):toLocalAxis(Target - holoEntity(NHipB):pos())
+        local Distance = min(AxisLocal:length(), LengthA + LengthB)
+
+        #holoAng(NHipB, holoEntity(NHipA):toWorld(ang(atan(-AxisLocal:x(), AxisLocal:z()) + icos(Distance, LengthA, LengthB), 180, 0))) #-- forward knee   
+        holoAng(NHipB, holoEntity(NHipA):toWorld(ang(atan(AxisLocal:x(), AxisLocal:z()) + icos(Distance, LengthA, LengthB), 0, 0))) #-- reverse knee
+        holoAng(NKnee, holoEntity(NHipB):toWorld(ang(icos(LengthB, LengthA, Distance) + 180, 0, 0)))
+        holoAng(NFoot, Base:angles())
+    }
+
+    two_seg_ik(1, 2, 3, 4, SegmentLengthA, SegmentLengthB, Entity, Target)
+
+]#

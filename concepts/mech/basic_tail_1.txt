@@ -1,0 +1,46 @@
+@name basic_tail_1
+@persist TailLength TailAngles:array TailAngle:angle Entity:entity
+@trigger none
+
+#-- by shadowscion
+
+#-- an example of one way to make a tail with simple physics
+
+if (first()) {
+    
+    #-- settings
+    TailLength = 10 #-- how many bones in the tail
+
+    #-- variables
+    Entity = entity()
+
+    #-- create the bones using a loop to keep the example simple
+    for (I = 1, TailLength) { 
+        holoCreate(I)    
+        holoParent(I, I > 1 ? holoEntity(I - 1) : Entity)
+        holoPos(I, holoEntity(I):parent():toWorld(vec(-12, 0, 0))) #-- the offset can be whatever you want
+
+        TailAngles[I, angle] = Entity:angles() #-- initialize the angle array
+    }
+
+}
+
+#-- setup
+interval(60) #-- i have found 60ms to be a good balance between performance and cpu/ops
+
+#-- add velocity of the the entity to the entity's angles to get some fake physics
+local VelW = Entity:vel()
+local VelL = Entity:velL()
+
+TailAngle = Entity:angles() + ang(-VelW:z() / 10, VelL:y() / 10, 0)
+
+#-- shift the angle through the array
+TailAngles:unshiftAngle(TailAngle)
+
+#-- remove the last entry to stop the array from becoming huge
+TailAngles:removeAngle(TailLength + 1)
+
+#-- loop through every bone and apply the angle at the array index
+for (I = 1, TailLength) {
+    holoAng(I, TailAngles[I, angle])
+}

@@ -15,6 +15,7 @@ if (first()) {
     Entity = entity()
 
     #-- create the bones using a loop to keep the example simple
+    #-- you don't need to do this, as long as they are parented in a chain this will work
     for (I = 1, TailLength) { 
         holoCreate(I)    
         holoParent(I, I > 1 ? holoEntity(I - 1) : Entity)

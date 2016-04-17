@@ -49,12 +49,12 @@ if (Ranger:hit()) {
     #-- to get away with using low intervals and applyforce, i turn off gravity when it's on the ground
     Entity:propGravity(0)
     
-    #-- yaw rotation
+    #-- yaw rotation using bearing 
     local Yaw =  Entity:angles():yaw() - bearing(Entity:pos(), Entity:angles(), Aim) / 5
 
     Entity:applyAngForce((Entity:toLocal(ang(0, Yaw, 0))*300 - Entity:angVel()*30) * Inertia)
     
-    #-- it hover at any height lower than the ranger length
+    #-- it can hover at any height lower than the ranger length
     #-- i use the tried and true Target - Current method
     #-- change the multipliers to suit your needs
     local Height = vec(0, 0, 90 - Ranger:distance()) * 1

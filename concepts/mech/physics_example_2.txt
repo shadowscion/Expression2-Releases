@@ -51,7 +51,7 @@ if (Ranger:hit()) {
     local Yaw =  Entity:angles():yaw()
     Entity:applyAngForce((Entity:toLocal(ang(0, Yaw, 0))*300 - Entity:angVel()*30) * Inertia)
     
-    #-- it hover at any height lower than the ranger length
+    #-- it can hover at any height lower than the ranger length
     #-- i use the tried and true Target - Current method
     #-- change the multipliers to suit your needs
     local Height = vec(0, 0, 90 - Ranger:distance()) * 1

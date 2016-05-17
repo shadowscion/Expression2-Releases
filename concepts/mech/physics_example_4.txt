@@ -1,0 +1,80 @@
+#-- by shadowscion
+
+#-- a series of examples showing how i usually
+#-- handle the physical aspects of my mechs
+
+#-- NEW: the power of sin/cos
+
+@name physics_example_4
+@inputs 
+@outputs 
+@persist Entity:entity Owner:entity Inertia:angle Mass
+@trigger none
+
+#-- i like using this model because it shows the orientation of the model
+@model models/maxofs2d/cube_tool.mdl
+
+
+if (first()) {
+    
+    Entity = entity()
+    Owner = owner()
+    
+    Entity:setMass(2000)
+    
+    Mass = Entity:mass()
+    Inertia = shiftL(ang(Entity:inertia()))
+
+    rangerHitEntities(0)
+    rangerPersist(1)
+
+}
+
+interval(60)
+
+#-- controls
+local W = Owner:keyPressed("up")
+local A = Owner:keyPressed("left")
+local S = Owner:keyPressed("down")
+local D = Owner:keyPressed("right")
+
+local Aim = Owner:eyeTrace():position()
+
+#-- sin/cos are very useful for giving the illusing of breathing
+#-- and adding a little movement to the body of the mech
+local Moving = max(Entity:vel():setZ(0):length(), 1)
+
+local Time = curtime()*200
+local CosT = cos(Time) / Moving
+local SinT = sin(Time) / Moving
+
+#-- for most mechs i just use a single ranger for the hovering
+local Ranger = rangerOffset(100, Entity:pos(), vec(0, 0, -1))
+
+#-- if the ranger is hitting, the mech is on the ground
+if (Ranger:hit()) {
+    
+    #-- to get away with using low intervals and applyforce, i turn off gravity when it's on the ground
+    Entity:propGravity(0)
+    
+    #-- add sin or cos to the pitch value
+    local Yaw =  Entity:angles():yaw() - bearing(Entity:pos(), Entity:angles(), Aim) / 5
+
+    Entity:applyAngForce((Entity:toLocal(ang(CosT*5, Yaw, 0))*300 - Entity:angVel()*30) * Inertia)
+    
+    #-- add sin or cos to the z value
+    local Height = vec(0, 0, SinT*2 + 90 - Ranger:distance()) * 1
+    local Forward = Entity:forward() * (W - S) * 10
+    local Strafe = Entity:right() * (D - A) * 10
+    
+    local Damping = vec(5, 5, 1)
+
+    Entity:applyForce(((Forward + Strafe + Height)*5 - Entity:vel() / Damping) * Mass)
+}
+
+#-- otherwise the mech is off the ground
+else {
+    
+    Entity:propGravity(1)
+
+}

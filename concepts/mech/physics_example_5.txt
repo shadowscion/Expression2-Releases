@@ -4,6 +4,8 @@
 #-- handle the physical aspects of my mechs
 
 #-- NEW: simple jumping animation
+#-- Controls:
+#-- W, A, S, D, Space, Aim/Camera
 
 @name physics_example_5
 @inputs 

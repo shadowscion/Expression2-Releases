@@ -1,0 +1,54 @@
+@name cooldown_example
+@inputs 
+@outputs Time_Perc
+@persist Owner:entity [Input] [Time_Left Time_Hold Time_Wait Time_Perc]
+@trigger none
+
+#-- by shadowscion
+
+#-- one way to make cooldowns without the user of timers that can be used for any input or condition
+
+if (first()) {
+
+    Owner = owner()
+
+    Time_Wait = 5 #-- time to wait after an input is given or condition is met (in seconds)
+    Time_Left = 0
+    Time_Hold = 0
+    Time_Perc = 0
+    
+    holoCreate(1)
+
+}
+
+interval(60)
+
+#-- this variable can be literally anything, not just inputs
+Input = Owner:keyPressed("rshift")
+
+#-- only start the cooldown if the previous one has finished
+if (Time_Hold == 0) {
+    if (Input) {
+        #-- add the wait variable to the current time
+        Time_Hold = curtime() + Time_Wait
+    }
+}
+
+else {
+    #-- subtract the current time from the sum
+    Time_Left = max(0, Time_Hold - curtime())
+
+    #-- this code will run continually until time left reaches 0
+    Time_Perc = 1 - Time_Left / Time_Wait #-- an easy way to get a percentage/interpolation (0-1) value 
+    
+    holoPos(1, entity():pos() + vec(0, 0, 100*Time_Perc))
+
+    #-- this code will run once when elapsed time left reaches 0
+    if (Time_Left == 0) {
+        
+        holoPos(1, entity():pos())
+
+        #-- it is very important to reset the hold time to 0
+        Time_Hold = 0
+    }
+}

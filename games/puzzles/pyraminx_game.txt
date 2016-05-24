@@ -1,0 +1,505 @@
+#----------------------------------------------
+#-- E2 Pyraminx (rubiks pyramid) by shadowscion
+
+@name pyraminx_game
+
+#-- variables
+@persist [Entity Player Owner]:entity HoloIndex Size TileMaterial:string
+@persist Scrambles:array [Colors Materials]:table
+
+#-- engine
+@persist [Controls Others Normals Faces Cores]:table [FindFilters]:array
+
+#-- puzzle
+@persist [ControlHolo]:entity [AutoMoveList Memory]:array Auto AutoMoveNumber Solving PuzzleRotate
+@persist FaceA FaceB RotationID [RotationDir RotationLen ControlHoloColor RayTrace]:vector
+@persist MoveIsQueued MoveTimer RotationDirection [RotateTo RotateFrom RotationAng]:angle
+
+@trigger none
+
+#[
+    Chat commands:
+        - !player    (gives control to <player>)
+        - !scramble  (scrambles the puzzle)
+        - !solve     ('solves' the puzzle, technically it just plays the moves back in reverse)
+        - !reset     (resets the e2)
+
+    Controls:
+        - Aim at a tile and press mouse1 or mouse2 to rotate that face/corner
+        - Press the left/right arrow keys to rotate the puzzle
+        - Press B to undo a move
+]#
+
+if (first()) {
+
+    #---------------------------#
+    #--       Customize       --#
+    #---------------------------#
+
+    Size = 3                             #-- overall scale
+
+    Colors = table(
+        "F" = hsv2rgb(120, 0.8, 0.625),  #-- forward face
+        "D" = hsv2rgb(50, 0.8, 0.625),   #-- down face
+        "L" = hsv2rgb(240, 0.8, 0.625),  #-- left face
+        "R" = hsv2rgb(0, 0.8, 0.625)     #-- right face
+    )
+
+    Materials = table(
+        "models/shiny",
+        "models/debug/debugwhite",
+        "models/cheeze/wires/metal_texture",
+        "phoenix_storms/cube"
+    )
+
+    TileMaterial = Materials[1, string]
+
+    #-- you can add your own scrambles if you want
+    Scrambles = array(
+        "U' L' B' L B L' B' U' B U' L U' R L B u l b'",
+        "B' U' L' B U' B' R B U B' U R L l",
+        "U' R' L' R' U R L R U' R u' r l b",
+        "U' L' B' L B L U R U' R' L' U R' l' b'",
+        "U B R U' L' U' L U' R' L' B u' r' l",
+        "L' B U' B' U' L' U' L U' R' L' r' l' b'",
+        "U' B L R' L' R B' R B R U R L u' l' b",
+        "L' B U B' R U L' U' L U' L' U L' B' u' r b",
+        "R' U' B' U' L R' L' R' U R L u' b"
+    )
+
+    #---------------------------#
+    #--         Setup         --#
+    #---------------------------#
+
+    Entity = entity()
+    Owner = owner()
+    Player = owner()
+
+    runOnChat(1)
+
+    timer("check_eye", 1000)
+    runOnKeys(Player, 1)
+
+    #---------------------------#
+    #--       Functions       --#
+    #---------------------------#
+
+    #-- holo creation
+    function number holo(Parent:entity, Pos:vector, Ang:angle, Scale:vector, Model:string, Mat:string, Col:vector, Shading) {
+        HoloIndex++
+
+        holoCreate(HoloIndex, Pos, Scale, Ang, Col, Model)
+        holoDisableShading(HoloIndex, Shading)
+        holoMaterial(HoloIndex, Mat)
+        holoParent(HoloIndex, Parent)
+
+        return HoloIndex
+    }
+
+    #-- fix fucky scaling of tetra and prism models
+    function vector unfuckScale(Type:string, Scale:vector) {
+        switch (Type:lower()) {
+            case "tetra", return Scale:setZ(1 / 3 * sqrt(6) * Scale:z()) / 12, break
+            case "prism", return Scale:setZ(1 / 2 * sqrt(3) * Scale:z()) / 12, break
+        }
+
+        return vec()
+    }
+
+    #-- ray plane intersection
+    function vector rayPlane([EyePos EyeDir PlanePos PlaneNormal]:vector) {
+        local A = PlaneNormal:dot(EyeDir)
+
+        if (A < 0) {
+            local B = PlaneNormal:dot(PlanePos - EyePos)
+            if (B < 0) {
+                return EyePos + EyeDir * (B / A)
+            }
+        } elseif (A == 0) {
+            if (PlaneNormal:dot(PlanePos - EyePos) == 0) {
+                return EyePos
+            }
+        }
+
+        return vec()
+    }
+
+    #-- ray triangle intersection
+    function vector rayTri([EyePos EyeDir Vert1 Vert2 Vert3]:vector) {
+        local V1V2 = (Vert2 - Vert1):normalized()
+        local V1V3 = (Vert3 - Vert1):normalized()
+        local Norm = V1V2:cross(V1V3)
+
+        if (EyeDir:dot(Norm) > 0) { Norm = -Norm }
+
+        local HitPos = rayPlane(EyePos, EyeDir, Vert1, Norm)
+        local V1Hit = (HitPos - Vert1):normalized()
+
+        if (V1V2:dot(V1V3) < V1V2:dot(V1Hit) & V1V3:dot(V1V2) < V1V3:dot(V1Hit) & V1V2:dot((Vert3 - Vert2):normalized()) > V1V2:dot((HitPos - Vert2):normalized())) {
+            return HitPos
+        }
+
+        return vec()
+    }
+
+    #-- ray hitpos
+    function vector getRayPos([EyePos EyeDir]:vector) {
+        local HitPos = vec()
+        foreach (K, V:array = Faces) {
+            if ((EyePos - Entity:toWorld(V[1, vector])):dot(Entity:toWorldAxis(V[4, vector])) >= 0) {
+                local RayTri = rayTri(EyePos, EyeDir, Entity:toWorld(V[1, vector]), Entity:toWorld(V[2, vector]), Entity:toWorld(V[3, vector]))
+                if (RayTri:distance(EyePos) < HitPos:distance(EyePos)) {
+                    HitPos = RayTri
+                    HitFace = K
+                }
+            }
+        }
+
+        return HitPos
+    }
+
+    #-- queue a clip
+    function number setNextClip( Key:string, Layers, Dir:vector ) {
+        local Length = (Layers == 1 ? (Key != "U" ? 4.899 : 1.67) : (Key != "U" ? 1.67 : -1.67)) * Size
+
+        holoClip(FaceA, Dir * Length, -Dir, 0)
+        holoClip(FaceB, holoEntity(FaceB):toLocal(Entity:toWorld(Dir * Length)), holoEntity(FaceB):toLocalAxis(Entity:toWorldAxis(Dir)), 0)
+
+        return Length
+    }
+
+    #-- queue a rotation
+    function setNextRotation( Key:string, Layers ) {
+        RotationID = Cores[Key, number]
+        RotationDir = Normals[Key, vector]
+        RotationAng = Entity:toLocal(holoEntity(RotationID):angles())
+        RotationLen = Entity:toWorld(RotationDir * setNextClip( Key, Layers, RotationDir ))
+
+        holoParent(FaceB, RotationID)
+
+        foreach (K, V:array = Controls) {
+            if (inrange(toByte(V[2, string]), 65, 90)) {
+                holoParent(K:toNumber(), Layers == 2 ? V[1, entity] : Entity)
+            }
+        }
+
+        local RotationPlane = Entity:toWorldAxis(RotationDir)
+        foreach (K, V:entity = Others) {
+            if (RotationPlane:dot(V:pos() - RotationLen) > 0) {
+                holoParent(K:toNumber(), RotationID)
+            } else {
+                holoParent(K:toNumber(), Entity)
+            }
+        }
+
+        if (!Auto) {
+            MoveIsQueued = 1
+            timer("MoveQueue", 100)
+        }
+    }
+
+    #-- resolve tetra positions
+    function table resolve( String:string ) {
+        local Table = table()
+        foreach ( K, V:string = String:explode("|") ) {
+            local Info = V:explode(",")
+            local Vec = vec(Info[1, string]:toNumber(), Info[2, string]:toNumber(), Info[3, string]:toNumber()) * Size
+            local Ang = ang(Info[4, string]:toNumber(), Info[5, string]:toNumber(), Info[6, string]:toNumber())
+
+            Table[Table:count() + 1, array] = array(Vec, Ang)
+        }
+        return Table
+    }
+
+    #---------------------------#
+    #--   Puzzle Dimensions   --#
+    #---------------------------#
+
+    EntNormal = Entity:up()
+
+    VertexU = Size * vec(0, 0, 4.899)
+    VertexB = Size * vec(-6.9282, 0, -4.899)
+    VertexL = Size * vec(3.4641, 6, -4.899)
+    VertexR = Size * vec(3.4641, -6, -4.899)
+
+    VertexAverage = (VertexU + VertexB + VertexL + VertexR) / 4
+
+    Normals = table(
+        "U"	=	vec(0, 0, 1),
+        "B"	=	vec(-0.9428, 0, -0.3333),
+        "L"	=	vec(0.4714, -0.8165, -0.3333),
+        "R"	=	vec(0.4714, 0.8165, -0.3333)
+    )
+
+    Faces = table(
+        "F" = array(VertexU, VertexL, VertexR, -Normals["B", vector], (VertexU + VertexL + VertexR) / 3),
+        "D" = array(VertexB, VertexL, VertexR, -Normals["U", vector], (VertexB + VertexL + VertexR) / 3),
+        "L" = array(VertexU, VertexB, VertexL, -Normals["L", vector], (VertexU + VertexB + VertexL) / 3),
+        "R" = array(VertexU, VertexB, VertexR, -Normals["R", vector], (VertexU + VertexB + VertexR) / 3)
+    )
+
+    #---------------------------#
+    #--   Spawn Puzzle Core   --#
+    #---------------------------#
+
+    CoreU = holo( Entity, Entity:toWorld(VertexAverage), Entity:toWorld(Normals["U", vector]:toAngle()), vec(), "", "", vec(), 0 )
+    CoreB = holo( Entity, Entity:toWorld(VertexAverage), Entity:toWorld(Normals["B", vector]:toAngle()), vec(), "", "", vec(), 0 )
+    CoreL = holo( Entity, Entity:toWorld(VertexAverage), Entity:toWorld(Normals["L", vector]:toAngle()), vec(), "", "", vec(), 0 )
+    CoreR = holo( Entity, Entity:toWorld(VertexAverage), Entity:toWorld(Normals["R", vector]:toAngle()), vec(), "", "", vec(), 0 )
+
+    Cores = table( "U" = CoreU, "B" = CoreB, "L" = CoreL, "R" = CoreR )
+
+    CoreUE = holoEntity(CoreU)
+    CoreBE = holoEntity(CoreB)
+    CoreLE = holoEntity(CoreL)
+    CoreRE = holoEntity(CoreR)
+
+    FaceScale = unfuckScale( "tetra", vec(12, 12, 12) ) * Size
+
+    FaceA = holo( Entity, Entity:pos(), Entity:angles(), FaceScale, "tetra", "models/props_combine/metal_combinebridge001", vec(), 1 )
+    FaceB = holo( Entity, Entity:pos(), Entity:angles(), FaceScale, "tetra", "models/props_combine/metal_combinebridge001", vec(), 1 )
+
+    holoClipEnabled(FaceA, 1)
+    holoClipEnabled(FaceB, 1)
+
+    #---------------------------#
+    #--   Spawn Puzzle Tiles  --#
+    #---------------------------#
+
+    TileDataA = resolve("0.598,0,3.207,0,90,-19.471|1.753,-2,-0.059,0,90,-19.471|1.725,0,0.059,0,90,160.529|1.753,2,-0.059,0,90,-19.471|
+                 2.908,-4,-3.325,0,90,-19.471|2.866,-2,-3.207,0,90,160.529|2.908,0,-3.325,0,90,-19.471|2.866,2,-3.207,0,90,160.529|2.908,4,-3.325,0,90,-19.471")
+
+    TileDataB = resolve("-5.134,0,-4.899,0,90,-90|-1.67,-2,-4.899,0,90,-90|-1.795,0,-4.899,0,90,90|-1.67,2,-4.899,0,90,-90|1.795,-4,-4.899,0,90,-90|
+                 1.67,-2,-4.899,0,90,90|1.795,0,-4.899,0,90,-90|1.67,2,-4.899,0,90,90|1.795,4,-4.899,0,90,-90")
+
+    TileScale = unfuckScale( "prism", vec(3.567, 0.1, 3.567) ) * Size
+
+    TempCtrl = table(
+        "F" = table(
+            1 = array(CoreUE, "u"),
+            5 = array(CoreLE, "l"),
+            9 = array(CoreRE, "r"),
+            3 = array(CoreUE, "U"),
+            6 = array(CoreLE, "L"),
+            8 = array(CoreRE, "R")
+        ),
+
+        "D" = table(
+            1 = array(CoreBE, "b"),
+            5 = array(CoreLE, "l"),
+            9 = array(CoreRE, "r"),
+            3 = array(CoreBE, "B"),
+            6 = array(CoreLE, "L"),
+            8 = array(CoreRE, "R")
+        ),
+
+        "L" = table(
+            1 = array(CoreUE, "u"),
+            5 = array(CoreBE, "b"),
+            9 = array(CoreLE, "l"),
+            3 = array(CoreUE, "U"),
+            6 = array(CoreBE, "B"),
+            8 = array(CoreLE, "L")
+        ),
+
+        "R" = table(
+            1 = array(CoreUE, "u"),
+            5 = array(CoreRE, "r"),
+            9 = array(CoreBE, "b"),
+            3 = array(CoreUE, "U"),
+            6 = array(CoreRE, "R"),
+            8 = array(CoreBE, "B")
+        )
+    )
+
+    foreach (K, V:vector = Colors) {
+        local Control = TempCtrl[K, table]
+
+        local Data = TileDataA
+        local Norm =  Data[1, array][2, angle]:right() * 0.065 * Size
+        local Rotate = (K == "R" | K == "L") ? (K == "R" ? 120 : -120) : 0
+
+        if (K == "D") {
+            Data = TileDataB
+            Norm = -EntNormal * 0.065 * Size
+        }
+
+        for (I = 1, 9) {
+            local Pos = Entity:toWorld((Data[I, array][1, vector] + Norm):rotate(0, Rotate, 0))
+            local Ang = Entity:toWorld(Data[I, array][2, angle]):rotateAroundAxis(EntNormal, Rotate)
+            local TileID = holo( Entity, Pos, Ang, TileScale, "prism", TileMaterial, V, 1 )
+
+            if (Control:exists(I)) {
+                #-- points ALWAYS rotate, so we can attach them permanently here
+                if (I == 1 | I == 5 | I == 9) { holoParent(TileID, Control[I, array][1, entity]) }
+
+                Controls[TileID:toString(), array] = Control[I, array]
+                FindFilters:pushEntity(holoEntity(TileID))
+            } else {
+                Others[TileID:toString(), entity] = holoEntity(TileID)
+            }
+        }
+    }
+}
+
+#-- key controls
+if (keyClk(Player)) {
+    local Weapon = Player:weapon():type()
+    local CanUse = !Entity:isPlayerHolding() & Entity:isFrozen() & Weapon != "weapon_physgun" & Weapon != "gmod_tool"
+
+    if (CanUse) {
+        if (!MoveIsQueued & ControlHolo & (Player:keyAttack1() | Player:keyAttack2())) {
+            local DataArray = Controls[holoIndex(ControlHolo):toString(), array]
+            local MoveString = DataArray[2, string] + (Player:keyAttack2() ? "'" : "")
+
+            RotationDirection = MoveString[2] == "'" ? -120 : 120
+            setNextRotation( MoveString[1]:upper(), inrange(toByte(MoveString[1]), 65, 90) ? 2 : 1 )
+
+            Memory:unshiftString(MoveString[2] ? MoveString[1] : MoveString[1] + "'")
+        }
+
+        if (CanUse) {
+            if (!MoveIsQueued & Player:keyPressed("B")) {
+                local MoveString = Memory[1, string]
+                RotationDirection = MoveString[2] == "'" ? -120 : 120
+                setNextRotation( MoveString[1]:upper(), inrange(toByte(MoveString[1]), 65, 90) ? 2 : 1 )
+                Memory:shift()
+            }
+        }
+    }
+
+    if (PuzzleRotate == 0) {
+        if (Player:keyPressed("Left") | Player:keyPressed("Right")) {
+            timer("PuzzleRotate", 0)
+            RotateTo = Entity:angles():rotateAroundAxis(Entity:up(), Player:keyPressed("Left") ? 120 : -120)
+        }
+    }
+}
+
+#-- animate a move or set of moves
+if (clk("MoveQueue")) {
+    timer("MoveQueue", Auto ? 60 : 15)
+
+    if (Auto) {
+        if (MoveIsQueued) {
+            MoveTimer += 0.2
+            SmoothMoveTimer = 10*MoveTimer^3 - 15*MoveTimer^4 + 6*MoveTimer^5
+
+            holoAng(RotationID, Entity:toWorld(RotationAng:rotateAroundAxis(RotationDir, SmoothMoveTimer * RotationDirection)))
+            if (MoveTimer >= 1) {
+                MoveIsQueued = MoveTimer =  0
+            }
+        } elseif (AutoMoveNumber < AutoMoveList:count()) {
+            AutoMoveNumber++
+
+            local MoveString = AutoMoveList[AutoMoveNumber, string]
+            RotationDirection = MoveString[2] == "'" ? -120 : 120
+            setNextRotation( MoveString[1]:upper(), inrange(toByte(MoveString[1]), 65, 90) ? 2 : 1 )
+
+            if (!Solving) { Memory:unshiftString(MoveString[2] ? MoveString[1] : MoveString[1] + "'") }
+
+            MoveIsQueued = 1
+        } else {
+            Auto = MoveTimer = AutoMoveNumber = MoveIsQueued = Solving = 0
+            stoptimer("MoveQueue")
+        }
+    } else {
+        if (MoveIsQueued) {
+            MoveTimer += 0.1
+            SmoothMoveTimer = 10*MoveTimer^3 - 15*MoveTimer^4 + 6*MoveTimer^5
+
+            holoAng(RotationID, Entity:toWorld(RotationAng:rotateAroundAxis(RotationDir, SmoothMoveTimer * RotationDirection)))
+            if (MoveTimer >= 1) {
+                MoveIsQueued = MoveTimer =  0
+                stoptimer("MoveQueue")
+            }
+        }
+    }
+}
+
+#-- rotate the entire puzzle
+if (clk("PuzzleRotate")) {
+    timer("PuzzleRotate", 100)
+
+    if (PuzzleRotate < 1) {
+        PuzzleRotate += 0.25
+        SmoothPuzzleRotate = 10*PuzzleRotate^3 - 15*PuzzleRotate^4 + 6*PuzzleRotate^5
+
+        Entity:setAng( slerp(quat(Entity), quat(RotateTo), SmoothPuzzleRotate):toAngle())
+
+        if (PuzzleRotate >= 1) {
+            PuzzleRotate = 0
+            stoptimer("PuzzleRotate")
+        }
+    }
+}
+
+#-- player eye and highlighting
+if (clk("check_eye")) {
+    timer("check_eye", 150)
+
+    if (!MoveIsQueued) {
+        RayTrace = getRayPos(Player:shootPos(), Player:eye())
+
+        if (RayTrace:length()) {
+            findByModel("models/holograms/prism.mdl")
+            findClipToEntities(FindFilters)
+            findSortByDistance(RayTrace)
+            FindResult = find()
+
+            if (changed(FindResult)) {
+                if (ControlHolo) {
+                    holoColor(holoIndex(ControlHolo), ControlHoloColor)
+                }
+
+                ControlHolo = FindResult
+                ControlHoloColor = ControlHolo:getColor()
+
+                holoColor(holoIndex(ControlHolo), hsv2rgb(rgb2hsv(ControlHoloColor):setZ(1)))
+            }
+        } else {
+            if (ControlHolo) {
+                holoColor(holoIndex(ControlHolo), ControlHoloColor)
+                ControlHolo = noentity()
+            }
+        }
+    }
+}
+
+#-- chat commands
+if (chatClk()) {
+    local LP = lastSpoke()
+
+    if (LP == Player | LP == Owner) {
+        local LS = lastSaid():explode(" ")
+
+        #-- wwitch Player
+        if (LS[1, string] == "!player") {
+            runOnKeys( Player, 0 )
+            Player = findPlayerByName(LS[2, string]) ?: Player
+            runOnKeys( Player, 1 )
+        }
+
+        if (LP == Player) {
+            #-- scramble
+            if (LS[1, string] == "!scramble") {
+                Auto = 1
+                AutoMoveList = Scrambles[randint(1, Scrambles:count()), string]:explode(" ")
+                timer("MoveQueue", 100)
+            }
+
+            #-- solve
+            if (LS[1, string] == "!solve") {
+                Auto = Solving = 1
+                AutoMoveList = Memory:clone()
+                Memory:clear()
+                timer("MoveQueue", 100)
+            }
+        }
+
+        #-- reset
+        if (LS[1, string] == "!reset") {
+            reset()
+        }
+    }
+}

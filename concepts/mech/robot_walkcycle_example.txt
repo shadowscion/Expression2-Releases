@@ -1,0 +1,167 @@
+@name robot_walkcycle_example
+@outputs [L R]:table
+@persist Anim:table [DT CT ET]
+@trigger none
+
+#-- by shadowscion
+
+#-- another method you can use to make hologram mechs and walkcycles
+#-- it's meant for slow moving robotic creations, it's not suitable for fast moving or agile mechs
+
+if (first()) {
+
+    Anim = table(
+        "walk_height" = 75,
+        "step_height" = 25,
+        "step_length" = 50,
+        "step_rate"   = 2,
+        "step_wait"   = 0,
+
+        "mode" = "",
+        "foot" = "",
+        "time" = 0,
+
+        "base_pos" = entity():pos(),
+        "base_ang" = entity():angles(),
+        "base_ent" = holoCreate(100),
+
+        "foot_l" = table(
+            "time" = 0,
+            "pos_hold" = entity():pos(),
+            "pos_next" = entity():pos(),
+            "pos_last" = entity():pos(),
+            "pos_offset" = vec(0,-25,0),
+            "sound_takestep" = "^npc/dog/dog_rollover_servos1.wav",
+            "sound_footfall" = "^doors/drawbridge_stop1.wav",
+            "entity" = holoCreate(101,vec(),vec())
+        ),
+
+        "foot_r" = table(
+            "time" = 0,
+            "pos_hold" = entity():pos(),
+            "pos_next" = entity():pos(),
+            "pos_last" = entity():pos(),
+            "pos_offset" = vec(0,25,0),
+            "sound_takestep" = "^npc/dog/dog_rollover_servos1.wav",
+            "sound_footfall" = "^doors/drawbridge_stop1.wav",
+            "entity" = holoCreate(102,vec(),vec())
+        )
+    )
+
+    CT = curtime()
+    DT = ET = 0
+
+    function dt(Interval,TimeScale) {
+        interval(Interval)
+
+        DT = curtime() - CT
+        CT = curtime()
+
+        DT *= TimeScale
+        ET += DT
+    }
+
+    function number approach(Cur,Tar,R) {
+        if (Cur < Tar) {
+            return clamp(Cur + R,Cur,Tar)
+        }
+        elseif (Cur > Tar) {
+            return clamp(Cur - R,Tar,Cur)
+        }
+        return Tar
+    }
+
+    function number approachAngle(Cur,Tar,R) {
+        local Diff = angnorm(Tar - Cur)
+        if (Diff > 180) { Diff -= 360 }
+        return approach(Cur,Cur+Diff,R)
+    }
+
+    function number mix(A,B,T) {
+        return A + (B - A)*T
+    }
+
+}
+
+dt(60,1)
+
+switch (Anim["mode",string]) {
+    case "",
+        local RandomSide = randint(1,2)
+        switch (RandomSide) {
+            case 1,Anim["foot",string] = "foot_l",break
+            case 2,Anim["foot",string] = "foot_r",break
+        }
+
+        Anim["mode",string] = "calc"
+    break
+
+    case "calc",
+        local Foot = table()
+        switch (Anim["foot",string]) {
+            case "foot_l",Foot = Anim["foot_l",table],break
+            case "foot_r",Foot = Anim["foot_r",table],break
+        }
+
+        local Trace = rangerOffset(Anim["walk_height",number]*2,toWorld(Foot["pos_offset",vector] + vec(Anim["step_length",number],0,0),ang(0,0,0),Anim["base_pos",vector],Anim["base_ang",angle]),vec(0,0,-1))
+
+        Foot["pos_hold",vector] = Foot["pos_next",vector]
+        Foot["pos_next",vector] = Trace:position()
+        Anim["ang_next",number] = (owner():eyeTrace():position() - Anim["base_pos",vector]):toAngle():yaw()
+
+        if (Foot["sound_takestep",string] != "") {
+            Foot["entity",entity]:soundPlay("sound_takestep",0,Foot["sound_takestep",string])
+        }
+
+        Anim["mode",string] = "exec"
+    break
+
+    case "exec",
+        local Foot = table()
+        switch (Anim["foot",string]) {
+            case "foot_l",Foot = Anim["foot_l",table],break
+            case "foot_r",Foot = Anim["foot_r",table],break
+        }
+
+        local Trace = rangerOffset(Anim["walk_height",number]*2,toWorld(Foot["pos_offset",vector] + vec(Anim["step_length",number],0,0),ang(0,0,0),Anim["base_pos",vector],Anim["base_ang",angle]),vec(0,0,-1))
+        Foot["pos_next",vector] = Trace:position()
+
+        Foot["time",number] = min(1,Foot["time",number] + DT*Anim["step_rate",number])
+
+        local S = 6*Foot["time",number]^5 - 15*Foot["time",number]^4 + 10*Foot["time",number]^3
+        local Z = sin(S*180) #mix( sign( sin(S*180) ),sin(S*180),0.5 + (1 - S)*0.5)
+
+        Foot["pos_last",vector] = mix(Foot["pos_next",vector],Foot["pos_hold",vector],S) + vec(0,0,Z*Anim["step_height",number])
+        Anim["base_pos",vector] = (Anim["foot_r",table]["pos_last",vector] + Anim["foot_l",table]["pos_last",vector])*0.5 + vec(0,0,Anim["walk_height",number])
+
+        Anim["base_ang",angle] = Anim["base_ang",angle]:setYaw(approachAngle(Anim["base_ang",angle]:yaw(),Anim["ang_next",number],DT*40))
+
+        if (Foot["time",number] == 1) {
+            Foot["pos_last",vector] = Foot["pos_next",vector]
+            Foot["time",number] = 0
+
+            if (Foot["sound_footfall",string] != "") {
+                Foot["entity",entity]:soundPlay("sound_footfall",0,Foot["sound_footfall",string])
+            }
+
+            Anim["mode",string] = "wait"
+        }
+    break
+
+    case "wait",
+        Anim["time",number] = min(1,Anim["time",number] + DT*Anim["step_wait",number])
+
+        local Input = owner():keyAttack2()
+
+        if ((Anim["time",number] == 1 | Anim["step_wait",number] == 0) & Input) {
+            Anim["foot",string] = Anim["foot",string] == "foot_l" ? "foot_r" : "foot_l"
+            Anim["time",number] = 0
+            Anim["mode",string] = "calc"
+        }
+    break
+}
+
+holoPos(100,Anim["base_pos",vector])
+holoAng(100,Anim["base_ang",angle])
+holoPos(102,Anim["foot_l",table]["pos_last",vector])
+holoPos(103,Anim["foot_r",table]["pos_last",vector])

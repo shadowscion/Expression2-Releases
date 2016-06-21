@@ -1,0 +1,435 @@
+#-------------------------------------
+#-- Mech Project by shadowscion
+
+@name mech_project/mech_spawn
+@inputs Seat:entity Camera:wirelink
+@outputs Ops Cpu
+
+#-- holograms
+@persist [Holo_Body Holo_Cockpit Holo_MRLS]:entity
+
+#-- mech variables
+@persist [Yaw_MechEntity Yaw_Cockpit] [Pitch_MRLS] Sin Cos
+
+#-- player inputs
+@persist [W A S D Shift Space Mouse1 Mouse2] [Active ActiveN Deactivate] PlayerAim:vector
+
+#-- weapons
+@persist [MRLS_CanFire MRLS_Wait] [MRLS_Fire MRLS_Sequence MRLS_Tube] MRLS_Active:array MRLS_Data:table MRLS_Pitch
+@persist Cannons:array CannonProjectiles:array [RecoilVector]:vector
+
+#-- triggers
+@trigger none
+
+if (first()) {
+    #include "mech_project/mech_lib"
+    #include "mech_project/mech_holo"
+}
+
+if (clk("spawn")) {
+    local Done = spawn_holograms()
+    if (Done) {
+        #-- initialize hologram entities
+        MechEntity   = holoEntity(1)
+        Holo_Body    = holoEntity(2)
+        Holo_Cockpit = holoEntity(3)
+        Holo_MRLS    = holoEntity(800)
+
+        holoUnparent(1)
+        holoUnparent(1000)
+        holoDisableShading(908,1)
+
+        Camera["Parent",entity] = MechEntity
+        Camera["Distance",number] = 0
+        Camera["Position",vector] = vec(0,0,100)
+
+        for (I = 1,8) {
+            local N = 806 + I
+            local MStartPos = Holo_MRLS:toLocal(holoEntity(N):pos())
+
+            MRLS_Data[I,table] = table(
+                "index" = N,
+                "entity" = holoEntity(N),
+                "startPos" = MStartPos
+           )
+        }
+
+        #-- initialize mech variables
+        Yaw_MechEntity  = MechEntity:angles():yaw()
+        Yaw_Cockpit     = MechEntity:angles():yaw()
+        Pitch_MRLS      = Holo_Cockpit:toLocal(Holo_MRLS:angles()):pitch()
+
+        Active        = 1
+        FootLerpRate  = 2
+        FootCycleRate = 0.25
+
+        MechMoveSpeed = LegLengthBF + LegLengthBF
+
+        PlayerAim = MechEntity:pos() + MechEntity:forward()*1000
+        MechHeight = 75
+
+        #-- initialize mech feet
+        MechFeet:createFoot("fl",ang(0,45,0):forward()*160):setFootGait(0.00,0.25)
+        MechFeet:createFoot("fr",ang(0,-45,0):forward()*160):setFootGait(0.50,0.75)
+        MechFeet:createFoot("rl",ang(0,135,0):forward()*160):setFootGait(0.25,0.50)
+        MechFeet:createFoot("rr",ang(0,-135,0):forward()*160):setFootGait(0.75,1.00)
+
+        MechFeet["fl",table]:setFootSound("soundStepTake","npc/dog/dog_pneumatic2.wav",holoEntity(100),0.50,100)
+        MechFeet["fl",table]:setFootSound("soundStepDone","doors/drawbridge_stop1.wav",holoEntity(101),0.75,200)
+        MechFeet["fr",table]:setFootSound("soundStepTake","npc/dog/dog_pneumatic2.wav",holoEntity(200),0.50,100)
+        MechFeet["fr",table]:setFootSound("soundStepDone","doors/drawbridge_stop1.wav",holoEntity(201),0.75,200)
+        MechFeet["rl",table]:setFootSound("soundStepTake","npc/dog/dog_pneumatic2.wav",holoEntity(300),0.50,100)
+        MechFeet["rl",table]:setFootSound("soundStepDone","doors/drawbridge_stop1.wav",holoEntity(301),0.75,200)
+        MechFeet["rr",table]:setFootSound("soundStepTake","npc/dog/dog_pneumatic2.wav",holoEntity(400),0.50,100)
+        MechFeet["rr",table]:setFootSound("soundStepDone","doors/drawbridge_stop1.wav",holoEntity(401),0.75,200)
+
+        #-- wire instructions
+        if (!->Seat | !->Camera) { spawn_help() }
+
+        #-- start the interval
+        interval(100)
+        runOnLast(1)
+    }
+}
+
+if (last()) {
+    Seat:ejectPod()
+    Seat:deparent()
+
+    Camera["Activated",number] = 0
+}
+
+if (clk()) {
+    dt(60,1)
+
+    #--  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -
+    #-- player and active timer
+    local Player = (->Seat & ->Camera) ? Seat:driver() : noentity()
+
+    if (!Seat:parent()) {
+        Seat:propFreeze(1)
+        Seat:setPos(Holo_Cockpit:toWorld(vec(0,0,-15)))
+        Seat:setAng(Holo_Cockpit:toWorld(ang(0,-90,0)))
+
+        rangerFilter(Seat)
+        rangerPersist(1)
+
+        if (Holo_Cockpit:toWorld(vec(0,0,-15)):distance(Seat:pos()) < 1) { Seat:parentTo(Holo_Cockpit) }
+    }
+
+    #--  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -
+    #-- player entier/exit seat
+    if (changed(Player)) {
+        foreach (K,V:entity = players()) {
+            holoVisible(909,V,0)
+            holoVisible(910,V,0)
+        }
+
+        if (Player) {
+            #-- start engine sounds
+            holoEntity(1):soundPlay("engine1",0,"vehicles/crane/crane_startengine1.wav")
+
+            #-- reset camera
+            Camera["Parent",entity] = holoEntity(908)
+            Camera["Distance",number] = 0
+            Camera["Position",vector] = vec()
+            Camera["Activated",number] = 1
+
+            #-- filter player from all traces
+            rangerFilter(Player)
+            rangerPersist(1)
+
+            holoVisible(909,Player,1)
+            holoVisible(910,Player,1)
+
+            Seat:controls_help(10)
+        }
+        else {
+            #-- reset inputs
+            W = A = S = D = Space = Shift = Mouse1 = Mouse2 = Sin = Cos = Camera["Activated",number] = 0
+            PlayerAim = MechEntity:pos() + MechEntity:forward()*1000
+
+            Seat:soundPlay("exit",0,"npc/env_headcrabcanister/hiss.wav",3)
+        }
+
+        Deactivate = 0
+    }
+
+    #--  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -
+    #-- active states
+    Active = clamp(Active + ((Player:isValid()|MRLS_Active:count()|CannonProjectiles:count()) ?: -1)*DT,0,1)
+    ActiveN = 1 - Active
+
+    #-- if inactive
+    if (Active == 0) {
+        #-- convenient timer to deactivate expensive code when inactive
+        Deactivate = min(1,Deactivate + DT*0.1)
+    }
+
+    #-- if active
+    elseif (Active == 1) {
+        if (Player) {
+            #-- player controls
+            W = Player:keyForward()
+            A = Player:keyLeft()
+            S = Player:keyBack()
+            D = Player:keyRight()
+
+            Space = Player:keyJump()
+            Shift = Player:keySprint()
+            Mouse1 = Player:keyAttack1()
+            Mouse2 = Player:keyAttack2()
+
+            PlayerAim = rangerOffset(32768,Player:shootPos(),Seat:toLocalAxis(Player:eye())):position()
+
+            if (Player:keyReload()) { Seat:ejectPod() }
+        }
+        else {
+
+        }
+
+        Sin = sin(CT*150)/max(abs($Yaw_MechEntity) + MechMoveDir:length(),1)
+        Cos = cos(CT*150)/max(abs($Yaw_MechEntity) + MechMoveDir:length(),1)
+    }
+
+    #-- if initializing
+    if ($Active) {
+        #-- mix resting height with active height
+        MechHeight = 40 + (75 - 40)*Active
+
+        #-- mix resting footpos with active footpos
+        MechFeet["fl",table]["restPos",vector] = mix(ang(0,45,0):forward()*160,ang(0,15,0):forward()*175,Active)
+        MechFeet["fr",table]["restPos",vector] = mix(ang(0,-45,0):forward()*160,ang(0,-15,0):forward()*175,Active)
+        MechFeet["rl",table]["restPos",vector] = mix(ang(0,135,0):forward()*160,ang(0,165,0):forward()*175,Active)
+        MechFeet["rr",table]["restPos",vector] = mix(ang(0,-135,0):forward()*160,ang(0,-165,0):forward()*175,Active)
+
+        #-- engine sound volume
+        soundVolume("engine1",Active)
+        soundVolume("engine2",Active)
+
+        if (!Player & Active <= DT) {
+            soundStop("engine1")
+            soundStop("engine2")
+        }
+
+        local Open = vec(0,0,ActiveN*135)
+        holoAng(901,Holo_Cockpit:toWorld((quat(ang(90,0,0))*qRotation(-Open)):toAngle()))
+        holoAng(904,Holo_Cockpit:toWorld((quat(ang(90,0,0))*qRotation(Open)):toAngle()))
+
+        holoAng(603,holoEntity(602):toWorld(ang(-90 - ActiveN*60,180,0)))
+        holoAng(703,holoEntity(702):toWorld(ang(-90 - ActiveN*60,180,0)))
+    }
+
+    #--  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -
+    #-- code is running
+    if (Deactivate != 1) {
+        #-- cycle feet
+        FootLerpRate = lerpN(2,2,Shift)
+        FootCycleRate = lerpN(0.25,0.50,Shift)
+
+        MechMoveDir = (MechEntity:forward()*(W - S) + MechEntity:right()*(D - A)):normalized()*MechMoveSpeed*!MRLS_Fire
+        MechFeet:cycleAllFeet()
+
+        #-- base hologram
+        holoPos(1,mix(FootAveragePos + vec(0,0,Sin*5 + MechHeight - MRLS_Fire*15) + MechEntity:toWorldAxis(RecoilVector)*3,MechEntity:pos(),0.75))
+
+        Yaw_MechEntity = approachAngle(Yaw_MechEntity,(PlayerAim - MechEntity:pos()):toAngle():yaw(),FootCycleRate*45*DT*!MRLS_Fire)
+        holoAng(1,ang(RecoilVector:x(),Yaw_MechEntity - (1 - Cannons[1,number])*15 + (1 - Cannons[2,number])*15,-RecoilVector:y()))
+
+        #-- cockpit & body holograms
+        local DirY = MechEntity:toLocalAxis((MechFeet["fl",table]["stepPos",vector] + MechFeet["fr",table]["stepPos",vector])*0.5 - (MechFeet["rl",table]["stepPos",vector] + MechFeet["rr",table]["stepPos",vector])*0.5) #-- pitch dir
+        local DirX = MechEntity:toLocalAxis((MechFeet["fr",table]["stepPos",vector] + MechFeet["rr",table]["stepPos",vector])*0.5 - (MechFeet["fl",table]["stepPos",vector] + MechFeet["rl",table]["stepPos",vector])*0.5) #-- roll dir
+
+        local Angle = MechEntity:toWorld(ang(atan(DirY:x(),DirY:z()) - 90 + ActiveN*15 + Cos*5,0,atan(-DirX:y(),DirX:z()) - 90))
+        holoAng(2,slerp(quat(Angle),quat(Holo_Body),0.5):toAngle())
+
+        local CDiff = MechEntity:toLocal((PlayerAim - Holo_Cockpit:pos()):toAngle())
+        Yaw_Cockpit = approachAngle(Yaw_Cockpit,CDiff:yaw(),FootCycleRate*90*DT)#*!MRLS_Fire)
+        holoAng(3,MechEntity:toWorld(ang(ActiveN*30 + MRLS_Fire*15,Yaw_Cockpit,0)))
+        holoAng(909,Holo_Cockpit:angles():setYaw(Yaw_MechEntity))
+
+        #-- leg holograms
+        mech_project_ik(Holo_Body,MechFeet["fl",table]["stepPos",vector],LegLengthCF,LegLengthBF,100,101,102,103,104)
+        mech_project_ik(Holo_Body,MechFeet["fr",table]["stepPos",vector],LegLengthCF,LegLengthBF,200,201,202,203,204)
+        mech_project_ik(Holo_Body,MechFeet["rl",table]["stepPos",vector],LegLengthCR,LegLengthBR,300,301,302,303,304)
+        mech_project_ik(Holo_Body,MechFeet["rr",table]["stepPos",vector],LegLengthCR,LegLengthBR,400,401,402,403,404)
+
+        holoEntity(101):hydraulic(114,122)
+        holoEntity(201):hydraulic(214,222)
+        holoEntity(301):hydraulic(314,322)
+        holoEntity(401):hydraulic(414,422)
+
+        holoEntity(101):hydraulic(133,117)
+        holoEntity(201):hydraulic(233,217)
+        holoEntity(301):hydraulic(333,317)
+        holoEntity(401):hydraulic(433,417)
+
+        #-- mrls system
+        if (!MRLS_Sequence) {
+            MRLS_Fire += clamp((Space ?: 0) - MRLS_Fire,-DT*3,DT*3)
+
+            MRLS_Pitch = lerpN(-90,clamp(Holo_Cockpit:toLocal((PlayerAim - Holo_MRLS:pos()):toAngle()):pitch(),-90,0),MRLS_Fire)
+            holoAng(800,Holo_Cockpit:toWorld(ang(MRLS_Pitch,0,0)))
+        }
+
+        else {
+            holoAng(800,Holo_Cockpit:toWorld(ang(lerpN(-45,MRLS_Pitch,MRLS_Fire),0,0)))
+        }
+
+        if (!MRLS_CanFire) {
+            if (CT - MRLS_Wait > 5) {
+                MRLS_CanFire = 1
+
+                Holo_MRLS:soundPlay("can_fire_mrls",0,"weapons/physcannon/physcannon_pickup.wav")
+
+                for (I = 1,8) {
+                    holoAlpha(MRLS_Data[I,table]["index",number],255)
+                }
+            }
+        }
+        else {
+            if (!MRLS_Sequence) {
+                if (MRLS_Fire == 1 & Mouse1) {
+                    MRLS_CanFire = 0
+                    MRLS_Sequence = 8
+                }
+            }
+        }
+
+        if (MRLS_Sequence) {
+            MRLS_Sequence = max(MRLS_Sequence - DT*2,0)
+            MRLS_Tube = ceil(MRLS_Sequence)
+
+            if (MRLS_Tube > 0) {
+                local T = MRLS_Data[MRLS_Tube,table]
+                local V = MRLS_Tube - MRLS_Sequence
+
+                T["velocity",number] = 5000*V*V*V*DT
+                T["randvec",vector] = randvec(-0.05,0.05):setZ(0)
+            }
+
+            if (changed(MRLS_Tube) & MRLS_Tube > 0) {
+                local T = MRLS_Data[MRLS_Tube,table]
+                local N = T["index",number]
+
+                holoUnparent(N)
+                holoEntity(N):setTrails(10,1,0.5,"trails/smoke",vec(255,200,200),100)
+                holoEntity(N):soundPlay("fire_missile_" + MRLS_Tube,1,"weapons/rpg/rocket1.wav")
+
+                RecoilVector += MechEntity:toLocalAxis(-Holo_MRLS:forward()*5)
+
+                MRLS_Active:pushNumber(MRLS_Tube)
+            }
+        }
+
+        if (MRLS_Active:count()) {
+            MRLS_Wait = CT
+
+            foreach (K,N:number = MRLS_Active) {
+                local T = MRLS_Data[N,table]
+                local N = T["index",number]
+
+                local P = rangerOffset(holoEntity(N):pos(),holoEntity(N):pos() + (T["randvec",vector] + holoEntity(N):up())*T["velocity",number])
+                if (P:hit()) {
+                    local Temp = propSpawn("models/props_phx/misc/potato_launcher_explosive.mdl",P:position(),1),Temp:propBreak()
+
+                    holoAlpha(N,0)
+                    holoEntity(N):removeTrails()
+                    holoPos(N,Holo_MRLS:toWorld(T["startPos",vector]))
+                    holoAng(N,Holo_MRLS:toWorld(ang(90,0,0)))
+                    holoParent(N,Holo_MRLS)
+
+                    MRLS_Active:remove(K)
+                }
+                else {
+                    holoPos(N,P:position())
+                }
+            }
+        }
+
+        #-- cannon system
+        for (I = 1,2) {
+            #-- if firing sequence
+            if (Cannons[I,number]) {
+                Cannons[I,number] = max(Cannons[I,number] - DT*2,0)
+
+                local NextAngle = Cannons[I + 2,number] + (Cannons[I + 2,number] + 120 - Cannons[I + 2,number])*(1 - Cannons[I,number])
+                local NextQuat  = quat(ang(90,0,0))*qRotation(vec(0,0,NextAngle))
+
+                holoAng(538 + I*100,holoEntity(535 + I*100):toWorld(NextQuat:toAngle()))
+
+                if (Cannons[I,number] == 0) {
+                    Cannons[I + 2,number] = NextAngle
+                    holoEntity(535 + I*100):soundPlay(I + "cannon_reload",0,"weapons/crossbow/reload1.wav")
+                }
+            }
+
+            #-- if inactive
+            else {
+                local Fire = select(I,Mouse1,Mouse2)*!MRLS_Fire
+                if (Fire) {
+                    local CanShoot = !select(I,Cannons[2,number],Cannons[1,number]) & propCanCreate()
+                    if (CanShoot) {
+                        #-- cannon fire sound
+                        holoEntity(538 + I*100):soundPlay(I + "cannon_fire",0,"weapons/irifle/irifle_fire2.wav")
+                        soundPitch(I + "cannon_fire",65)
+
+                        #-- cannon fire projectile
+                        local P = propSpawn("models/props_phx/misc/potato_launcher_explosive.mdl",holoEntity(535 + I*100):toWorld(vec(30,0,0)),holoEntity(535 + I*100):toWorld(ang(90,0,0)),0)
+
+                        P:setAlpha(0),P:setMass(100),P:setTrails(10,1,0.25,"trails/smoke",vec(255,255,135),200)
+                        P:applyForce(P:mass()*holoEntity(535 + I*100):forward()*3000)
+
+                        rangerFilter(P)
+
+                        CannonProjectiles:pushEntity(P)
+
+                        #-- cannon fire recoil
+                        RecoilVector += MechEntity:toLocalAxis(-(PlayerAim - holoEntity(538 + I*100):pos()):normalized()*15)
+
+                        #-- cannon fire sequence
+                        Cannons[I,number] = 1
+                    }
+                }
+            }
+        }
+
+        #-- recoil divide toward zero
+        RecoilVector /= 1.5
+
+        #-- explode cannon projectiles
+        foreach (K,V:entity = CannonProjectiles) {
+            local R = rangerOffset(V:pos(),V:pos() + V:vel():normalized()*200)
+            if (R:hit() | V == noentity()) {
+                CannonProjectiles:remove(K)
+                V:propBreak()
+            }
+        }
+
+        #-- left arm holograms
+        local Diff = Holo_Cockpit:toLocalAxis(PlayerAim - holoEntity(601):pos())
+        local Dist = min(Diff:length(),60)
+
+        local Y = atan(Diff:y(),Diff:x())
+        local P = atan(Diff:x(),Diff:z()) - icos(Dist,30,30)
+        local Frac = abs(Diff:normalized():y())*45 + 15 + Cannons[1,number]*25 + Cos*5
+
+        holoAng(600,Holo_Cockpit:toWorld(ang(0,Diff:normalized():y()*45 + Cannons[1,number]*25,-25)))
+        holoAng(601,Holo_Cockpit:toWorld(ang(P + 180 + Frac + ActiveN*75,Y,180)))
+        holoAng(602,holoEntity(601):toWorld(ang(-icos(30,30,Dist) + 180 + Frac + ActiveN*15,0,0)))
+        holoEntity(601):hydraulic(624,633)
+
+        #-- right arm holograms
+        local Diff = Holo_Cockpit:toLocalAxis(PlayerAim - holoEntity(701):pos())
+        local Dist = min(Diff:length(),60)
+
+        local Y = atan(Diff:y(),Diff:x())
+        local P = atan(Diff:x(),Diff:z()) - icos(Dist,30,30)
+        local Frac = abs(Diff:normalized():y())*45 + 15 + Cannons[2,number]*25 + Cos*5
+
+        holoAng(700,Holo_Cockpit:toWorld(ang(0,Diff:normalized():y()*45 - Cannons[2,number]*25,25)))
+        holoAng(701,Holo_Cockpit:toWorld(ang(P + 180 + Frac + ActiveN*75,Y,180)))
+        holoAng(702,holoEntity(701):toWorld(ang(-icos(30,30,Dist) + 180 + Frac + ActiveN*15,0,0)))
+        holoEntity(701):hydraulic(724,733)
+    }
+}

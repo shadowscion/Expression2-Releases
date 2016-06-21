@@ -1,0 +1,220 @@
+#-------------------------------------
+#-- a very simple and unperfect library
+#-- for holo mech step generation
+
+#-- by shadowscion
+
+@name mech_project/mech_lib
+
+#-- core
+@persist [CT DT]
+
+#-- mech
+@persist [MechEntity]:entity [MechFeet]:table [MechMoveDir FootAveragePos]:vector [MechMoveSpeed MechEdgeDetect]
+
+#-- constants
+@persist [MechHeight Cycle FootCycleRate FootLerpRate]
+
+
+#[
+
+    example usage:
+
+    if (first()) {
+        #include "mech_project/mech_lib"
+
+        MechEntity = holoCreate(10)
+        for (I = 1,4) { holoCreate(I) }
+
+        FootLerpRate = 2.00
+        FootCycleRate = 0.25
+        MechHeight = 100
+
+        MechFeet:createFoot("fl",vec(50,50,0)*2):setFootGait(0.00,0.25)
+        MechFeet:createFoot("fr",vec(50,-50,0)*2):setFootGait(0.50,0.75)
+        MechFeet:createFoot("rl",vec(-50,50,0)*2):setFootGait(0.25,0.50)
+        MechFeet:createFoot("rr",vec(-50,-50,0)*2):setFootGait(0.75,1.00)
+    }
+
+    dt(60,1)
+
+    MechFeet:cycleAllFeet()
+
+    MechMoveDir = MechEntity:forward()*100
+
+    holoPos(10,mix(FootAveragePos + vec(0,0,MechHeight),holoEntity(10):pos(),0.5))
+    holoAng(10,ang(0,curtime()*0,0))
+
+    holoPos(1,MechFeet["fl",table]["stepPos",vector])
+    holoPos(2,MechFeet["fr",table]["stepPos",vector])
+    holoPos(3,MechFeet["rl",table]["stepPos",vector])
+    holoPos(4,MechFeet["rr",table]["stepPos",vector])
+
+]#
+
+#-------------------------------------
+#-- constant values
+function dt(Interval,TimeScale) {
+    interval(Interval)
+
+    if (!CT) { CT = curtime() }
+
+    DT = curtime() - CT
+    CT = curtime()
+
+    DT *= TimeScale
+
+    Ops = ops()
+    Cpu = cpuUsage()*10000
+}
+
+MechEdgeDetect = 1
+
+#-------------------------------------
+#-- add a new foot
+function table table:createFoot(Key:string,RestPos:vector) {
+    #-- initial foot vectors
+    local Default = rangerOffset(MechHeight*2,MechEntity:toWorld(RestPos),-MechEntity:up()):position()
+
+    #-- table of foot data
+    This[Key,table] = table(
+        "key" = Key,
+        "point0" = Default,#-- bezier start
+        "point1" = Default,#-- bezier control
+        "point2" = Default,#-- bezler finish
+        "stepPos" = Default,#-- end effect of bezier curve
+        "restPos" = RestPos  #-- foot res position
+    )
+
+    return This[Key,table]
+}
+
+
+#-------------------------------------
+#-- set foot sounds (soundStepTake,soundStepDone)
+function table:setFootSound(Id:string,Path:string,Ent:entity,Volume,Pitch) {
+    This[Id,string] = Path
+    This[Id+"Ent",entity] = Ent
+    This[Id+"Pitch",number] = Pitch
+    This[Id+"Volume",number] = Volume
+}
+
+
+#-------------------------------------
+#-- set when foot should trigger
+function table table:setFootGait(Min,Max) {
+    This["inMin",number] = Min
+    This["inMax",number] = Max
+
+    return This
+}
+
+
+#-------------------------------------
+#-- calculate next step coordinates
+function void table:setFootTransition() {
+    #-- set point0 of step to point2 of previous step
+    This["point0",vector] = This["stepPos",vector] #This["point2",vector]
+
+    #-- find suitable point2 of step
+    local Hull = vec(6,6,1)
+    local Trace = rangerOffsetHull(MechHeight*4,MechEntity:toWorld(This["restPos",vector]+vec(0,0,MechHeight)) + MechMoveDir*floor(MechEdgeDetect),-MechEntity:up(),-Hull,Hull)
+
+    if (Trace:hit()) {
+        This["point2",vector] = Trace:position()
+        This["noHit",number] = 0
+    }
+    else {
+        This["noHit",number] = 1 / MechFeet:count()
+    }
+
+    #-- set point1 of step to average of point0 and point2 + z value
+    local Normal = This["point2",vector] - This["point0",vector]
+    local ZValue = Normal:toAngle():up() * Normal:length()*0.50
+    This["point1",vector] = mix(This["point2",vector],This["point0",vector],0.5) + ZValue
+
+    #-- reset linear interpolation value
+    This["lerp",number] = Normal:length() > 5 ? 0 : 1
+
+    #-- play a step sound if there is one
+    if (This["lerp",number] == 0) {
+        if (This["soundStepTake",string] != "") {
+            This["soundStepTakeEnt",entity]:soundPlay("step_take" + This["key",string],0,This["soundStepTake",string])
+            soundPitch("step_take" + This["key",string],This["soundStepTakePitch",number])
+            soundVolume("step_take" + This["key",string],This["soundStepTakeVolume",number])
+        }
+    }
+}
+
+
+#-------------------------------------
+#-- perform calculated step
+function void table:perfFootTransition() {
+    #-- linear interpolation from 0-1
+    if (This["lerp",number] < 1) {
+        This["lerp",number] = min(This["lerp",number] + DT*FootLerpRate,1)
+
+        #-- quadratic bezier curve between the three points
+        This["stepPos",vector] = bezier(This["point0",vector],This["point1",vector],This["point2",vector],This["lerp",number])
+
+        #-- if linear interpolation value is 1,the step is complete
+        if (This["lerp",number] == 1) {
+            if (This["soundStepDone",string] != "") {
+                This["soundStepDoneEnt",entity]:soundPlay("step_done" + This["key",string],0,This["soundStepDone",string])
+                soundPitch("step_done" + This["key",string],This["soundStepDonePitch",number])
+                soundVolume("step_done" + This["key",string],This["soundStepDoneVolume",number])
+            }
+        }
+    }
+    else {
+        local Hull = vec(6,6,0)
+        local Trace = rangerOffsetHull(MechHeight*3,This["point2",vector]+vec(0,0,MechHeight),-MechEntity:up(),-Hull,Hull)
+        This["stepPos",vector] = Trace:position()
+    }
+}
+
+
+#-------------------------------------
+#-- run cycle
+function void table:cycleFootTransition() {
+    #-- if cycle is within min/max
+    local Trigger = Cycle >= This["inMin",number] & Cycle < This["inMax",number]
+
+    #-- only set a transition when trigger value changes
+    if (This["trigger",number] != Trigger) {
+        This["trigger",number] = Trigger
+        if (Trigger) {
+            This:setFootTransition()
+        }
+    }
+
+    #-- perform transition with set values
+    This:perfFootTransition()
+
+    #-- add the output position to an average value
+    FootAveragePos += This["stepPos",vector]
+}
+
+
+#-------------------------------------
+#-- run all cycles
+function void table:cycleAllFeet() {
+    #-- increment cycle value by deltatime*rate
+    Cycle = (Cycle + DT*FootCycleRate) % 1
+
+    #-- reset average foot position
+    FootAveragePos = vec()
+
+    #-- edge detection
+    MechEdgeDetect = 1
+
+    #-- loop through every foot
+    foreach (K,Foot:table = This) {
+        MechEdgeDetect -= Foot["noHit",number]
+        Foot:cycleFootTransition()
+    }
+
+    #-- divide average foot position by foot count
+    FootAveragePos /= MechFeet:count()
+}
+

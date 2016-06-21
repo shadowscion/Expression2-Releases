@@ -1,0 +1,486 @@
+#-------------------------------------
+#-- holo data for this mech_project
+#-- by shadowscion
+
+@name mech_project/mech_holo
+
+#-- core
+@persist [HN CN HS CS] HT:table CR:table ShowSkeleton
+
+#-- info
+@persist [LegLengthAF LegLengthBF LegLengthCF] [LegLengthAR LegLengthBR LegLengthCR]
+
+
+#--------------------------------
+#-- hologram spawn function
+if (first()) { timer("spawn",15) }
+
+function number spawn_holograms() {
+    timer("spawn",15)
+
+    while (perf() & HS < HN & holoCanCreate()) {
+        HS++
+
+        local Data = HT[HS,array]
+
+        local Index  = Data[1,number]
+        local Parent = holoEntity(Data[2,number]) ?: entity()
+
+        holoCreate(Index,Parent:toWorld(Data[3,vector]),Data[5,vector]/Data[9,number],Parent:toWorld(Data[4,angle]))
+        holoParent(Index,Parent)
+        holoModel(Index,Data[6,string])
+        holoMaterial(Index,Data[7,string])
+        holoColor(Index,Data[8,vector4])
+
+        if (CR[Index,table]) {
+            for (K = 1,CR[Index,table]:count()) {
+                local Clip = CR[Index,table][K,array]
+                holoClipEnabled(Index,Clip[1,number],1)
+                holoClip(Index,Clip[2,vector],Clip[3,vector],0)
+            }
+        }
+    }
+
+    if (HS >= HN) {
+        stoptimer("spawn")
+        printColor(vec(225,255,225),"\nFinished spawning " + HS + " holograms.")
+    }
+
+    return HS >= HN
+}
+
+function spawn_help() {
+    local TextColor  = vec(255,255,255)
+    local InputColor = vec(160,240,160)
+    local TypeColor  = vec(240,160,96)
+    local OptionColor = vec(255,255,200)
+    local CheckedY   = vec(100,255,100)
+    local CheckedN   = vec(255,100,100)
+
+    hint("Mech Project: See chatbox or console for setup instructions",15)
+    printColor(
+        TextColor,"- Spawn a jeep seat or other pod and wire the ",InputColor,"Seat",TypeColor," entity",TextColor," input to it.\n",
+        TextColor,"- Spawn a camera controller and wire the ",InputColor,"Camera",TypeColor," wirelink",TextColor," input to it. Link it to the pod.\n",
+        TextColor,"- Make sure the camera controller has the following options: \n",
+        TextColor," - ",OptionColor,"Coordinates local to parent: ",CheckedY,"checked\n",
+        TextColor," - ",OptionColor,"Clientside movement: ",CheckedY,"checked\n",
+        TextColor," - ",OptionColor,"Localized movement: ",CheckedN,"unhecked\n",
+        TextColor," - ",OptionColor,"Clientside zooming: ",CheckedY,"checked\n"
+    )
+}
+
+function entity:controls_help(D) {
+    This:hintDriver( "Mech Project Controls:",D )
+    This:hintDriver( "W / S / Shift - Move forward/reverse/sprint",D )
+    This:hintDriver( "A / D - Strafe left/right",D )
+    This:hintDriver( "Reload/Use - Exit",D )
+    This:hintDriver( "Mech will rotate toward your aim position",D )
+    This:hintDriver( "Cannons can be fired with Mouse1 and Mouse2",D )
+    This:hintDriver( "MRLS can be fired by holding space and then pressing Mouse1",D )
+}
+
+
+#--------------------------------
+#-- inverse kinematics functions
+function number icos(A,B,C) {
+    return acos((A^2 + B^2 - C^2) / (2*A*B))
+}
+
+function void mech_project_ik(Base:entity,Target:vector,L1,L2,A,B,C,D,E) {
+    local DirZ = Base:toLocalAxis(Target - holoEntity(A):pos())
+    holoAng(A,Base:toWorld(ang(0,atan(DirZ:y(),DirZ:x()),0)))
+
+    local DirY = holoEntity(A):toLocalAxis(Target - holoEntity(A):pos())
+    holoAng(B,holoEntity(A):toWorld(ang(atan(DirY:x(),DirY:z()),0,0)))
+
+    local DirY = holoEntity(B):toLocalAxis(Target - holoEntity(C):pos())
+    local Diff = min(DirY:length() - L1,L2 + L2)
+
+    holoAng(C,holoEntity(B):toWorld(ang(-icos(Diff,L2,L2),0,0)))
+    holoAng(D,holoEntity(C):toWorld(ang(-asin(Diff / (L2+L2)) + 90,0,0)))
+    holoAng(E,holoEntity(C):toWorld(ang(-icos(L2,L2,Diff) + 180,0,0)))
+}
+
+function void entity:hydraulic(A,B) {
+    local Dir = This:toLocalAxis(holoEntity(B):pos() - holoEntity(A):pos())
+    holoAng(A,This:toWorld(ang(atan(Dir:x(),Dir:z()) + 90,0,90)))
+    holoAng(B,This:toWorld(ang(atan(-Dir:z(),Dir:x()),0,90)))
+}
+
+function number approach(Cur,Tar,R) {
+    if (Cur < Tar) {
+        return clamp(Cur + R,Cur,Tar)
+    }
+    elseif (Cur > Tar) {
+        return clamp(Cur - R,Tar,Cur)
+    }
+    return Tar
+}
+
+function number approachAngle(Cur,Tar,R) {
+    local Diff = angnorm(Tar - Cur)
+    if (Diff > 180) { Diff -= 360 }
+    return approach(Cur,Cur+Diff,R)
+}
+
+function number lerpN(A,B,T) {
+    return A + (B - A)*T
+}
+
+
+#--------------------------------
+#-- inverse kinematics variables
+LegLengthAF = 50
+LegLengthBF = 50
+LegLengthCF = 50
+
+LegLengthAR = 50
+LegLengthBR = 50
+LegLengthCR = 50
+
+
+#--------------------------------
+#-- hologram data
+
+#-- bone data
+local ShowBones = 0
+local ShowSkeleton = 0
+
+local BoneModel = "sphere"
+local BoneColor = vec4(255,255,255,255*ShowBones)
+local BoneScale = vec(6,6,6)
+
+local Ang = ang()
+local Vec = vec()
+
+#-- bones: base
+HN++,HT[HN,array] = array(1,0,Vec,Ang,BoneScale,BoneModel,"",BoneColor,12)
+HN++,HT[HN,array] = array(2,1,Vec,Ang,BoneScale,BoneModel,"",BoneColor,12)
+HN++,HT[HN,array] = array(3,2,vec(0,0,35),Ang,BoneScale,BoneModel,"",BoneColor,12)
+
+#-- bones: front left leg
+HN++,HT[HN,array] = array(100,2,vec(25,30,-5),Ang,BoneScale,BoneModel,"",BoneColor,12)
+HN++,HT[HN,array] = array(101,100,Vec,Ang,BoneScale,BoneModel,"",BoneColor,12)
+HN++,HT[HN,array] = array(102,101,vec(0,0,LegLengthAF),Ang,BoneScale,BoneModel,"",BoneColor,12)
+HN++,HT[HN,array] = array(103,102,vec(0,0,LegLengthBF),Ang,BoneScale,BoneModel,"",BoneColor,12)
+HN++,HT[HN,array] = array(104,103,vec(0,0,LegLengthCF),Ang,BoneScale,BoneModel,"",BoneColor,12)
+#HN++,HT[HN,array] = array(105,104,vec(0,0,LegLengthBF),Ang,BoneScale,BoneModel,"",BoneColor,12)
+
+#-- bones: front right leg
+HN++,HT[HN,array] = array(200,2,vec(25,-30,-5),Ang,BoneScale,BoneModel,"",BoneColor,12)
+HN++,HT[HN,array] = array(201,200,Vec,Ang,BoneScale,BoneModel,"",BoneColor,12)
+HN++,HT[HN,array] = array(202,201,vec(0,0,LegLengthAF),Ang,BoneScale,BoneModel,"",BoneColor,12)
+HN++,HT[HN,array] = array(203,202,vec(0,0,LegLengthBF),Ang,BoneScale,BoneModel,"",BoneColor,12)
+HN++,HT[HN,array] = array(204,203,vec(0,0,LegLengthCF),Ang,BoneScale,BoneModel,"",BoneColor,12)
+#HN++,HT[HN,array] = array(205,204,vec(0,0,LegLengthBF),Ang,BoneScale,BoneModel,"",BoneColor,12)
+
+#-- bones: rear left leg
+HN++,HT[HN,array] = array(300,2,vec(-25,30,-5),Ang,BoneScale,BoneModel,"",BoneColor,12)
+HN++,HT[HN,array] = array(301,300,Vec,Ang,BoneScale,BoneModel,"",BoneColor,12)
+HN++,HT[HN,array] = array(302,301,vec(0,0,LegLengthAR),Ang,BoneScale,BoneModel,"",BoneColor,12)
+HN++,HT[HN,array] = array(303,302,vec(0,0,LegLengthBR),Ang,BoneScale,BoneModel,"",BoneColor,12)
+HN++,HT[HN,array] = array(304,303,vec(0,0,LegLengthCR),Ang,BoneScale,BoneModel,"",BoneColor,12)
+#HN++,HT[HN,array] = array(305,304,vec(0,0,LegLengthBR),Ang,BoneScale,BoneModel,"",BoneColor,12)
+
+#-- bones: rear right leg
+HN++,HT[HN,array] = array(400,2,vec(-25,-30,-5),Ang,BoneScale,BoneModel,"",BoneColor,12)
+HN++,HT[HN,array] = array(401,400,Vec,Ang,BoneScale,BoneModel,"",BoneColor,12)
+HN++,HT[HN,array] = array(402,401,vec(0,0,LegLengthAR),Ang,BoneScale,BoneModel,"",BoneColor,12)
+HN++,HT[HN,array] = array(403,402,vec(0,0,LegLengthBR),Ang,BoneScale,BoneModel,"",BoneColor,12)
+HN++,HT[HN,array] = array(404,403,vec(0,0,LegLengthCR),Ang,BoneScale,BoneModel,"",BoneColor,12)
+#HN++,HT[HN,array] = array(405,404,vec(0,0,LegLengthBR),Ang,BoneScale,BoneModel,"",BoneColor,12)
+
+#-- bones: left top arm
+HN++,HT[HN,array] = array(600,3,vec(28,34,20),Ang,BoneScale,BoneModel,"",BoneColor,12) #vec(-53,31,55)
+HN++,HT[HN,array] = array(601,600,vec(0,31,0),Ang,BoneScale,BoneModel,"",BoneColor,12)
+HN++,HT[HN,array] = array(602,601,vec(0,0,30),Ang,BoneScale,BoneModel,"",BoneColor,12)
+HN++,HT[HN,array] = array(603,602,vec(0,0,30),ang(-90,180,0),BoneScale,BoneModel,"",BoneColor,12)
+
+#-- bones: right top arm
+HN++,HT[HN,array] = array(700,3,vec(28,-34,20),Ang,BoneScale,BoneModel,"",BoneColor,12) #vec(-53,-31,55)
+HN++,HT[HN,array] = array(701,700,vec(0,-31,0),Ang,BoneScale,BoneModel,"",BoneColor,12)
+HN++,HT[HN,array] = array(702,701,vec(0,0,30),Ang,BoneScale,BoneModel,"",BoneColor,12)
+HN++,HT[HN,array] = array(703,702,vec(0,0,30),ang(-90,180,0),BoneScale,BoneModel,"",BoneColor,12)
+
+
+if (ShowSkeleton) {
+    local BoneScale = BoneScale*0.75
+    local BoneColor = vec4(125,125,125,255)
+    local BoneModel = "cylinder"
+
+    #-- skeleton: front left leg
+    HN++,HT[HN,array] = array(106,101,vec(0,0,LegLengthAF*0.5),Ang,BoneScale:setZ(LegLengthAF),BoneModel,"",BoneColor,12)
+    HN++,HT[HN,array] = array(107,102,vec(0,0,LegLengthBF*0.5),Ang,BoneScale:setZ(LegLengthBF),BoneModel,"",BoneColor,12)
+    HN++,HT[HN,array] = array(108,103,vec(0,0,LegLengthCF*0.5),Ang,BoneScale:setZ(LegLengthCF),BoneModel,"",BoneColor,12)
+    HN++,HT[HN,array] = array(109,104,vec(0,0,LegLengthBF*0.5),Ang,BoneScale:setZ(LegLengthBF),BoneModel,"",BoneColor,12)
+
+    #-- skeleton: front right leg
+    HN++,HT[HN,array] = array(206,201,vec(0,0,LegLengthAF*0.5),Ang,BoneScale:setZ(LegLengthAF),BoneModel,"",BoneColor,12)
+    HN++,HT[HN,array] = array(207,202,vec(0,0,LegLengthBF*0.5),Ang,BoneScale:setZ(LegLengthBF),BoneModel,"",BoneColor,12)
+    HN++,HT[HN,array] = array(208,203,vec(0,0,LegLengthCF*0.5),Ang,BoneScale:setZ(LegLengthCF),BoneModel,"",BoneColor,12)
+    HN++,HT[HN,array] = array(209,204,vec(0,0,LegLengthBF*0.5),Ang,BoneScale:setZ(LegLengthBF),BoneModel,"",BoneColor,12)
+
+    #-- skeleton: rear left leg
+    HN++,HT[HN,array] = array(306,301,vec(0,0,LegLengthAF*0.5),Ang,BoneScale:setZ(LegLengthAF),BoneModel,"",BoneColor,12)
+    HN++,HT[HN,array] = array(307,302,vec(0,0,LegLengthBF*0.5),Ang,BoneScale:setZ(LegLengthBF),BoneModel,"",BoneColor,12)
+    HN++,HT[HN,array] = array(308,303,vec(0,0,LegLengthCF*0.5),Ang,BoneScale:setZ(LegLengthCF),BoneModel,"",BoneColor,12)
+    HN++,HT[HN,array] = array(309,304,vec(0,0,LegLengthBF*0.5),Ang,BoneScale:setZ(LegLengthBF),BoneModel,"",BoneColor,12)
+
+    #-- skeleton: rear right leg
+    HN++,HT[HN,array] = array(406,401,vec(0,0,LegLengthAF*0.5),Ang,BoneScale:setZ(LegLengthAF),BoneModel,"",BoneColor,12)
+    HN++,HT[HN,array] = array(407,402,vec(0,0,LegLengthBF*0.5),Ang,BoneScale:setZ(LegLengthBF),BoneModel,"",BoneColor,12)
+    HN++,HT[HN,array] = array(408,403,vec(0,0,LegLengthCF*0.5),Ang,BoneScale:setZ(LegLengthCF),BoneModel,"",BoneColor,12)
+    HN++,HT[HN,array] = array(409,404,vec(0,0,LegLengthBF*0.5),Ang,BoneScale:setZ(LegLengthBF),BoneModel,"",BoneColor,12)
+}
+
+#-- visuals
+local Black = vec4(35,35,35,255)
+local White = vec4(255,255,255,255)
+local Gray = select(randint(1,3),vec4(65,55,55,255),vec4(55,65,55,255),vec4(55,55,65,255))
+
+#-- models/props_debris/building_template022j
+#-- models/Cheeze/wires/metal_texture
+#-- models/props_c17/metalladder003
+
+local Material1 = "models/props_debris/building_template022j"
+local Material2 = ""
+
+#-- visuals: front left leg
+HN++,HT[HN,array] = array(110,101,vec(0,0,2),ang(180,0,0),vec(1,1,1),"models/props_combine/breenglobe.mdl",Material1,Black,1)
+HN++,HT[HN,array] = array(111,101,vec(0,5,LegLengthAF*0.5+7),ang(0,90,0),vec(0.25,0.35,0.65),"models/props_c17/gravestone002a.mdl",Material1,Gray,1)
+HN++,HT[HN,array] = array(112,101,vec(0,-5,LegLengthAF*0.5+7),ang(0,90,0),vec(0.25,0.35,0.65),"models/props_c17/gravestone002a.mdl",Material1,Gray,1)
+HN++,HT[HN,array] = array(113,101,vec(-14,0,13),ang(90,0,0),vec(1,1,1),"models/props_wasteland/panel_leverHandle001a.mdl",Material1,Gray,1)
+HN++,HT[HN,array] = array(114,101,vec(-14,0,13),ang(20,0,90),vec(0.5,0.5,1),"models/props_junk/PopCan01a.mdl",Material1,Gray,1)
+HN++,HT[HN,array] = array(115,114,vec(-14,0,0),ang(90,0,0),vec(0.5,0.5,0.75),"models/props_junk/propane_tank001a.mdl",Material1,Black,1)
+HN++,HT[HN,array] = array(116,101,vec(3,0,LegLengthAF),ang(-90,180,0),vec(2,1,2),"models/props_wasteland/panel_leverHandle001a.mdl",Material1,Gray,1)
+HN++,HT[HN,array] = array(117,101,vec(18,0,LegLengthAF+2),ang(40,0,90),vec(0.5,0.5,1),"models/props_junk/PopCan01a.mdl",Material1,Gray,1)
+HN++,HT[HN,array] = array(118,117,vec(-28,0,0),ang(90,0,0),vec(0.5,0.5,1.5),"models/props_junk/propane_tank001a.mdl",Material1,Black,1)
+
+HN++,HT[HN,array] = array(119,102,vec(0,0,0),ang(0,0,0),vec(0.125),"models/props_wasteland/wheel02a.mdl",Material1,Black,1)
+HN++,HT[HN,array] = array(120,102,vec(0,0,LegLengthBF*0.5+5),ang(0,90,0),vec(0.45,0.35,0.65),"models/props_c17/gravestone002a.mdl",Material1,Gray,1)
+HN++,HT[HN,array] = array(121,102,vec(-13.5,0,LegLengthBF-6),ang(85,0,0),vec(1,0.45,1),"models/props_wasteland/panel_leverHandle001a.mdl",Material1,Gray,1)
+HN++,HT[HN,array] = array(122,102,vec(-13.5,0,LegLengthBF-6),ang(-20,0,90),vec(0.5,0.5,0.5),"models/props_junk/PopCan01a.mdl",Material1,Gray,1)
+HN++,HT[HN,array] = array(123,122,vec(-24,0,0),ang(90,0,0),vec(0.125,0.125,4),"cylinder",Material1,White,1)
+
+HN++,HT[HN,array] = array(124,103,vec(0,2.5,0),ang(0,0,0),vec(0.125*0.5),"models/props_wasteland/wheel02a.mdl",Material1,Black,1)
+HN++,HT[HN,array] = array(125,103,vec(0,-2.5,0),ang(0,0,0),vec(0.125*0.5),"models/props_wasteland/wheel02a.mdl",Material1,Black,1)
+HN++,HT[HN,array] = array(126,103,vec(0,3,LegLengthCF*0.5),ang(0,90,90),vec(2,4.25,2),"models/props_c17/TrapPropeller_Lever.mdl",Material1,Gray,1)
+HN++,HT[HN,array] = array(127,103,vec(0,-3,LegLengthCF*0.5),ang(0,90,90),vec(2,4.25,2),"models/props_c17/TrapPropeller_Lever.mdl",Material1,Gray,1)
+HN++,HT[HN,array] = array(128,103,vec(0,3,LegLengthCF*0.5),ang(0,90,-90),vec(2,4.25,2),"models/props_c17/TrapPropeller_Lever.mdl",Material1,Gray,1)
+HN++,HT[HN,array] = array(129,103,vec(0,-3,LegLengthCF*0.5),ang(0,90,-90),vec(2,4.25,2),"models/props_c17/TrapPropeller_Lever.mdl",Material1,Gray,1)
+
+HN++,HT[HN,array] = array(130,104,vec(0,0,0),ang(0,0,0),vec(0.125*0.5),"models/props_wasteland/wheel02a.mdl",Material1,Black,1)
+HN++,HT[HN,array] = array(131,104,vec(0,0,LegLengthBF*0.5),ang(0,90,-90),vec(2,4.25,2),"models/props_c17/TrapPropeller_Lever.mdl",Material1,Gray,1)
+HN++,HT[HN,array] = array(132,104,vec(6,0,LegLengthBF*0.5-5),ang(90,0,180),vec(1,0.45,1),"models/props_wasteland/panel_leverHandle001a.mdl",Material1,Gray,1)
+HN++,HT[HN,array] = array(133,104,vec(6,0,LegLengthBF*0.5-5),ang(180,0,90),vec(0.5,0.5,0.5),"models/props_junk/PopCan01a.mdl",Material1,Gray,1)
+HN++,HT[HN,array] = array(134,133,vec(-30,0,0),ang(90,0,0),vec(0.125,0.125,5),"cylinder",Material1,White,1)
+
+HN++,HT[HN,array] = array(135,103,vec(-1,0,LegLengthCF*0.5),ang(-90,0,0),vec(1.3,1.35,1.15),"models/props_c17/playground_swingset_seat01a.mdl",Material1,Gray,1)
+
+
+
+#-- visuals: front right leg
+HN++,HT[HN,array] = array(210,201,vec(0,0,2),ang(180,0,0),vec(1,1,1),"models/props_combine/breenglobe.mdl",Material1,Black,1)
+HN++,HT[HN,array] = array(211,201,vec(0,5,LegLengthAF*0.5+7),ang(0,90,0),vec(0.25,0.35,0.65),"models/props_c17/gravestone002a.mdl",Material1,Gray,1)
+HN++,HT[HN,array] = array(212,201,vec(0,-5,LegLengthAF*0.5+7),ang(0,90,0),vec(0.25,0.35,0.65),"models/props_c17/gravestone002a.mdl",Material1,Gray,1)
+HN++,HT[HN,array] = array(213,201,vec(-14,0,13),ang(90,0,0),vec(1,1,1),"models/props_wasteland/panel_leverHandle001a.mdl",Material1,Gray,1)
+HN++,HT[HN,array] = array(214,201,vec(-14,0,13),ang(20,0,90),vec(0.5,0.5,1),"models/props_junk/PopCan01a.mdl",Material1,Gray,1)
+HN++,HT[HN,array] = array(215,214,vec(-14,0,0),ang(90,0,0),vec(0.5,0.5,0.75),"models/props_junk/propane_tank001a.mdl",Material1,Black,1)
+HN++,HT[HN,array] = array(216,201,vec(3,0,LegLengthAF),ang(-90,180,0),vec(2,1,2),"models/props_wasteland/panel_leverHandle001a.mdl",Material1,Gray,1)
+HN++,HT[HN,array] = array(217,201,vec(18,0,LegLengthAF+2),ang(40,0,90),vec(0.5,0.5,1),"models/props_junk/PopCan01a.mdl",Material1,Gray,1)
+HN++,HT[HN,array] = array(218,217,vec(-28,0,0),ang(90,0,0),vec(0.5,0.5,1.5),"models/props_junk/propane_tank001a.mdl",Material1,Black,1)
+
+HN++,HT[HN,array] = array(219,202,vec(0,0,0),ang(0,0,0),vec(0.125),"models/props_wasteland/wheel02a.mdl",Material1,Black,1)
+HN++,HT[HN,array] = array(220,202,vec(0,0,LegLengthBF*0.5+5),ang(0,90,0),vec(0.45,0.35,0.65),"models/props_c17/gravestone002a.mdl",Material1,Gray,1)
+HN++,HT[HN,array] = array(221,202,vec(-13.5,0,LegLengthBF-6),ang(85,0,0),vec(1,0.45,1),"models/props_wasteland/panel_leverHandle001a.mdl",Material1,Gray,1)
+HN++,HT[HN,array] = array(222,202,vec(-13.5,0,LegLengthBF-6),ang(-20,0,90),vec(0.5,0.5,0.5),"models/props_junk/PopCan01a.mdl",Material1,Gray,1)
+HN++,HT[HN,array] = array(223,222,vec(-24,0,0),ang(90,0,0),vec(0.125,0.125,4),"cylinder",Material1,White,1)
+
+HN++,HT[HN,array] = array(224,203,vec(0,2.5,0),ang(0,0,0),vec(0.125*0.5),"models/props_wasteland/wheel02a.mdl",Material1,Black,1)
+HN++,HT[HN,array] = array(225,203,vec(0,-2.5,0),ang(0,0,0),vec(0.125*0.5),"models/props_wasteland/wheel02a.mdl",Material1,Black,1)
+HN++,HT[HN,array] = array(226,203,vec(0,3,LegLengthCF*0.5),ang(0,90,90),vec(2,4.25,2),"models/props_c17/TrapPropeller_Lever.mdl",Material1,Gray,1)
+HN++,HT[HN,array] = array(227,203,vec(0,-3,LegLengthCF*0.5),ang(0,90,90),vec(2,4.25,2),"models/props_c17/TrapPropeller_Lever.mdl",Material1,Gray,1)
+HN++,HT[HN,array] = array(228,203,vec(0,3,LegLengthCF*0.5),ang(0,90,-90),vec(2,4.25,2),"models/props_c17/TrapPropeller_Lever.mdl",Material1,Gray,1)
+HN++,HT[HN,array] = array(229,203,vec(0,-3,LegLengthCF*0.5),ang(0,90,-90),vec(2,4.25,2),"models/props_c17/TrapPropeller_Lever.mdl",Material1,Gray,1)
+
+HN++,HT[HN,array] = array(230,204,vec(0,0,0),ang(0,0,0),vec(0.125*0.5),"models/props_wasteland/wheel02a.mdl",Material1,Black,1)
+HN++,HT[HN,array] = array(231,204,vec(0,0,LegLengthBF*0.5),ang(0,90,-90),vec(2,4.25,2),"models/props_c17/TrapPropeller_Lever.mdl",Material1,Gray,1)
+HN++,HT[HN,array] = array(232,204,vec(6,0,LegLengthBF*0.5-5),ang(90,0,180),vec(1,0.45,1),"models/props_wasteland/panel_leverHandle001a.mdl",Material1,Gray,1)
+HN++,HT[HN,array] = array(233,204,vec(6,0,LegLengthBF*0.5-5),ang(180,0,90),vec(0.5,0.5,0.5),"models/props_junk/PopCan01a.mdl",Material1,Gray,1)
+HN++,HT[HN,array] = array(234,233,vec(-30,0,0),ang(90,0,0),vec(0.125,0.125,5),"cylinder",Material1,White,1)
+
+HN++,HT[HN,array] = array(235,203,vec(-1,0,LegLengthCF*0.5),ang(-90,0,0),vec(1.3,1.35,1.15),"models/props_c17/playground_swingset_seat01a.mdl",Material1,Gray,1)
+
+
+#-- visuals: rear left leg
+HN++,HT[HN,array] = array(310,301,vec(0,0,2),ang(180,0,0),vec(1,1,1),"models/props_combine/breenglobe.mdl",Material1,Black,1)
+HN++,HT[HN,array] = array(311,301,vec(0,5,LegLengthAF*0.5+7),ang(0,90,0),vec(0.25,0.35,0.65),"models/props_c17/gravestone002a.mdl",Material1,Gray,1)
+HN++,HT[HN,array] = array(312,301,vec(0,-5,LegLengthAF*0.5+7),ang(0,90,0),vec(0.25,0.35,0.65),"models/props_c17/gravestone002a.mdl",Material1,Gray,1)
+HN++,HT[HN,array] = array(313,301,vec(-14,0,13),ang(90,0,0),vec(1,1,1),"models/props_wasteland/panel_leverHandle001a.mdl",Material1,Gray,1)
+HN++,HT[HN,array] = array(314,301,vec(-14,0,13),ang(20,0,90),vec(0.5,0.5,1),"models/props_junk/PopCan01a.mdl",Material1,Gray,1)
+HN++,HT[HN,array] = array(315,314,vec(-14,0,0),ang(90,0,0),vec(0.5,0.5,0.75),"models/props_junk/propane_tank001a.mdl",Material1,Black,1)
+HN++,HT[HN,array] = array(316,301,vec(3,0,LegLengthAF),ang(-90,180,0),vec(2,1,2),"models/props_wasteland/panel_leverHandle001a.mdl",Material1,Gray,1)
+HN++,HT[HN,array] = array(317,301,vec(18,0,LegLengthAF+2),ang(40,0,90),vec(0.5,0.5,1),"models/props_junk/PopCan01a.mdl",Material1,Gray,1)
+HN++,HT[HN,array] = array(318,317,vec(-28,0,0),ang(90,0,0),vec(0.5,0.5,1.5),"models/props_junk/propane_tank001a.mdl",Material1,Black,1)
+
+HN++,HT[HN,array] = array(319,302,vec(0,0,0),ang(0,0,0),vec(0.125),"models/props_wasteland/wheel02a.mdl",Material1,Black,1)
+HN++,HT[HN,array] = array(320,302,vec(0,0,LegLengthBF*0.5+5),ang(0,90,0),vec(0.45,0.35,0.65),"models/props_c17/gravestone002a.mdl",Material1,Gray,1)
+HN++,HT[HN,array] = array(321,302,vec(-13.5,0,LegLengthBF-6),ang(85,0,0),vec(1,0.45,1),"models/props_wasteland/panel_leverHandle001a.mdl",Material1,Gray,1)
+HN++,HT[HN,array] = array(322,302,vec(-13.5,0,LegLengthBF-6),ang(-20,0,90),vec(0.5,0.5,0.5),"models/props_junk/PopCan01a.mdl",Material1,Gray,1)
+HN++,HT[HN,array] = array(323,322,vec(-24,0,0),ang(90,0,0),vec(0.125,0.125,4),"cylinder",Material1,White,1)
+
+HN++,HT[HN,array] = array(324,303,vec(0,2.5,0),ang(0,0,0),vec(0.125*0.5),"models/props_wasteland/wheel02a.mdl",Material1,Black,1)
+HN++,HT[HN,array] = array(325,303,vec(0,-2.5,0),ang(0,0,0),vec(0.125*0.5),"models/props_wasteland/wheel02a.mdl",Material1,Black,1)
+HN++,HT[HN,array] = array(326,303,vec(0,3,LegLengthCF*0.5),ang(0,90,90),vec(2,4.25,2),"models/props_c17/TrapPropeller_Lever.mdl",Material1,Gray,1)
+HN++,HT[HN,array] = array(327,303,vec(0,-3,LegLengthCF*0.5),ang(0,90,90),vec(2,4.25,2),"models/props_c17/TrapPropeller_Lever.mdl",Material1,Gray,1)
+HN++,HT[HN,array] = array(328,303,vec(0,3,LegLengthCF*0.5),ang(0,90,-90),vec(2,4.25,2),"models/props_c17/TrapPropeller_Lever.mdl",Material1,Gray,1)
+HN++,HT[HN,array] = array(329,303,vec(0,-3,LegLengthCF*0.5),ang(0,90,-90),vec(2,4.25,2),"models/props_c17/TrapPropeller_Lever.mdl",Material1,Gray,1)
+
+HN++,HT[HN,array] = array(330,304,vec(0,0,0),ang(0,0,0),vec(0.125*0.5),"models/props_wasteland/wheel02a.mdl",Material1,Black,1)
+HN++,HT[HN,array] = array(331,304,vec(0,0,LegLengthBF*0.5),ang(0,90,-90),vec(2,4.25,2),"models/props_c17/TrapPropeller_Lever.mdl",Material1,Gray,1)
+HN++,HT[HN,array] = array(332,304,vec(6,0,LegLengthBF*0.5-5),ang(90,0,180),vec(1,0.45,1),"models/props_wasteland/panel_leverHandle001a.mdl",Material1,Gray,1)
+HN++,HT[HN,array] = array(333,304,vec(6,0,LegLengthBF*0.5-5),ang(180,0,90),vec(0.5,0.5,0.5),"models/props_junk/PopCan01a.mdl",Material1,Gray,1)
+HN++,HT[HN,array] = array(334,333,vec(-30,0,0),ang(90,0,0),vec(0.125,0.125,5),"cylinder",Material1,White,1)
+
+HN++,HT[HN,array] = array(335,303,vec(-1,0,LegLengthCF*0.5),ang(-90,0,0),vec(1.3,1.35,1.15),"models/props_c17/playground_swingset_seat01a.mdl",Material1,Gray,1)
+
+
+#-- visuals: rear right leg
+HN++,HT[HN,array] = array(410,401,vec(0,0,2),ang(180,0,0),vec(1,1,1),"models/props_combine/breenglobe.mdl",Material1,Black,1)
+HN++,HT[HN,array] = array(411,401,vec(0,5,LegLengthAF*0.5+7),ang(0,90,0),vec(0.25,0.35,0.65),"models/props_c17/gravestone002a.mdl",Material1,Gray,1)
+HN++,HT[HN,array] = array(412,401,vec(0,-5,LegLengthAF*0.5+7),ang(0,90,0),vec(0.25,0.35,0.65),"models/props_c17/gravestone002a.mdl",Material1,Gray,1)
+HN++,HT[HN,array] = array(413,401,vec(-14,0,13),ang(90,0,0),vec(1,1,1),"models/props_wasteland/panel_leverHandle001a.mdl",Material1,Gray,1)
+HN++,HT[HN,array] = array(414,401,vec(-14,0,13),ang(20,0,90),vec(0.5,0.5,1),"models/props_junk/PopCan01a.mdl",Material1,Gray,1)
+HN++,HT[HN,array] = array(415,414,vec(-14,0,0),ang(90,0,0),vec(0.5,0.5,0.75),"models/props_junk/propane_tank001a.mdl",Material1,Black,1)
+HN++,HT[HN,array] = array(416,401,vec(3,0,LegLengthAF),ang(-90,180,0),vec(2,1,2),"models/props_wasteland/panel_leverHandle001a.mdl",Material1,Gray,1)
+HN++,HT[HN,array] = array(417,401,vec(18,0,LegLengthAF+2),ang(40,0,90),vec(0.5,0.5,1),"models/props_junk/PopCan01a.mdl",Material1,Gray,1)
+HN++,HT[HN,array] = array(418,417,vec(-28,0,0),ang(90,0,0),vec(0.5,0.5,1.5),"models/props_junk/propane_tank001a.mdl",Material1,Black,1)
+
+HN++,HT[HN,array] = array(419,402,vec(0,0,0),ang(0,0,0),vec(0.125),"models/props_wasteland/wheel02a.mdl",Material1,Black,1)
+HN++,HT[HN,array] = array(420,402,vec(0,0,LegLengthBF*0.5+5),ang(0,90,0),vec(0.45,0.35,0.65),"models/props_c17/gravestone002a.mdl",Material1,Gray,1)
+HN++,HT[HN,array] = array(421,402,vec(-13.5,0,LegLengthBF-6),ang(85,0,0),vec(1,0.45,1),"models/props_wasteland/panel_leverHandle001a.mdl",Material1,Gray,1)
+HN++,HT[HN,array] = array(422,402,vec(-13.5,0,LegLengthBF-6),ang(-20,0,90),vec(0.5,0.5,0.5),"models/props_junk/PopCan01a.mdl",Material1,Gray,1)
+HN++,HT[HN,array] = array(423,422,vec(-24,0,0),ang(90,0,0),vec(0.125,0.125,4),"cylinder",Material1,White,1)
+
+HN++,HT[HN,array] = array(424,403,vec(0,2.5,0),ang(0,0,0),vec(0.125*0.5),"models/props_wasteland/wheel02a.mdl",Material1,Black,1)
+HN++,HT[HN,array] = array(425,403,vec(0,-2.5,0),ang(0,0,0),vec(0.125*0.5),"models/props_wasteland/wheel02a.mdl",Material1,Black,1)
+HN++,HT[HN,array] = array(426,403,vec(0,3,LegLengthCF*0.5),ang(0,90,90),vec(2,4.25,2),"models/props_c17/TrapPropeller_Lever.mdl",Material1,Gray,1)
+HN++,HT[HN,array] = array(427,403,vec(0,-3,LegLengthCF*0.5),ang(0,90,90),vec(2,4.25,2),"models/props_c17/TrapPropeller_Lever.mdl",Material1,Gray,1)
+HN++,HT[HN,array] = array(428,403,vec(0,3,LegLengthCF*0.5),ang(0,90,-90),vec(2,4.25,2),"models/props_c17/TrapPropeller_Lever.mdl",Material1,Gray,1)
+HN++,HT[HN,array] = array(429,403,vec(0,-3,LegLengthCF*0.5),ang(0,90,-90),vec(2,4.25,2),"models/props_c17/TrapPropeller_Lever.mdl",Material1,Gray,1)
+
+HN++,HT[HN,array] = array(430,404,vec(0,0,0),ang(0,0,0),vec(0.125*0.5),"models/props_wasteland/wheel02a.mdl",Material1,Black,1)
+HN++,HT[HN,array] = array(431,404,vec(0,0,LegLengthBF*0.5),ang(0,90,-90),vec(2,4.25,2),"models/props_c17/TrapPropeller_Lever.mdl",Material1,Gray,1)
+HN++,HT[HN,array] = array(432,404,vec(6,0,LegLengthBF*0.5-5),ang(90,0,180),vec(1,0.45,1),"models/props_wasteland/panel_leverHandle001a.mdl",Material1,Gray,1)
+HN++,HT[HN,array] = array(433,404,vec(6,0,LegLengthBF*0.5-5),ang(180,0,90),vec(0.5,0.5,0.5),"models/props_junk/PopCan01a.mdl",Material1,Gray,1)
+HN++,HT[HN,array] = array(434,433,vec(-30,0,0),ang(90,0,0),vec(0.125,0.125,5),"cylinder",Material1,White,1)
+
+HN++,HT[HN,array] = array(435,403,vec(-1,0,LegLengthCF*0.5),ang(-90,0,0),vec(1.3,1.35,1.15),"models/props_c17/playground_swingset_seat01a.mdl",Material1,Gray,1)
+
+
+#-- visuals: body
+HN++,HT[HN,array] = array(500,2,vec(22.5,27.5,0),(vec(25,30,-5)-vec(22.5,27.5,0)):toAngle() + ang(90,0,0),vec(0.45,0.45,0.3),"models/props_wasteland/laundry_basket001.mdl",Material1,Gray,1)
+HN++,HT[HN,array] = array(501,2,vec(22.5,-27.5,0),(vec(25,-30,-5)-vec(22.5,-27.5,0)):toAngle() + ang(90,0,0),vec(0.45,0.45,0.3),"models/props_wasteland/laundry_basket001.mdl",Material1,Gray,1)
+HN++,HT[HN,array] = array(502,2,vec(-22.5,27.5,0),(vec(-25,30,-5)-vec(-22.5,27.5,0)):toAngle() + ang(90,0,0),vec(0.45,0.45,0.3),"models/props_wasteland/laundry_basket001.mdl",Material1,Gray,1)
+HN++,HT[HN,array] = array(503,2,vec(-22.5,-27.5,0),(vec(-25,-30,-5)-vec(-22.5,-27.5,0)):toAngle() + ang(90,0,0),vec(0.45,0.45,0.3),"models/props_wasteland/laundry_basket001.mdl",Material1,Gray,1)
+HN++,HT[HN,array] = array(504,2,vec(0,0,35),ang(0,0,180),vec(1,1,1),"models/hunter/misc/shell2x2a.mdl",Material1,Gray,1)
+
+HN++,HT[HN,array] = array(505,3,vec(0,0,0),ang(0,0,0),vec(1,1,1)*0.9,"models/hunter/misc/sphere2x2.mdl",Material1,Black,1)
+HN++,HT[HN,array] = array(506,3,vec(0,0,12),ang(0,0,0),vec(1,1,1)*0.9,"models/hunter/tubes/circle2x2.mdl",Material1,Black,1)
+HN++,HT[HN,array] = array(507,3,vec(-10,0,15),ang(0,0,0),vec(1,1,0.75)*0.85,"models/props_lab/teleplatform.mdl",Material1,Black,1)
+
+CR[505,table] = table(array(1,vec(0,0,12),vec(0,0,-1)))
+
+
+#-- visuals: left arm
+HN++,HT[HN,array] = array(610,600,vec(0,25,0),ang(0,0,-90),vec(0.25,0.25,0.125),"models/props_wasteland/laundry_basket001.mdl",Material1,Gray,1)
+HN++,HT[HN,array] = array(611,600,vec(0,25,0),ang(0,-90,0),vec(2,1,1),"models/props_lab/tpplug.mdl",Material1,Gray,1)
+
+HN++,HT[HN,array] = array(620,601,vec(0,0,2),ang(180,0,0),vec(0.65),"models/props_combine/breenglobe.mdl",Material1,Black,1)
+HN++,HT[HN,array] = array(621,601,vec(0,3,20),ang(0,90,0),vec(0.25,0.25,0.385),"models/props_c17/gravestone002a.mdl",Material1,Gray,1)
+HN++,HT[HN,array] = array(622,601,vec(0,-3,20),ang(0,90,0),vec(0.25,0.25,0.385),"models/props_c17/gravestone002a.mdl",Material1,Gray,1)
+HN++,HT[HN,array] = array(623,601,vec(12,0,4),ang(45,180,0),vec(1,1,1),"models/props_wasteland/panel_leverHandle001a.mdl",Material1,Gray,1)
+HN++,HT[HN,array] = array(624,623,vec(0,0,0),ang(0,0,90),vec(0.5,0.5,1),"models/props_junk/PopCan01a.mdl",Material1,Gray,1)
+HN++,HT[HN,array] = array(625,624,vec(-16,0,0),ang(90,0,0),vec(0.4,0.4,0.75),"models/props_junk/propane_tank001a.mdl",Material1,Black,1)
+
+HN++,HT[HN,array] = array(630,602,vec(0,0,0),ang(0,0,0),vec(0.075),"models/props_wasteland/wheel02a.mdl",Material1,Black,1)
+HN++,HT[HN,array] = array(631,602,vec(0,0,19),ang(0,90,0),vec(0.25,0.25,0.425),"models/props_c17/gravestone002a.mdl",Material1,Gray,1)
+HN++,HT[HN,array] = array(632,602,vec(10,0,31),ang(110,180,0),vec(0.75,0.5,0.9),"models/props_wasteland/panel_leverHandle001a.mdl",Material1,Gray,1)
+HN++,HT[HN,array] = array(633,632,vec(0,0,0),ang(0,0,90),vec(0.5,0.5,0.5),"models/props_junk/PopCan01a.mdl",Material1,Gray,1)
+HN++,HT[HN,array] = array(634,633,vec(-15,0,0),ang(90,0,0),vec(0.1,0.1,2.5),"cylinder",Material1,White,1)
+
+HN++,HT[HN,array] = array(635,603,vec(-13,7.5,0),ang(0,0,-15),vec(2,1,1),"rcube_thin",Material1,Gray,1)
+HN++,HT[HN,array] = array(636,635,vec(6,0,28),ang(180,0,0),vec(0.35,0.35,0.35),"models/props_c17/canister_propane01a.mdl",Material1,Black,1)
+HN++,HT[HN,array] = array(637,635,vec(-6,0,28),ang(180,0,0),vec(0.35,0.35,0.35),"models/props_c17/canister_propane01a.mdl",Material1,Black,1)
+HN++,HT[HN,array] = array(638,635,vec(18,0,0),ang(90,0,0),vec(1,1,1),"rcylinder",Material1,Black,1)
+
+HN++,HT[HN,array] = array(639,638,vec(0,-3.25,0):rotate(0,120*0 + 30,0),ang(-90,0,0),vec(3,0.35,0.35),"models/props_c17/pipe_cap003.mdl",Material1,Black,1)
+HN++,HT[HN,array] = array(640,638,vec(0,-3.25,0):rotate(0,120*1 + 30,0),ang(-90,0,0),vec(3,0.35,0.35),"models/props_c17/pipe_cap003.mdl",Material1,Black,1)
+HN++,HT[HN,array] = array(641,638,vec(0,-3.25,0):rotate(0,120*2 + 30,0),ang(-90,0,0),vec(3,0.35,0.35),"models/props_c17/pipe_cap003.mdl",Material1,Black,1)
+
+
+#-- visuals: right arm
+HN++,HT[HN,array] = array(710,700,vec(0,-25,0),ang(0,0,90),vec(0.25,0.25,0.125),"models/props_wasteland/laundry_basket001.mdl",Material1,Gray,1)
+HN++,HT[HN,array] = array(711,700,vec(0,-25,0),ang(0,90,0),vec(2,1,1),"models/props_lab/tpplug.mdl",Material1,Gray,1)
+
+HN++,HT[HN,array] = array(720,701,vec(0,0,2),ang(180,0,0),vec(0.65),"models/props_combine/breenglobe.mdl",Material1,Black,1)
+HN++,HT[HN,array] = array(721,701,vec(0,3,20),ang(0,90,0),vec(0.25,0.25,0.385),"models/props_c17/gravestone002a.mdl",Material1,Gray,1)
+HN++,HT[HN,array] = array(722,701,vec(0,-3,20),ang(0,90,0),vec(0.25,0.25,0.385),"models/props_c17/gravestone002a.mdl",Material1,Gray,1)
+HN++,HT[HN,array] = array(723,701,vec(12,0,4),ang(45,180,0),vec(1,1,1),"models/props_wasteland/panel_leverHandle001a.mdl",Material1,Gray,1)
+HN++,HT[HN,array] = array(724,723,vec(0,0,0),ang(0,0,90),vec(0.5,0.5,1),"models/props_junk/PopCan01a.mdl",Material1,Gray,1)
+HN++,HT[HN,array] = array(725,724,vec(-16,0,0),ang(90,0,0),vec(0.4,0.4,0.75),"models/props_junk/propane_tank001a.mdl",Material1,Black,1)
+
+HN++,HT[HN,array] = array(730,702,vec(0,0,0),ang(0,0,0),vec(0.075),"models/props_wasteland/wheel02a.mdl",Material1,Black,1)
+HN++,HT[HN,array] = array(731,702,vec(0,0,19),ang(0,90,0),vec(0.25,0.25,0.425),"models/props_c17/gravestone002a.mdl",Material1,Gray,1)
+HN++,HT[HN,array] = array(732,702,vec(10,0,31),ang(110,180,0),vec(0.75,0.5,0.9),"models/props_wasteland/panel_leverHandle001a.mdl",Material1,Gray,1)
+HN++,HT[HN,array] = array(733,732,vec(0,0,0),ang(0,0,90),vec(0.5,0.5,0.5),"models/props_junk/PopCan01a.mdl",Material1,Gray,1)
+HN++,HT[HN,array] = array(734,733,vec(-15,0,0),ang(90,0,0),vec(0.1,0.1,2.5),"cylinder",Material1,White,1)
+
+HN++,HT[HN,array] = array(735,703,vec(-13,-7.5,0),ang(0,0,15),vec(2,1,1),"rcube_thin",Material1,Gray,1)
+HN++,HT[HN,array] = array(736,735,vec(6,0,28),ang(180,0,0),vec(0.35,0.35,0.35),"models/props_c17/canister_propane01a.mdl",Material1,Black,1)
+HN++,HT[HN,array] = array(737,735,vec(-6,0,28),ang(180,0,0),vec(0.35,0.35,0.35),"models/props_c17/canister_propane01a.mdl",Material1,Black,1)
+HN++,HT[HN,array] = array(738,735,vec(18,0,0),ang(90,0,0),vec(1,1,1),"rcylinder",Material1,Black,1)
+
+HN++,HT[HN,array] = array(739,738,vec(0,-3.25,0):rotate(0,120*0 + 30,0),ang(-90,0,0),vec(3,0.35,0.35),"models/props_c17/pipe_cap003.mdl",Material1,Black,1)
+HN++,HT[HN,array] = array(740,738,vec(0,-3.25,0):rotate(0,120*1 + 30,0),ang(-90,0,0),vec(3,0.35,0.35),"models/props_c17/pipe_cap003.mdl",Material1,Black,1)
+HN++,HT[HN,array] = array(741,738,vec(0,-3.25,0):rotate(0,120*2 + 30,0),ang(-90,0,0),vec(3,0.35,0.35),"models/props_c17/pipe_cap003.mdl",Material1,Black,1)
+
+
+#-- visuals: mrls
+HN++,HT[HN,array] = array(800,3,vec(-56,0,66),ang(0,0,0),vec(1,4,2),"rcube_thin",Material1,Gray,1)
+HN++,HT[HN,array] = array(801,800,vec(24,-24,0)*0.65,ang(0,0,0),vec(1,1,0.9),"models/props_junk/CinderBlock01a.mdl",Material1,Black,1)
+HN++,HT[HN,array] = array(802,800,vec(24,-8,0)*0.65,ang(0,0,0),vec(1,1,0.9),"models/props_junk/CinderBlock01a.mdl",Material1,Black,1)
+HN++,HT[HN,array] = array(803,800,vec(24,8,0)*0.65,ang(0,0,0),vec(1,1,0.9),"models/props_junk/CinderBlock01a.mdl",Material1,Black,1)
+HN++,HT[HN,array] = array(804,800,vec(24,24,0)*0.65,ang(0,0,0),vec(1,1,0.9),"models/props_junk/CinderBlock01a.mdl",Material1,Black,1)
+HN++,HT[HN,array] = array(805,800,vec(-12,0,0),ang(0,0,0),vec(4,3.75,1.75),"rcube_thin",Material1,Gray,1)
+HN++,HT[HN,array] = array(806,800,vec(0,0,0),ang(0,0,90),vec(0.25,0.25,4.5),"cylinder",Material1,White,1)
+
+
+HN++,HT[HN,array] = array(807,800,vec(-35,-15.5,4.5),ang(90,0,0),vec(0.25,0.25,1.5),"models/props_phx/misc/flakshell_big.mdl",Material1,White,1)
+HN++,HT[HN,array] = array(808,800,vec(-35,-15.5,-4.5),ang(90,0,0),vec(0.25,0.25,1.5),"models/props_phx/misc/flakshell_big.mdl",Material1,White,1)
+HN++,HT[HN,array] = array(809,800,vec(-35,-15.5+10,4.5),ang(90,0,0),vec(0.25,0.25,1.5),"models/props_phx/misc/flakshell_big.mdl",Material1,White,1)
+HN++,HT[HN,array] = array(810,800,vec(-35,-15.5+10,-4.5),ang(90,0,0),vec(0.25,0.25,1.5),"models/props_phx/misc/flakshell_big.mdl",Material1,White,1)
+HN++,HT[HN,array] = array(811,800,vec(-35,15.5,4.5),ang(90,0,0),vec(0.25,0.25,1.5),"models/props_phx/misc/flakshell_big.mdl",Material1,White,1)
+HN++,HT[HN,array] = array(812,800,vec(-35,15.5,-4.5),ang(90,0,0),vec(0.25,0.25,1.5),"models/props_phx/misc/flakshell_big.mdl",Material1,White,1)
+HN++,HT[HN,array] = array(813,800,vec(-35,15.5-10,4.5),ang(90,0,0),vec(0.25,0.25,1.5),"models/props_phx/misc/flakshell_big.mdl",Material1,White,1)
+HN++,HT[HN,array] = array(814,800,vec(-35,15.5-10,-4.5),ang(90,0,0),vec(0.25,0.25,1.5),"models/props_phx/misc/flakshell_big.mdl",Material1,White,1)
+
+
+#-- visuals: cockpit
+HN++,HT[HN,array] = array(900,3,vec(0,33.6,24),ang(0,90,180),vec(1.5,2.25,1),"models/props_wasteland/panel_leverHandle001a.mdl",Material1,Gray,1)
+HN++,HT[HN,array] = array(901,3,vec(0,33.6,24),ang(90,0,0),vec(1,1,2),"models/props_junk/PopCan01a.mdl",Material1,White,1)
+HN++,HT[HN,array] = array(902,901,vec(0,-33.6,0),ang(0,-90,90),vec(1,1,1)*0.7,"models/hunter/misc/shell2x2c.mdl",Material1,Gray,1)
+HN++,HT[HN,array] = array(903,3,vec(0,-33.6,24),ang(0,-90,180),vec(1.5,2.25,1),"models/props_wasteland/panel_leverHandle001a.mdl",Material1,Gray,1)
+HN++,HT[HN,array] = array(904,3,vec(0,-33.6,24),ang(90,0,0),vec(1,1,2),"models/props_junk/PopCan01a.mdl",Material1,White,1)
+HN++,HT[HN,array] = array(905,904,vec(0,33.6,0),ang(0,90,-90),vec(1,1,1)*0.7,"models/hunter/misc/shell2x2c.mdl",Material1,Gray,1)
+HN++,HT[HN,array] = array(906,3,vec(0,0,-36),ang(0,-45,0),vec(1,1,0.75),"models/hunter/tubes/tube1x1x2b.mdl",Material1,Black,1)
+HN++,HT[HN,array] = array(907,3,vec(20,0,15),ang(0,0,0),vec(0.25,3,1),"models/props_junk/CinderBlock01a.mdl",Material1,Gray,1)
+HN++,HT[HN,array] = array(908,3,vec(20,0,20),ang(90,0,0),vec(1,2,1),"plane","",vec4(175,0,0,75),1)
+
+
+#-- visuals: compass
+HN++,HT[HN,array] = array(909,3,vec(25,0,18),ang(0,0,0),vec(1,0.125,1),"cplane","",vec4(255,255,0,35),1)
+HN++,HT[HN,array] = array(910,3,vec(25,0,18.25),ang(0,0,0),vec(1,0.05,1),"cplane","",vec4(0,255,0,50),1)
+
+CR[909,table] = table(array(1,vec(0,0,0),vec(1,0,0)))
+CR[910,table] = table(array(1,vec(0,0,0),vec(1,0,0)))

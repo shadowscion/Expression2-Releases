@@ -378,6 +378,7 @@ if (clk()) {
                         local P = propSpawn("models/props_phx/misc/potato_launcher_explosive.mdl",holoEntity(535 + I*100):toWorld(vec(30,0,0)),holoEntity(535 + I*100):toWorld(ang(90,0,0)),0)
 
                         P:setAlpha(0),P:setMass(100),P:setTrails(10,1,0.25,"trails/smoke",vec(255,255,135),200)
+                        P:propFreeze(0)
                         P:applyForce(P:mass()*holoEntity(535 + I*100):forward()*3000)
 
                         rangerFilter(P)

@@ -1,0 +1,92 @@
+@name true_digi_ik_test
+@inputs GPS:vector GPS2:vector
+@outputs 
+@persist [L_AtoB L_BtoC L_CtoD L_DtoE]
+@trigger none
+@model models/maxofs2d/cube_tool.mdl
+
+#[
+    Digitigrade IK by shadowscion
+    WARNING: NOT OPTIMIZED!
+]#
+
+if (first()) {
+    function void holoCreate(N, P, Pos:vector, Ang:angle, Scale:vector, Model:string, Material:string, Color:vector4) {
+        local PR = holoEntity(P) ?: entity()
+        holoCreate(N, PR:toWorld(Pos), Scale, PR:toWorld(Ang))   
+        holoModel(N, Model)
+        holoMaterial(N, Material)
+        holoColor(N, Color)
+        holoParent(N, PR) 
+    }
+    function number icos(A, B, C) {
+        return acos((A^2 + B^2 - C^2) / (2*A*B))    
+    }
+    function ik(A, B, C, D, E, Base:entity, IK:vector) {
+        #--
+        local H_A = holoEntity(A)
+        local H_B = holoEntity(B)
+        local H_C = holoEntity(C)
+        local H_D = holoEntity(D)
+        local H_E = holoEntity(E)
+        
+        #-- A
+        local Dir = Base:toLocalAxis(IK - H_A:pos())
+        local Dis = 1 - min(1, Dir:length() / (L_BtoC + L_CtoD + L_DtoE) - 0.5)
+        local Ang = quat(Dir:toAngle():setRoll(-bearing(H_A:pos(), Base:angles(), IK))) * qRotation(vec(0, 10-Dis*90, 0))
+        
+        holoAng(A, Base:toWorld(Ang:toAngle()))
+        
+        #-- B
+        local Dir = H_A:toLocalAxis(IK - H_B:pos())
+        local Dis = 1 - min(1, Dir:length() / (L_CtoD + L_DtoE) - 0.5)
+    
+        holoAng(B, H_A:toWorld(ang(atan(Dir:x(), Dir:z()) - 60 + Dis*45, 0, 0)))
+        
+        #-- C
+        local Dir = H_B:toLocalAxis(IK - H_C:pos())
+        local Dis = min(Dir:length(), L_CtoD + L_DtoE)
+        
+        holoAng(C, H_B:toWorld(ang(atan(Dir:x(), Dir:z()) - 90 + icos(Dis, L_CtoD, L_DtoE), 0, 0)))
+        
+        #-- D
+        holoAng(D, H_C:toWorld(ang(icos(L_DtoE, L_CtoD, Dis) - 180, 0, 0)))
+    }    
+    
+    
+    L_AtoB = 50           # x/154
+    L_BtoC = L_AtoB*0.650
+    L_CtoD = L_AtoB*1.156
+    L_DtoE = L_AtoB*0.500
+    
+    holoCreate(1, 0, vec(), ang(), vec(0.25), "", "", vec4(255))
+    
+    holoCreate(2, 1, vec(0, L_AtoB*0.325, 0), ang(), vec(6)/12, "", "", vec4(255))       #-- hip joint
+    holoCreate(3, 2, vec(L_AtoB, 0, 0), ang(), vec(5)/12, "", "", vec4(255))             #-- shin joint
+    holoCreate(4, 3, vec(L_BtoC, 0, 0), ang(), vec(4)/12, "", "", vec4(255))             #-- pre-ankle joint
+    holoCreate(5, 4, vec(L_CtoD, 0, 0), ang(), vec(3)/12, "", "", vec4(255))             #-- ankle joint
+    holoCreate(6, 5, vec(L_DtoE, 0, 0), ang(), vec(3)/12, "", "", vec4(255))             #-- toes (end)
+    
+    for (I = 1, 4) {
+        local N = 600+I
+        local L = select(I, L_AtoB, L_BtoC, L_CtoD, L_DtoE)
+        holoCreate(N, 1+I, vec(L*0.5, 0, 0), ang(), vec(L, 5-I, 5-I)/12, "", "", vec4(0, 0, 125, 255))    
+    }
+    
+    holoCreate(7, 1, vec(0, -L_AtoB*0.325, 0), ang(), vec(6)/12, "", "", vec4(255))      #-- hip joint
+    holoCreate(8, 7, vec(L_AtoB, 0, 0), ang(), vec(5)/12, "", "", vec4(255))             #-- shin joint
+    holoCreate(9, 8, vec(L_BtoC, 0, 0), ang(), vec(4)/12, "", "", vec4(255))             #-- pre-ankle joint
+    holoCreate(10, 9, vec(L_CtoD, 0, 0), ang(), vec(3)/12, "", "", vec4(255))            #-- ankle joint
+    holoCreate(11, 10, vec(L_DtoE, 0, 0), ang(), vec(3)/12, "", "", vec4(255))           #-- toes (end)
+    
+    for (I = 1, 4) {
+        local N = 700+I
+        local L = select(I, L_AtoB, L_BtoC, L_CtoD, L_DtoE)
+        holoCreate(N, 6+I, vec(L*0.5, 0, 0), ang(), vec(L, 5-I, 5-I)/12, "", "", vec4(125, 0, 0, 255))    
+    }
+}
+
+interval(60)
+
+ik(2, 3, 4, 5, 6, holoEntity(1), GPS)
+ik(7, 8, 9, 10, 11, holoEntity(1), GPS2)

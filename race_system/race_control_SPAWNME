@@ -1,0 +1,99 @@
+@name race_system/race_control_SPAWNME
+@trigger none
+
+if (first()) {
+    #include "race_system/race_library"
+
+    #--- Instructions:
+    #---
+    #--- Spawn both the <race_interface_SPAWNME> and the <race_control_SPAWNME> chips
+    #--- Spawn an EGP emitter (it will link itself automatically)
+
+    #--- Checkpoint placement:
+    #---
+    #--- newCheckpoint( Position, Rotation, SizeMin, SizeMax )
+    #--- Probably best to just leave SizeMin and SizeMax at <300, 0> for now
+
+    newCheckpoint(entity():pos(), 0, 300, 0)
+    newCheckpoint(entity():pos() + entity():right()*1000, 0, 300, 0)
+    newCheckpoint(entity():pos() + entity():right()*-100, 0, 300, 0)
+
+    #--- Chat Commands:
+    #---
+    #--- Player:
+    #--- !rs trial <lap count> <vehicle name>
+    #---
+    #--- Owner:
+    #--- !rs debug <all, active, last, session>
+    #--- !rs purge <all, active, last, session>
+    #--- !rs remove <player name>
+
+    #---
+    #--- Don't edit anything below this
+    #---
+
+    runOnChat(1)
+    timer("RaceClk", 1000)
+}
+
+if (chatClk()) {
+    local LS = lastSaid()
+    if (LS:sub(1, 4) == "!rs ") {
+        local Player = lastSpoke()
+        local Str = LS:sub(5):explode(" ")
+
+        switch (Str[1, string]:lower()) {
+            case "trial", newTrial(Player, Str[2, string]:toNumber(), Str[3, string] + " " + Str[4, string] + " " + Str[5, string]), break
+
+            case "debug",
+                if (Player == owner()) {
+                    #hideChat(1)
+                    switch (Str[2, string]:lower()) {
+                        case "all",     printTable(S_Active), printTable(S_Last), printTable(S_Sort), break
+                        case "active",  printTable(S_Active), break
+                        case "last",    printTable(S_Last), break
+                        case "session", printTable(S_Sort), break
+                    }
+                }
+            break
+
+            case "purge",
+                if (Player == owner()) {
+                    #hideChat(0)
+                    switch (Str[2, string]:lower()) {
+                        case "all",       S_Active:clear(), S_Last:clear(), S_Sort:clear(), break
+                        case "active",    S_Active:clear(), break
+                        case "last",      S_Last:clear(),   break
+                        case "session",   S_Sort:clear(),   break
+                    }
+                }
+            break
+
+            case "remove",
+                #hideChat(0)
+                if (Player == owner()) {
+                    if (Str[2, string] != "") { S_Active:removeTable(getID(findPlayerByName(Str[2, string]))) }
+                    else { S_Active:removeTable(getID(Player)) }
+                }
+                else {
+                    S_Active:removeTable(getID(Player))
+                }
+            break
+        }
+    }
+}
+
+if (clk("RaceClk")) {
+    timer("RaceClk", 50)
+
+    foreach (K, V:table = S_Active) {
+        V:process()
+    }
+
+    if (changed(S_Sort:count())) {
+        S_Sort["RunSort", number] = 1
+        S_Sort["J", number] = 1
+        S_Sort["I", number] = S_Sort:count() - 3
+    }
+    S_Sort:bubbleSort("_rawtime")
+}

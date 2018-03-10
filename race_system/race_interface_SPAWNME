@@ -1,0 +1,447 @@
+@name race_system/race_interface_SPAWNME
+@outputs Ops
+@persist EGP:wirelink [EDX ESC] [ScoreBoard InfoText OutputTable Colors]:table
+@persist [FilterA FilterB FilterA_V FilterB_V] [MenuSelection MenuPage MenuInfo MenuUnits MenuElement] XGT:gtable
+
+if (first())
+{
+
+    #--- Instructions:
+    #---
+    #--- Spawn both the <race_interface_SPAWNME> and the <race_control_SPAWNME> chips
+    #--- Spawn an EGP emitter (it will link itself automatically)
+
+    #---
+    #--- Don't edit anything below this
+    #---
+
+
+    function wirelink egpInitiallize(TopLeft, ScaleFactor, Type:string)
+    {
+        if (findCanQuery())
+        {
+            findIncludePlayerProps(owner())
+            findInSphere(entity():pos(), 300)
+            findClipToClass("gmod_wire_egp*")
+            findSortByDistance(entity():pos())
+
+            local Find = find()
+            if (Find)
+            {
+                if (Find:type():find(Type))
+                {
+                    timer("EGP_CLK", 2000)
+
+                    local Wirelink = Find:wirelink()
+
+                    Wirelink:egpClear()
+                    Wirelink:egpDrawTopLeft(TopLeft)
+                    Wirelink:egpResolution(vec2(), vec2(512) / ScaleFactor)
+
+                    ESC = ScaleFactor
+                    return Wirelink
+                }
+                else { print("Incorrect EGP entity, this script requires: " + Type) }
+            }
+            else { print("No valid EGP entity found.") }
+        }
+    }
+
+    function number egpDrawShape(Parent,Type:string,[Pos Size]:vector2,Col:vector4,Mat:string,[R F LS])
+    {
+        EDX++
+        switch (Type:lower())
+        {
+            case "line",  EGP:egpLine(EDX,Pos,Size),EGP:egpSize(EDX,LS) break
+            case "box",   EGP:egpBox(EDX,Pos,Size) break
+            case "boxo",  EGP:egpBoxOutline(EDX,Pos,Size),EGP:egpSize(EDX,LS) break
+            case "rbox",  EGP:egpRoundedBox(EDX,Pos,Size),EGP:egpRadius(EDX,R) break
+            case "rboxo", EGP:egpRoundedBox(EDX,Pos,Size),EGP:egpRadius(EDX,R),EGP:egpSize(EDX,LS) break
+            case "circ",  EGP:egpCircle(EDX, Pos, Size),EGP:egpFidelity(EDX,F) break
+            case "circo", EGP:egpCircle(EDX, Pos, Size),EGP:egpFidelity(EDX,F), EGP:egpSize(EDX,LS) break
+        }
+
+        EGP:egpColor(EDX, Col)
+        if (Parent > 0) { EGP:egpParent(EDX, Parent) }
+        if (Mat != "")  { EGP:egpMaterial(EDX, Mat) }
+
+        return EDX
+    }
+
+    function number egpDrawText(Parent, [String Font]:string, Pos:vector2, Col:vector4, Size, Align)
+    {
+        EDX++
+
+        EGP:egpText(EDX, String, Pos), EGP:egpFont(EDX, Font), EGP:egpSize(EDX, Size*ESC)
+        EGP:egpAlign(EDX, Align), EGP:egpColor(EDX, Col)
+
+        if (Parent > 0) { EGP:egpParent(EDX, Parent) }
+
+        return EDX
+    }
+
+    function number egpButton(Player:entity, [V1 V2]:vector2, Sound)
+    {
+        local Return = inrange(EGP:egpCursor(Player), V1, V2)
+        if (Return & Sound) { soundPlay("UI_DOCLICK", 0, "ui/buttonclick.wav", 0.137) }
+
+        return Return
+    }
+
+    function string digitizer(Num:string)
+    {
+        local Dig = Num[Num:length()]
+
+        if     (Dig == "1") { return Num + "st" }
+        elseif (Dig == "2") { return Num + "nd" }
+        elseif (Dig == "3") { return Num + "rd" }
+        else                { return Num + "th" }
+    }
+
+    EGP = egpInitiallize(1, 1.45, "emitter")
+
+    if (EGP)
+    {
+        Font = "Arial"
+
+        Colors = table(
+            "Background" = vec4(30, 30, 30, 250),
+            "TextA"      = vec4(125, 125, 125, 125),
+            "TextB"      = vec4(255, 255, 255, 125),
+            "TextC"      = vec4(75, 125, 175, 100),
+            "Highlight"  = vec4(255, 255, 0, 125)
+        )
+
+        #------------------
+        #- Main menu frames
+        local Vert = array(
+            vec2(172,348), vec2(160,360), vec2(76,360),   vec2(64,348),
+            vec2(12,348),  vec2(0,336),   vec2(0,15),     vec2(3,12),
+            vec2(88,12),   vec2(100,0),   vec2(472,0),    vec2(484,12),
+            vec2(509,12),  vec2(512,15),   vec2(512,336), vec2(500,348),
+            vec2(172,348)
+        )
+        EDX++, EGP:egpPoly(EDX, Vert), EGP:egpColor(EDX, vec4(255, 255, 255, 50))
+
+        local Vert = array(
+            vec2(12,90),  vec2(0,78),   vec2(0,41),   vec2(3,38),
+            vec2(509,38), vec2(512,41), vec2(512,87), vec2(509,90),
+            vec2(12,90)
+        )
+        EDX++, EGP:egpPoly(EDX, Vert) EGP:egpColor(EDX, Colors["Background", vector4])
+
+        local Vert = array(
+            vec2(88,12),  vec2(100,0),  vec2(472,0),  vec2(484,12),
+            vec2(509,12), vec2(512,15), vec2(512,31), vec2(509,34),
+            vec2(3,34),   vec2(0,31),   vec2(0,15),   vec2(3,12),
+            vec2(88,12)
+        )
+        EDX++, EGP:egpPoly(EDX, Vert) EGP:egpColor(EDX, Colors["Background", vector4])
+
+        local Vert = array(
+            vec2(0,128),   vec2(0,106), vec2(12,94), vec2(358,94),
+            vec2(358,128), vec2(0,128)
+        )
+        EDX++, EGP:egpPoly(EDX, Vert) EGP:egpColor(EDX, Colors["Background", vector4])
+
+        local Vert = array(
+            vec2(500,348), vec2(362,348), vec2(362,132), vec2(512,132),
+            vec2(512,336), vec2(500,348)
+        )
+        EDX++, EGP:egpPoly(EDX, Vert) EGP:egpColor(EDX, Colors["Background", vector4])
+
+        local Vert = array(
+            vec2(362,128), vec2(362,94), vec2(509,94), vec2(512,97),
+            vec2(512,128), vec2(362,128)
+        )
+        EDX++, EGP:egpPoly(EDX, Vert) EGP:egpColor(EDX, Colors["Background", vector4])
+
+        local Vert = array(
+            vec2(358,132), vec2(358,348), vec2(172,348), vec2(160,360),
+            vec2(76,360),  vec2(64,348),  vec2(12,348),  vec2(0,336),
+            vec2(0,132),   vec2(358,132)
+        )
+        EDX++, EGP:egpPoly(EDX, Vert) EGP:egpColor(EDX, Colors["Background", vector4])
+
+        #- Page turners
+        EDX++, EGP:egpTriangle(EDX, vec2(14, 143), vec2(6, 149), vec2(22, 149)), EGP:egpColor(EDX, Colors["TextC", vector4])
+        EDX++, EGP:egpTriangle(EDX, vec2(14, 274), vec2(6, 268), vec2(22, 268)), EGP:egpColor(EDX, Colors["TextC", vector4])
+
+        #---------------
+        #- Menu Text
+        egpDrawText(0, "Lap Tracker",  "Coolvetica", vec2(256, 2), Colors["TextB", vector4], 32, 1)
+        egpDrawText(0, "Time Trials:", "Coolvetica", vec2(30, 53), Colors["TextB", vector4], 24, 0)
+        MenuElement = egpDrawText(0, "Last",         "Coolvetica", vec2(150, 53), Colors["TextC", vector4], 24, 0)
+
+        egpDrawText(0, "Show: Acf      Non-Acf", Font, vec2(300, 56), Colors["TextB", vector4], 16, 0)
+
+        egpDrawShape(0, "box", vec2(371, 59), vec2(10, 10), Colors["TextB", vector4], "", 0, 0, 0)
+        egpDrawShape(0, "box", vec2(441, 59), vec2(10, 10), Colors["TextB", vector4], "", 0, 0, 0)
+        FilterA = egpDrawShape(0, "box", vec2(373, 61), vec2(6, 6), Colors["TextC", vector4]:setW(255), "", 0, 0, 0)
+        FilterB = egpDrawShape(0, "box", vec2(443, 61), vec2(6, 6), Colors["TextC", vector4]:setW(255), "", 0, 0, 0)
+
+        egpDrawText(0, "Place",     "Coolvetica", vec2(32, 102),  Colors["TextB", vector4], 19, 0)
+        egpDrawText(0, "Driver",    "Coolvetica", vec2(96, 102),  Colors["TextB", vector4], 19, 0)
+        egpDrawText(0, "Vehicle",   "Coolvetica", vec2(193, 102), Colors["TextB", vector4], 19, 0)
+        egpDrawText(0, "Time",      "Coolvetica", vec2(297, 102), Colors["TextB", vector4], 19, 0)
+        egpDrawText(0, "Race Info", "Coolvetica", vec2(400, 102), Colors["Highlight", vector4], 19, 0)
+
+        egpDrawText(0, "Type  \"!rs trial <laps> <vehicle name>\"  to start a time trial.", Font, vec2(32, 300), Colors["TextB", vector4], 12, 0)
+        egpDrawText(0, "Press USE on a name to show additional info.", Font, vec2(32, 315), Colors["TextB", vector4], 12, 0)
+        egpDrawText(0, "v1.1 - by shadowscion", "", vec2(80, 350), Colors["TextB", vector4]:setW(10), 8, 0)
+
+        #---------------
+        #- Info Text
+        InfoText = table(
+            "_lapcnt"   = array(EDX + 1, "Laps: "),
+            "_distance" = array(EDX + 2, "Distance: ",  0.0000254, " km",  0.00001578,   " mi"),
+            "_topspeed" = array(EDX + 3, "Top Speed: ", 0.09114,   " kph", 0.0568181818, " mph"),
+            "_avgspeed" = array(EDX + 4, "Avg Speed: ", 0.09114,   " kph", 0.0568181818, " mph"),
+            "_bsttime"  = array(EDX + 5, "Best Time: "),
+            "_avgtime"  = array(EDX + 6, "Avg Time: "),
+            "_tottime"  = array(EDX + 7, "Total Time: "),
+            "_vehtype"  = array(EDX + 8, "Vehicle Type: "),
+            "_vehmass"  = array(EDX + 9, "Vehicle Mass: ", 1, " kg", 2.20462, " lbs"),
+            "_vehratio" = array(EDX + 10)
+        )
+
+        egpDrawText(0, "<no text>", Font, vec2(375, 140), Colors["Highlight", vector4], 12, 0)
+        egpDrawText(0, "<no text>", Font, vec2(375, 154), Colors["Highlight", vector4], 12, 0)
+        egpDrawText(0, "<no text>", Font, vec2(375, 168), Colors["Highlight", vector4], 12, 0)
+        egpDrawText(0, "<no text>", Font, vec2(375, 182), Colors["Highlight", vector4], 12, 0)
+        egpDrawText(0, "<no text>", Font, vec2(375, 196), Colors["Highlight", vector4], 12, 0)
+        egpDrawText(0, "<no text>", Font, vec2(375, 210), Colors["Highlight", vector4], 12, 0)
+        egpDrawText(0, "<no text>", Font, vec2(375, 224), Colors["Highlight", vector4], 12, 0)
+        egpDrawText(0, "<no text>", Font, vec2(375, 252), Colors["Highlight", vector4], 12, 0)
+        egpDrawText(0, "<no text>", Font, vec2(375, 266), Colors["Highlight", vector4], 12, 0)
+        egpDrawText(0, "<no text>", Font, vec2(375, 280), Colors["Highlight", vector4], 12, 0)
+
+        #---------------
+        #- Scoreboard
+        ScoreBoard = table(
+            "Ranks" = table(),
+            "Rows"  = table()
+        )
+
+        MenuSelection = 0
+        MenuInfo = 1
+        FilterA_V = 1
+        FilterB_V = 1
+
+        for (I = 1, 10) {
+            local Index = EDX + I
+            ScoreBoard["Rows", table]:pushTable(table(
+                Index,                  # Ranks egp index
+                Index + 10,             # Drivers egp index
+                Index + 20,             # Vehicle egp index
+                Index + 30,             # Time egp index
+                vec2(28, 126 + I*14),
+                vec2(340, 140 + I*14)   # Row box
+            ))
+        }
+
+        #- Ranks
+        egpDrawText(0, "1st", Font, vec2(32, 140), Colors["Highlight", vector4], 12, 0)
+        egpDrawText(0, "2nd", Font, vec2(32, 154), Colors["TextB", vector4], 12, 0)
+        egpDrawText(0, "3rd", Font, vec2(32, 168), Colors["TextB", vector4], 12, 0)
+        egpDrawText(0, "4th", Font, vec2(32, 182), Colors["TextB", vector4], 12, 0)
+        egpDrawText(0, "5th", Font, vec2(32, 196), Colors["TextB", vector4], 12, 0)
+        egpDrawText(0, "6th", Font, vec2(32, 210), Colors["TextB", vector4], 12, 0)
+        egpDrawText(0, "7th", Font, vec2(32, 224), Colors["TextB", vector4], 12, 0)
+        egpDrawText(0, "8th", Font, vec2(32, 238), Colors["TextB", vector4], 12, 0)
+        egpDrawText(0, "9th", Font, vec2(32, 252), Colors["TextB", vector4], 12, 0)
+        egpDrawText(0, "10th", Font, vec2(32, 266), Colors["TextB", vector4], 12, 0)
+
+        #- Drivers
+        egpDrawText(0, "<null entity>", Font, vec2(96, 140), Colors["Highlight", vector4], 12, 0)
+        egpDrawText(0, "<null entity>", Font, vec2(96, 154), Colors["TextB", vector4], 12, 0)
+        egpDrawText(0, "<null entity>", Font, vec2(96, 168), Colors["TextB", vector4], 12, 0)
+        egpDrawText(0, "<null entity>", Font, vec2(96, 182), Colors["TextB", vector4], 12, 0)
+        egpDrawText(0, "<null entity>", Font, vec2(96, 196), Colors["TextB", vector4], 12, 0)
+        egpDrawText(0, "<null entity>", Font, vec2(96, 210), Colors["TextB", vector4], 12, 0)
+        egpDrawText(0, "<null entity>", Font, vec2(96, 224), Colors["TextB", vector4], 12, 0)
+        egpDrawText(0, "<null entity>", Font, vec2(96, 238), Colors["TextB", vector4], 12, 0)
+        egpDrawText(0, "<null entity>", Font, vec2(96, 252), Colors["TextB", vector4], 12, 0)
+        egpDrawText(0, "<null entity>", Font, vec2(96, 266), Colors["TextB", vector4], 12, 0)
+
+        #- Vehicles
+        egpDrawText(0, "<no string>", Font, vec2(193, 140), Colors["Highlight", vector4], 12, 0)
+        egpDrawText(0, "<no string>", Font, vec2(193, 154), Colors["TextB", vector4], 12, 0)
+        egpDrawText(0, "<no string>", Font, vec2(193, 168), Colors["TextB", vector4], 12, 0)
+        egpDrawText(0, "<no string>", Font, vec2(193, 182), Colors["TextB", vector4], 12, 0)
+        egpDrawText(0, "<no string>", Font, vec2(193, 196), Colors["TextB", vector4], 12, 0)
+        egpDrawText(0, "<no string>", Font, vec2(193, 210), Colors["TextB", vector4], 12, 0)
+        egpDrawText(0, "<no string>", Font, vec2(193, 224), Colors["TextB", vector4], 12, 0)
+        egpDrawText(0, "<no string>", Font, vec2(193, 238), Colors["TextB", vector4], 12, 0)
+        egpDrawText(0, "<no string>", Font, vec2(193, 252), Colors["TextB", vector4], 12, 0)
+        egpDrawText(0, "<no string>", Font, vec2(193, 266), Colors["TextB", vector4], 12, 0)
+
+        #- Times
+        egpDrawText(0, "00:00.00", Font, vec2(297, 140), Colors["Highlight", vector4], 12, 0)
+        egpDrawText(0, "00:00.00", Font, vec2(297, 154), Colors["TextB", vector4], 12, 0)
+        egpDrawText(0, "00:00.00", Font, vec2(297, 168), Colors["TextB", vector4], 12, 0)
+        egpDrawText(0, "00:00.00", Font, vec2(297, 182), Colors["TextB", vector4], 12, 0)
+        egpDrawText(0, "00:00.00", Font, vec2(297, 196), Colors["TextB", vector4], 12, 0)
+        egpDrawText(0, "00:00.00", Font, vec2(297, 210), Colors["TextB", vector4], 12, 0)
+        egpDrawText(0, "00:00.00", Font, vec2(297, 224), Colors["TextB", vector4], 12, 0)
+        egpDrawText(0, "00:00.00", Font, vec2(297, 238), Colors["TextB", vector4], 12, 0)
+        egpDrawText(0, "00:00.00", Font, vec2(297, 252), Colors["TextB", vector4], 12, 0)
+        egpDrawText(0, "00:00.00", Font, vec2(297, 266), Colors["TextB", vector4], 12, 0)
+
+        #- Load data for selected row
+
+        function string rsTrimString(String:string)
+        {
+            return String:length() > 14 ? String:left(14) + "..." : String
+        }
+
+        function rsRefreshInfo()
+        {
+            local Data = OutputTable[MenuInfo + MenuPage*10, table]
+            foreach (K, V:array = InfoText)
+            {
+                if (V:count() > 2) {
+                    switch (MenuUnits)
+                    {
+                        #- Metric
+                        case 0, EGP:egpSetText(V[1, number], V[2, string] + round(Data[K, number]*V[3, number], 2) + V[4, string]), break
+                        #- Standard
+                        case 1, EGP:egpSetText(V[1, number], V[2, string] + round(Data[K, number]*V[5, number], 2) + V[6, string]), break
+                    }
+                }
+                else
+                {
+                    EGP:egpSetText(V[1, number], V[2, string] + Data[K, string])
+                }
+            }
+        }
+
+        function rsRefreshMain()
+        {
+            local Table = ScoreBoard["Rows", table]
+            for (I = 1, Table:count())
+            {
+                local Temp = Table[I, table]
+
+                EGP:egpSetText(Temp[2, number], rsTrimString(OutputTable[I + MenuPage*10, table]["_driver", string]))
+                EGP:egpSetText(Temp[3, number], rsTrimString(OutputTable[I + MenuPage*10, table]["_vehname", string]))
+                EGP:egpSetText(Temp[4, number], OutputTable[I + MenuPage*10, table]["_bsttime", string])
+            }
+        }
+
+        XGT = gTable("_gtable")
+    }
+}
+else {
+
+
+    if (clk("EGP_CLK"))
+    {
+        timer("EGP_CLK", 100)
+
+        Player = noentity()
+        foreach (K, V:entity = players())
+        {
+            Use  = V:keyUse()
+            if (Use)
+            {
+                Player = V
+                break
+            }
+        }
+
+        #Player = owner()
+        #Use    = Player:keyUse()
+
+        if (changed(MenuSelection) | changed(OutputTable:count()) | changed(MenuPage))
+        #if (changed(MenuSelection) | changed(InputTable:count()) | changed(MenuPage))
+        {
+
+
+            #- Select a table to read from
+            switch (MenuSelection)
+            {
+                case 0, OutputTable = XGT["_s_last", table], EGP:egpSetText(MenuElement, "Last"), break
+                case 1, OutputTable = XGT["_s_sort", table], EGP:egpSetText(MenuElement, "Session"), break
+
+            }
+
+            #- Load main board data
+            rsRefreshMain()
+            rsRefreshInfo()
+        }
+
+        if (changed(Use) & Use)
+        {
+            if (egpButton(Player, vec2(148, 50), vec2(230, 70), 1)) {
+                MenuSelection = (MenuSelection + 1) % 2
+            }
+            elseif (egpButton(Player, vec2(371, 59), vec2(381, 69), 0))
+            {
+                if (FilterB_V)
+                {
+                    FilterA_V = !FilterA_V
+                    EGP:egpAlpha(FilterA, FilterA_V*255)
+                    soundPlay("UI_DOCLICK", 0, "ui/buttonclick.wav", 0.137)
+                }
+                else
+                {
+                    soundPlay("UI_DONTCLICK", 0, "ui/hint.wav", 0.253)
+                }
+            }
+            elseif (egpButton(Player, vec2(441, 59), vec2(451, 69), 0))
+            {
+                if (FilterA_V)
+                {
+                    FilterB_V = !FilterB_V
+                    EGP:egpAlpha(FilterB, FilterB_V*255)
+                    soundPlay("UI_DOCLICK", 0, "ui/buttonclick.wav", 0.137)
+                }
+                else
+                {
+                    soundPlay("UI_DONTCLICK", 0, "ui/hint.wav", 0.253)
+                }
+            }
+            elseif (egpButton(Player, vec2(362, 132), vec2(512, 348), 1))
+            {
+                MenuUnits = (MenuUnits + 1) % 2
+                rsRefreshInfo()
+            }
+            elseif (egpButton(Player, vec2(8, 142), vec2(24, 148), 1))
+            {
+                MenuPage = clamp(MenuPage - 1, 0, 10)
+                for (I = 1, 10) { EGP:egpSetText(ScoreBoard["Rows", table][I, table][1, number], digitizer((I + 10*MenuPage):toString())) }
+            }
+            elseif (egpButton(Player, vec2(8, 268), vec2(24, 274), 1))
+            {
+                MenuPage = clamp(MenuPage + 1, 0, 10)
+                for (I = 1, 10) { EGP:egpSetText(ScoreBoard["Rows", table][I, table][1, number], digitizer((I + 10*MenuPage):toString())) }
+            }
+            else
+            {
+                local Table = ScoreBoard["Rows", table]
+                for (I = 1, Table:count())
+                {
+                    local Temp = Table[I, table]
+                    if (egpButton(Player, Temp[5, vector2], Temp[6, vector2], 1))
+                    {
+                        #- Highlight a row
+                        local Last = Table[MenuInfo, table]
+                        for (J = 1, 4) {
+                            EGP:egpColor(Last[J, number], Colors["TextB", vector4])
+                            EGP:egpColor(Temp[J, number], Colors["Highlight", vector4])
+                        }
+                        MenuInfo = I
+                        rsRefreshInfo()
+
+                        break
+                    }
+                }
+            }
+        }
+
+        Ops = ops()
+
+    }
+
+}

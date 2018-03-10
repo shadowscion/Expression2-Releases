@@ -1,0 +1,261 @@
+@name race_system/race_library
+@persist [S_Active S_Last S_Sort Checkpoints]:table XGT:gtable Slots:array NumCheckpoints
+
+#--------------------
+#- Table setup
+XGT = gTable("_gtable", 0)
+
+XGT["_s_last", table] = XGT["_s_last", table]
+XGT["_s_sort", table] = XGT["_s_sort", table]
+
+S_Active = table()
+S_Last   = XGT["_s_last", table]
+S_Sort   = XGT["_s_sort", table]
+
+Checkpoints    = table()
+NumCheckpoints = 0
+#--------------------
+
+
+#--------------------
+#- Formatting
+function string getID(Player:entity) {
+    return Player:steamID():explode(":"):string(3)
+}
+
+function string getTime(Number) {
+    return format("%.2d:%.2d.%02d", floor(Number / 60), floor(Number % 60), frac(Number)*100)
+}
+#--------------------
+
+
+#--------------------
+
+#--------------------
+#- Checkpoint system
+function void newCheckpoint(Position:vector, Rotation, OffsetMin, OffsetMax)
+{
+    NumCheckpoints++
+    local Holo = holoCreate(NumCheckpoints, Position, vec(1.905, 1.905, 0.001), ang(0, Rotation, 0))
+                 holoModel(NumCheckpoints, "models/sprops/rectangles/size_3/rect_24x336x3.mdl")
+                 holoMaterial(NumCheckpoints, "sprops/textures/sprops_metal6")
+                 holoColor(NumCheckpoints, NumCheckpoints == 1 ? vec4(255,255,255,255) : vec4(255,255,0,125))
+                 holoDisableShading(NumCheckpoints, 1)
+    Checkpoints[NumCheckpoints, table] = table(
+        "Entity" = Holo,
+        "BoxMin" = Holo:boxMin():setZ(0) * 2 - vec(0, OffsetMin, 0),
+        "BoxMax" = Holo:boxMax():setZ(0) * 2 + vec(0, OffsetMax, 0)
+    )
+}
+#--------------------
+
+function number readCheckpoint(Checkpoint, Player:entity)
+{
+    local Table = Checkpoints[Checkpoint, table]
+    return inrange(Table["Entity", entity]:toLocal(Player:pos()):setZ(0), Table["BoxMin", vector], Table["BoxMax", vector])
+}
+#--------------------
+
+
+#--------------------
+#- Indication system
+Slots = array(
+    vec(0,0,0),    vec(-24,0,0),  vec(-60,0,0),  vec(-84,0,0),vec(-120,0,0),
+    vec(-144,0,0), vec(-180,0,-8),vec(-200,0,-8),vec(-42,0,6),
+    vec(-102,0,0), vec(-190,0,-8)
+)
+
+function void indicators(Key) {
+    for (I = 1, 11) {
+        local Idx = Key + I
+        holoCreate(Idx), holoParent(Idx, Key + 1), holoDisableShading(Idx, 1)
+        holoPos(Idx, holoEntity(Key + 1):toWorld(Slots[I, vector]))
+        holoAng(Idx, holoEntity(Key + 1):angles())
+        holoMaterial(Idx, "models/debug/debugwhite")
+
+        if (I == 11)     { holoModel(Idx, "models/sprops/misc/alphanum/alphanum_div.mdl") }
+        elseif (I == 10) { holoModel(Idx, "models/sprops/misc/alphanum/alphanum_prd.mdl") }
+        else             { holoModel(Idx, "models/sprops/misc/alphanum/alphanum_colon.mdl") }
+
+        holoBodygroup(Idx, 0, 1), holoAlpha(Idx, 0)
+        holoScale(Idx, (I < 7 | I == 9 | I == 10) ? vec(3, 0.001, 3) : vec(1.5, 0.001, 1.5))
+    }
+}
+
+function void table:setIndication(Pos:vector, Ang:angle, Color:vector) {
+    local Idx = This["_id", string]:toNumber()
+    local Time = getTime(This["_laptime", number]):replace(":",""):replace(".","")
+    for (I = 1, 11) {
+        if (I < 7)      { holoModel(I + Idx, "models/sprops/misc/alphanum/alphanum_"+Time[I]+".mdl") }
+        elseif (I == 7) { holoModel(I + Idx, "models/sprops/misc/alphanum/alphanum_"+This["_lap", number]+".mdl") }
+        elseif (I == 8) { holoModel(I + Idx, "models/sprops/misc/alphanum/alphanum_"+This["_lapcount", number]+".mdl") }
+        holoColor(I + Idx, Color)
+    }
+    holoPos(Idx + 1, Pos), holoAng(Idx + 1, Ang)
+    This["_indication", number] = 1
+}
+
+function number table:runIndications() {
+    if (This["_indication", number]) {
+        This["_indication", number] = This["_indication", number] + 10
+        local Alpha = clamp(500 - This["_indication", number], 0, 255)
+        for (I = 1, 11) { holoAlpha(This["_id", string]:toNumber() + I, Alpha) }
+        if (Alpha <= 0) { This["_indication", number] = 0 }
+        return Alpha
+    }
+}
+#--------------------
+
+
+#--------------------
+#- Main system functions
+function void newTrial(Player:entity, LapCount, VehicleName:string)
+{
+    local Key = getID(Player)
+    if (!S_Active:exists(Key))
+    {
+        S_Active[Key, table] = table(
+            "_id"        = Key,
+            "_name"      = Player:name(),
+            "_player"    = Player,
+            "_vehicle"   = VehicleName,
+            "_lapcount"  = clamp(floor(LapCount), 1, 9),
+            "_data"      = table()
+        )
+        indicators(Key:toNumber())
+    }
+}
+
+function number table:preload() {
+    if (!This["_ent", entity]) {
+        #- Attempt to locate a suitable base entity.
+        local Vehicle = This["_player", entity]:vehicle()
+        This["_ent", entity] = Vehicle:parent():parent() ?: (Vehicle:parent() ?: Vehicle)
+
+        #- Calculate total vehicle mass, determine if acf is used.
+        if (This["_ent", entity]) {
+            This["_ent", entity]:soundPlay("READY", 0, "garrysmod/save_load4.wav", 4.114)
+
+            local Data = This["_data", table]
+            local Mass = 0
+            foreach (K, V:entity = This["_ent", entity]:getConstraints()) {
+                local Temp = V:mass()
+                if (Temp < 50000) { Mass += Temp }
+
+                if (!Data["_acf", entity]) {
+                    if (V:type() == "acf_engine") {
+                        Data["_acf", entity] = V
+                    }
+                }
+            }
+            Mass += This["_ent", entity]:mass()
+
+            #- Set preloaded data.
+            This["_data", table] = table(
+                "_type"  = Data["_acf", entity] ? "Acf" : "Non-Acf",
+                "_ratio" = Data["_acf", entity] ? "P/W Ratio: " + round(Data["_acf", entity]:acfMaxPower() / Mass, 3) : "",
+                "_mass"  = round(Mass, 2)
+            )
+        }
+    }
+    else {
+        return 1
+    }
+}
+
+function void table:relocate() {
+    for (I = 1, 11) { holoDelete(I + This["_id", string]:toNumber()) }
+    local Table = table(
+        "_driver"   = This["_name", string],
+        "_lapcnt"   = This["_lapcount", number]:toString(),
+
+        "_rawtime"  = This["_bsttime", number],
+        "_avgtime"  = getTime(This["_avgtime", number] / This["_lapcount", number]),
+        "_bsttime"  = getTime(This["_bsttime", number]),
+        "_tottime"  = getTime(This["_tottime", number]),
+        "_topspeed" = This["_topspeed", number],
+        "_avgspeed" = This["_avgspeed", number],
+        "_distance" = This["_distance", number],
+
+        "_vehname"  = This["_vehicle", string],
+        "_vehtype"  = This["_data", table]["_type", string],
+        "_vehratio" = This["_data", table]["_ratio", string],
+        "_vehmass"  = This["_data", table]["_mass", number]
+    )
+    S_Last:unshiftTable(Table)
+    S_Sort:unshiftTable(Table)
+    S_Active:removeTable(This["_id", string])
+}
+
+function void table:process() {
+    if (!This["_player", entity]) { S_Active:remove(This["_id", string]) }
+    elseif (This:preload()) {
+        if (This["_finished", number]) {
+            if (!This:runIndications()) {
+                This:relocate()
+            }
+        }
+        elseif (This["_lap", number] < This["_lapcount", number]) {
+            local Velocity = This["_ent", entity]:vel():length()
+
+            if (This["_checkpoint", number]) {
+                This["_distance", number] = This["_distance", number] + Velocity*0.05
+                if (Velocity > This["_topspeed", number]) { This["_topspeed", number] = Velocity }
+            }
+
+            if (This["_checkpoint", number] < NumCheckpoints & readCheckpoint(This["_checkpoint", number] + 1, This["_ent", entity])) {
+                This["_checkpoint", number] = This["_checkpoint", number] + 1
+
+                if (This["_checkpoint", number] == 1) {  This["_starttime", number] = curtime() }
+                elseif (This["_checkpoint", number] == NumCheckpoints) {
+                    This["_checkpoint", number] = 0
+                    This["_lap", number]        = This["_lap", number] + 1
+                    if (This["_lap", number]   >= This["_lapcount", number]) { This["_finished", number] = 1 }
+
+                    This["_laptime", number]  = curtime() - This["_starttime", number]
+                    This["_avgtime", number]  = This["_avgtime", number] + This["_laptime", number]
+                    This["_tottime", number]  = This["_tottime", number] + This["_laptime", number]
+                    This["_avgspeed", number] = (This["_distance", number] / This["_tottime", number])
+                    if (This["_lap", number] == 1) { This["_bsttime", number] = This["_laptime", number] }
+                    elseif (This["_laptime", number] < This["_bsttime", number]) { This["_bsttime", number] = This["_laptime", number] }
+
+                    local NoteVel = This["_ent", entity]:vel()
+                    local NotePos = This["_ent", entity]:pos() + (NoteVel:normalized()*NoteVel:length()*2):setZ(50)
+                    local NoteColor = This["_laptime", number] <= This["_bsttime", number] ? vec(0, 255, 0) : vec(255, 255, 0)
+                    This:setIndication(NotePos, NoteVel:toAngle() + ang(0, 90, 0), NoteColor)
+                }
+                This["_ent", entity]:soundPlay("CHECKPOINT", 0, "ui/freeze_cam.wav", 1.216)
+            }
+            This:runIndications()
+        }
+    }
+}
+
+function table:bubbleSort(SortBy:string)
+{
+    if (This["RunSort", number]) {
+        while (perf() & This["I", number] > 1)
+        {
+            if (This["J", number] < This["I", number])
+            {
+                This["J", number] = This["J", number] + 1
+
+                local K = This["J", number] - 1
+                if (This[K, table][SortBy, number] > This[This["J", number], table][SortBy, number])
+                {
+                    local Temp = This[K, table]
+                    This[K, table] = This[This["J", number], table]
+                    This[This["J", number], table] = Temp
+                }
+            }
+            if (This["J", number] >= This["I", number])
+            {
+                This["I", number] = This["I", number] - 1
+                This["J", number] = 1
+            }
+            if (This["I", number] <= 1) {
+                This["RunSort", number] = 0
+            }
+        }
+    }
+}

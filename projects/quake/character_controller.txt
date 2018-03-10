@@ -1,0 +1,233 @@
+@name quake/character_controller
+@inputs Camera:wirelink [W A S D] [Shift Space] [Mouse1 Mouse2] [Active] [Entity]:entity
+@outputs Ops Cpu [HitGround HitCeiling HitBBox] Velocity:vector
+@persist [BBox_Radius BBox_Height BBox_Height_Real] [BBox_Mins BBox_Maxs]:vector
+@persist [Ct Dt] [Position]:vector [Velocity MoveDir]:vector Speed
+@persist [WalkSpeed RunSpeed] [JumpHeight JumpSpeed RocketJumpCount RocketJumpDelay] [HitGround HitCeiling HitBBox] Momentum:vector
+@trigger none
+
+
+if (first()) {
+    #-- settings
+    JumpHeight = 100
+    WalkSpeed  = 250
+    RunSpeed   = 250
+
+    BBox_Height_Real = 72
+    BBox_Radius = 10
+    BBox_Height = BBox_Height_Real * 0.5
+
+    BBox_Mins = vec(BBox_Radius, BBox_Radius, BBox_Height) *  -1
+    BBox_Maxs = vec(BBox_Radius, BBox_Radius, 0)
+
+    #-- debug
+    function entity holoCreate(N, P, Pos:vector, Ang:angle, Scale:vector, Model:string, Material:string, Color:vector4, Shading) {
+        holoCreate(N)
+
+        local Parent = holoEntity(P)
+        if (Parent) { holoParent(N, P) } else { Parent = entity() }
+
+        holoPos(N, Parent:toWorld(Pos))
+        holoAng(N, Parent:toWorld(Ang))
+        holoScale(N, Scale)
+        holoModel(N, Model)
+        holoMaterial(N, Material)
+        holoColor(N, Color)
+        holoDisableShading(N, Shading)
+
+        return holoEntity(N)
+    }
+
+    #-- origin
+    holoCreate(1000, 0, vec(0, 0, BBox_Height_Real), ang(), vec(1, 1, 1) / 12, "", "", vec4(0, 255, 0, 55), 1)
+
+    #-- bbox
+    holoCreate(1001, 1000, vec(0, 0, -BBox_Height * 0.5), ang(), vec(BBox_Radius * 2, BBox_Radius * 2, BBox_Height) / 12, "", "models/wireframe", vec4(255, 255, 255, 55), 1)
+    holoCreate(1002, 1001, vec(0, 0, 0), ang(), vec(BBox_Radius * 2, BBox_Radius * 2, BBox_Height) / 12, "", "", vec4(255, 255, 0, 15), 1)
+
+    #-- ground trace
+    holoCreate(1003, 1000, vec(0, 0, -BBox_Height_Real * 0.5), ang(), vec(BBox_Radius * 2, 4, BBox_Height_Real) / 12, "", "", vec4(255, 0, 0, 55), 1)
+    holoCreate(1004, 1003, vec(0, 0, 0), ang(), vec(0.25, 0.25, BBox_Height_Real) / 12, "", "", vec4(0, 0, 255, 255), 1)
+
+    #-- setup
+    Camera["Parent", entity] = holoEntity(1000)
+    Camera["Distance", number] = 100
+    
+    E = entity()
+    if (E["Position", vector]) {
+        Position = E["Position", vector]   
+    }
+    else {
+        Position = entity():pos() + vec(0, 0, BBox_Height_Real)
+    }
+    
+    Velocity = vec()
+
+    Ct = curtime()
+
+    interval(60)
+    runOnLast(1)
+    
+    function number easeOutCirc(T, B, C, D) {
+        return C * sqrt(1 - (T / D - 1) ^ 2) + B
+    }
+}
+
+if (last()) {
+    E = entity()
+    E["Position", vector] = Position    
+}
+
+if (clk()) {
+    interval(60)
+
+    TimeScale = 1#1/4
+    Dt = (curtime() - Ct) * TimeScale
+    Ct = curtime()
+
+    if (Active) {
+        #-- player input
+        Camera["Activated", number] = 1
+
+        Player = Entity:driver()
+        EyeDir = Entity:toLocalAxis(Player:eye()):setZ(0)
+
+        MoveDir = (W - S) * EyeDir + EyeDir:cross(vec(0, 0, 1)) * (D - A)
+        MoveDir = MoveDir:normalized()
+
+        local Speed = (Shift * RunSpeed + WalkSpeed) * Dt
+        local Gravity = 600 * Dt * Dt *  -1
+
+        if (!HitGround) {
+            #-- AIR STRAFING...?
+            #local AirDir = EyeDir * (W - S) + EyeDir:cross(vec(0, 0, 1)) * (D - A)
+            local AirDir = EyeDir:cross(vec(0, 0, 1)) * (D - A)
+                  AirDir = AirDir:normalized()
+   
+            local DotVel = Velocity:setZ(0):dot(AirDir)
+            local AirVel = 100 * Dt
+            
+            if (DotVel + AirVel > JumpSpeed) {
+                AirVel = JumpSpeed - DotVel
+            }
+
+            Velocity += AirDir:setZ(0) * AirVel
+        }
+        if (HitGround) {
+            Velocity = (MoveDir * Speed):setZ(Space * sqrt(2 * abs(Gravity) * JumpHeight))
+            if (Velocity[3]) {
+                JumpSpeed = Velocity:setZ(0):length()
+                HitGround = 0
+            }
+        }
+        else {
+            Velocity += vec(0, 0, Gravity)
+        }
+        
+        if (Mouse1 | (Mouse2 & HitGround)) {
+            if (Ct - RocketJumpDelay >= 1/TimeScale) {
+                RocketJumpCount++
+                RocketJumpDelay = Ct
+                holoEntity(1001):soundPlay("rocket_fire", 0, "phx/explode0" + randint(0, 5) + ".wav")
+                holoEntity(1001):soundPlay("rocket_reload", 0, "weapons/crossbow/bolt_load" + randint(1, 2) + ".wav")
+                
+                local RocketJumpDir = -Entity:toLocalAxis(Player:eye())
+                if (HitGround) {
+                    Velocity += 2 * RocketJumpDir * sqrt(2 * abs(Gravity) * (JumpHeight + Velocity:length()))
+                    HitGround = 0
+                }
+                else {
+                    Velocity = RocketJumpDir * Velocity:length()
+                }
+                
+                Momentum = Velocity:setZ(0) + Velocity:normalized():setZ(0) * abs(Velocity:z() / 30)
+            }
+        }
+        
+        Velocity += Momentum
+
+        #-- linear movement
+        HitBBox = 0
+        
+        local Ranger = rangerOffsetHull(Position, Position + Velocity, BBox_Mins, BBox_Maxs)
+        if (Ranger:hit()) {
+            #-- resolve collisions
+            local TargetPos = Position + Velocity
+            local RangerPos = Ranger:position()
+            local RangerNormal = Ranger:hitNormal():setZ(0) * 1.05
+            
+            Momentum -= Momentum:dot(RangerNormal) * RangerNormal
+
+            Ranger = rangerOffsetHull(RangerPos, TargetPos - RangerNormal * (TargetPos - RangerPos):dot(RangerNormal), BBox_Mins, BBox_Maxs)
+
+            #-- set new velocity
+            Velocity = (Ranger:position() - Position):setZ(Velocity:z())
+
+            HitBBox = 1  
+        }
+
+        #-- vertical movement
+        local Normal = sign(Velocity:z()) ?: -1
+        local Ranger = rangerOffset(999999999, Position + Velocity:setZ(0), vec(0, 0, Normal))
+
+        #-- stick to downward slopes
+        if (HitGround) {
+            local GDot = Velocity:normalized():setZ(0):dot(Ranger:hitNormal())
+            if (GDot > 0) {
+                Position[3] = Ranger:position():z() + BBox_Height_Real
+                Velocity[3] = 0
+                HitGround = 2
+            }
+        }
+
+        #-- downward movement
+        if (Normal == -1) {
+            local Ground = Ranger:position():z() + BBox_Height_Real
+
+            Position[3] = max(Position[3] + Velocity[3], Ground)
+            if (Position[3] <= Ground) {
+                Position[3] = Ground
+                Velocity[3] = 0
+                HitGround = 1
+            }
+            else {
+                HitGround = 0
+            }
+        }
+
+        #-- upward movement
+        else {
+            local Ceiling = Ranger:position():z() - Velocity[3]
+
+            Position[3] = min(Position[3], Ceiling)
+            if (Position[3] >= Ceiling) {
+                Position[3] = Ceiling
+                Velocity[3] = Gravity
+                HitCeiling = 1
+            }
+            else {
+                HitCeiling = 0
+            }
+        }
+
+        #-- integrate velocity
+        Velocity -= Momentum
+        Position += Velocity
+        Position += Momentum
+        
+        if (HitGround) { Momentum *= (1 - Dt * 2) }
+
+        #-- debug
+        holoPos(1000, Position)
+        holoAng(1003, EyeDir:toAngle())
+        
+        holoColor(1003, HitGround | HitCeiling ? vec(255, 0, 0) : vec(0, 255, 0))
+        holoColor(1002, HitBBox  ? vec(255, 0, 0) : vec(0, 255, 0))
+    }
+    else {
+        Camera["Activated", number] = 0
+    }
+    
+    Ops = ops()
+    Cpu = cpuUsage() * 1000000
+}

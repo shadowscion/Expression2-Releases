@@ -1,13 +1,13 @@
 @name exteel_skeleton_v1
 @inputs Camera:wirelink [W A S D] [Shift Space] [Mouse1 Mouse2] [Active] [Entity]:entity
-@outputs 
+@outputs
 @persist PHYS:entity [Ct Dt Ts] DEBUG
 @trigger none
 
 #[
     An mech/robot animation template based on the action game "Exteel"
     by shadowscion
-    
+
     To wire:
         - Spawn a SEAT
         - Spawn a WIRE POD CONTROLLER
@@ -15,18 +15,20 @@
             - CHECK   "coordinates local to parent"
             - CHECK   "clientside movement"
             - UNCHECK "localized movement"
-            
+
         - Link the pod and cam to the seat
-        
+
         - With the wiring tool selected,HOLD ALT and LEFT CLICK on the E2
         - LEFT CLICK on the pod controller
         - HOLD ALT and LEFT CLICK again
-        
+
         - Rewire the Camera:wirelink input to the camera controller entity
+
+        - Reload the E2
 ]#
 
 if (first()) {
-    
+
     #-- SETTINGS
     local Setup = table(
         "EnableAirStrafe" = 1,          # enable quake style air strafing
@@ -38,15 +40,15 @@ if (first()) {
         "CamDistance"     = 100,
         "CamOffset"       = vec()
     )
-    
+
     DEBUG = 1
-    
+
     #[
         I SUGGEST NOT EDITING
         BELOW THIS COMMENT UNLESS
         YOU KNOW WHAT YOU'RE DOING
     ]#
-    
+
     function entity holoCreate(N,P,Pos:vector,Ang:angle,Scale:vector,Model:string,Material:string,Color:vector4,Shading) {
         holoCreate(N)
 
@@ -63,18 +65,18 @@ if (first()) {
 
         return holoEntity(N)
     }
-        
+
     #-- SETUP
     #-- most are variables stored on the entity,to share and interact with other expression2s
     PHYS = holoCreate(98765,0,vec(0,0,Setup["BBoxHeightReal",number]),ang(),vec(DEBUG) / 12,"","",vec4(0,255,0,55),1)
-    
+
     PHYS["EnableAirStrafe",number] = Setup["EnableAirStrafe",number]
     PHYS["WalkSpeed",number] = Setup["WalkSpeed",number]
     PHYS["RunSpeed",number] = Setup["RunSpeed",number]
     PHYS["JumpHeight",number] = Setup["JumpHeight",number]
     PHYS["BBoxRadius",number] = Setup["BBoxRadius",number]
     PHYS["BBoxHeightReal",number] = Setup["BBoxHeightReal",number]
-    
+
     PHYS["BBoxHeight",number] = PHYS["BBoxHeightReal",number] * 0.5
     PHYS["BBoxMins",vector] = vec(PHYS["BBoxRadius",number],PHYS["BBoxRadius",number],PHYS["BBoxHeight",number]) *  -1
     PHYS["BBoxMaxs",vector] = vec(PHYS["BBoxRadius",number],PHYS["BBoxRadius",number],0)
@@ -88,27 +90,26 @@ if (first()) {
         holoCreate(98768,98765,vec(0,0,-PHYS["BBoxHeightReal",number] * 0.5),ang(),vec(PHYS["BBoxRadius",number] * 2,4,PHYS["BBoxHeightReal",number]) / 12,"","",vec4(255,0,0,55),1)
         holoCreate(98769,98768,vec(0,0,0),ang(),vec(0.25,0.25,PHYS["BBoxHeightReal",number]) / 12,"","",vec4(0,0,255,255),1)
     }
-    
+
     Camera["Parent",entity] = PHYS
     Camera["Distance",number] = Setup["CamDistance",number]
     Camera["Position",vector] = Setup["CamOffset",vector]
 
     Ct = curtime()
-    
+
     interval(60)
-    runOnLast(1)
-    
+
 }
 
 if (clk()) {
-    
+
     #-- e2 execution
     interval(60)
-    
+
     Ts = 1                      #-- timescale
     Dt = (curtime() - Ct) * Ts  #-- delta time
     Ct = curtime()
-    
+
     if (Active) {
         #-- enable camera
         Camera["Activated",number] = 1
@@ -117,30 +118,30 @@ if (clk()) {
         #-- player setup
         PHYS["Player",entity] = Entity:driver()
         PHYS["EyeDir",vector] = Entity:toLocalAxis(PHYS["Player",entity]:eye()):setZ(0)
-        
-        
+
+
         #-- movement input
         PHYS["MoveDir",vector] = (W - S) * PHYS["EyeDir",vector] + PHYS["EyeDir",vector]:cross(vec(0,0,1)) * (D - A)
         PHYS["MoveDir",vector] = PHYS["MoveDir",vector]:normalized()
-        
+
         local Speed = (PHYS["WalkSpeed",number] + PHYS["RunSpeed",number] * Shift) * Dt
         local Gravity = 600 * Dt * Dt * -1
-        
-        
+
+
         #-- jump input
         if (PHYS["EnableAirStrafe",number]) {
             if (!PHYS["HitGround",number]) {
                 local AirDir = PHYS["EyeDir",vector]:cross(vec(0, 0, 1)) * (D - A)
                       AirDir = AirDir:normalized()
-       
+
                 local DotVel = PHYS["Velocity",vector]:setZ(0):dot(AirDir)
                 local AirVel = 100 * Dt
-                
+
                 if (DotVel + AirVel > PHYS["JumpSpeed",number]) {
                     AirVel = PHYS["JumpSpeed",number] - DotVel
                 }
-    
-                PHYS["Velocity",vector] = PHYS["Velocity",vector] + AirDir:setZ(0) * AirVel                
+
+                PHYS["Velocity",vector] = PHYS["Velocity",vector] + AirDir:setZ(0) * AirVel
             }
         }
         if (PHYS["HitGround",number]) {
@@ -153,11 +154,11 @@ if (clk()) {
         else {
             PHYS["Velocity",vector] = PHYS["Velocity",vector] + vec(0,0,Gravity)
         }
-        
-        
+
+
         #-- XY-axis velocity handler
         PHYS["HitBBox",number] = 0
-        
+
         local Ranger = rangerOffsetHull(PHYS["Position",vector],PHYS["Position",vector] + PHYS["Velocity",vector],PHYS["BBoxMins",vector],PHYS["BBoxMaxs",vector])
         if (Ranger:hit()) {
             #-- resolve collisions
@@ -170,10 +171,10 @@ if (clk()) {
             #-- set new velocity
             PHYS["Velocity",vector] = (Ranger:position() - PHYS["Position",vector]):setZ(PHYS["Velocity",vector][3])
 
-            PHYS["HitBBox",number] = 1  
+            PHYS["HitBBox",number] = 1
         }
-        
-    
+
+
         #-- Z-axis velocity handler
         #-- vertical movement
         local Normal = sign(PHYS["Velocity",vector]:z()) ?: -1
@@ -218,12 +219,12 @@ if (clk()) {
                 PHYS["HitCeiling",number] = 0
             }
         }
-    
+
         PHYS["Position",vector] = PHYS["Position",vector] + PHYS["Velocity",vector]
 
         #-- debug
         holoPos(98765,PHYS["Position",vector])
-        
+
         if (DEBUG) {
             holoAng(98768,PHYS["EyeDir",vector]:toAngle())
             holoColor(98768,PHYS["HitGround",number] | PHYS["HitCeiling",number] ? vec(255,0,0) : vec(0,255,0))
@@ -233,8 +234,4 @@ if (clk()) {
     else {
         Camera["Activated",number] = 0
     }
-}
-
-if (last()) {
-    
 }

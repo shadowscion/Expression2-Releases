@@ -1,0 +1,278 @@
+@name exteel/alpha/anim
+
+#----------------------------------------------------------------
+@persist [G_WorldZ]:vector [G_WorldA]:angle Root:entity
+
+
+#----------------------------------------------------------------
+@persist [A_WalkPelvisZ A_WalkStrideX A_WalkStrideZ A_WalkIdleSway] [A_WalkStrideY]:vector
+@persist [A_RunPelvisZ] [A_RunStrideY]:vector
+
+
+#----------------------------------------------------------------
+@persist [A_FrameLoop] [A_WalkMoveSpeed A_RunMoveSpeed] [A_STATE_Speed A_STATE_Direction] A_LayerOutput:table
+
+
+#----------------------------------------------------------------
+A_WalkPelvisZ = 60
+A_WalkStrideX = A_WalkPelvisZ*0.66
+A_WalkStrideZ = A_WalkPelvisZ*0.33
+A_WalkStrideY = vec(0,A_WalkPelvisZ*0.33,0)
+
+A_RunPelvisZ = A_WalkPelvisZ
+A_RunStrideY = A_WalkStrideY
+
+A_WalkMoveSpeed = A_WalkStrideX*2*_PI
+A_RunMoveSpeed = A_RunPelvisZ*2*_PI
+
+
+#----------------------------------------------------------------
+function table anim__JUMP_LOOP()  {
+    local FootTraceL = rangerOffset(A_WalkPelvisZ,Root:toWorld(A_WalkStrideY:setX(A_WalkStrideX*0.5)),-G_WorldZ)
+    local FootTraceR = rangerOffset(A_WalkPelvisZ,Root:toWorld((-A_WalkStrideY):setX(-A_WalkStrideX*0.5)),-G_WorldZ)
+
+    return table(
+        "vpelvispos" = Root:toWorld(vec(0,cos(A_FrameLoop*0.5)*A_WalkIdleSway,sin(A_FrameLoop)*A_WalkIdleSway)),
+        "qpelvisang" = quat(Root:toWorld(G_WorldA)),
+        "vfootlpos" = FootTraceL:position(),
+        "vfootrpos" = FootTraceR:position(),
+        "nmovespeed" = 0,
+        "nframerate" = 1
+    )
+}
+
+
+#----------------------------------------------------------------
+function table anim__WALK_IDLE() {
+    local FootTraceL = rangerOffset(A_WalkPelvisZ,Root:toWorld(A_WalkStrideY:setX(A_WalkStrideX*0.15)),-G_WorldZ)
+    local FootTraceR = rangerOffset(A_WalkPelvisZ,Root:toWorld((-A_WalkStrideY):setX(-A_WalkStrideX*0.15)),-G_WorldZ)
+
+    return table(
+        "vpelvispos" = Root:toWorld(vec(0,cos(A_FrameLoop*0.5)*A_WalkIdleSway,sin(A_FrameLoop)*A_WalkIdleSway)),
+        "qpelvisang" = quat(Root:toWorld(G_WorldA)),
+        "vfootlpos" = FootTraceL:position(),
+        "vfootrpos" = FootTraceR:position(),
+        "nmovespeed" = 0,
+        "nframerate" = 1
+    )
+}
+function table anim__WALK_F() {
+    local Sin = sin(90 + A_FrameLoop)*A_WalkStrideZ
+    local Cos = cos(90 + A_FrameLoop)*A_WalkStrideX
+
+    local FootTraceL = rangerOffset(A_WalkPelvisZ,Root:toWorld(A_WalkStrideY:setX(Cos)),-G_WorldZ)
+    local FootTraceR = rangerOffset(A_WalkPelvisZ,Root:toWorld((-A_WalkStrideY):setX(-Cos)),-G_WorldZ)
+
+    return table(
+        "vpelvispos" = Root:toWorld(vec(0,0,abs(Sin)*0.25)),
+        "qpelvisang" = quat(Root:toWorld(ang(7 + abs(Cos/9),Cos/9,0))),
+        "vfootlpos" = FootTraceL:position() + max(0,-Sin)*(FootTraceL:hitNormal() ?: G_WorldZ),
+        "vfootrpos" = FootTraceR:position() + max(0,Sin)*(FootTraceR:hitNormal() ?: G_WorldZ),
+        "nmovespeed" = A_WalkMoveSpeed,
+        "nframerate" = _PHI^2*0.45
+    )
+}
+function table anim__WALK_B() {
+    local Sin = sin(270 + A_FrameLoop)*A_WalkStrideZ
+    local Cos = cos(270 + A_FrameLoop)*A_WalkStrideX
+
+    local FootTraceL = rangerOffset(A_WalkPelvisZ,Root:toWorld(A_WalkStrideY:setX(Cos)),-G_WorldZ)
+    local FootTraceR = rangerOffset(A_WalkPelvisZ,Root:toWorld((-A_WalkStrideY):setX(-Cos)),-G_WorldZ)
+
+    return table(
+        "vpelvispos" = Root:toWorld(vec(0,0,abs(Sin)*0.25)),
+        "qpelvisang" = quat(Root:toWorld(ang(-7 - abs(Cos/9),Cos/9,0))),
+        "vfootlpos" = FootTraceL:position() + max(0,Sin)*(FootTraceL:hitNormal() ?: G_WorldZ),
+        "vfootrpos" = FootTraceR:position() + max(0,-Sin)*(FootTraceR:hitNormal() ?: G_WorldZ),
+        "nmovespeed" = A_WalkMoveSpeed,
+        "nframerate" = _PHI^2*0.45
+    )
+}
+function table anim__WALK_L() {
+    local Sin = sin(90 + A_FrameLoop)*A_WalkStrideZ
+    local Cos = cos(90 + A_FrameLoop)*A_WalkStrideX
+
+    local FootTraceL = rangerOffset(A_WalkPelvisZ,Root:toWorld(vec(-A_WalkStrideY:y(),A_WalkStrideY:y() + Cos,0)),-G_WorldZ)
+    local FootTraceR = rangerOffset(A_WalkPelvisZ,Root:toWorld(vec(A_WalkStrideY:y(),-A_WalkStrideY:y() - Cos,0)),-G_WorldZ)
+
+    return table(
+        "vpelvispos" = Root:toWorld(vec(0,0,abs(Sin)*0.25)),
+        "qpelvisang" = quat(Root:toWorld(ang(0,Cos/9,-7 - abs(Cos/9)))),
+        "vfootlpos" = FootTraceL:position() + max(0,-Sin)*(FootTraceL:hitNormal() ?: G_WorldZ),
+        "vfootrpos" = FootTraceR:position() + max(0,Sin)*(FootTraceR:hitNormal() ?: G_WorldZ),
+        "nmovespeed" = A_WalkMoveSpeed,
+        "nframerate" = _PHI^2*0.45
+    )
+}
+function table anim__WALK_R() {
+    local Sin = sin(270 + A_FrameLoop)*A_WalkStrideZ
+    local Cos = cos(270 + A_FrameLoop)*A_WalkStrideX
+
+    local FootTraceL = rangerOffset(A_WalkPelvisZ,Root:toWorld(vec(A_WalkStrideY:y(),A_WalkStrideY:y() + Cos,0)),-G_WorldZ)
+    local FootTraceR = rangerOffset(A_WalkPelvisZ,Root:toWorld(vec(-A_WalkStrideY:y(),-A_WalkStrideY:y() - Cos,0)),-G_WorldZ)
+
+    return table(
+        "vpelvispos" = Root:toWorld(vec(0,0,abs(Sin)*0.25)),
+        "qpelvisang" = quat(Root:toWorld(ang(0,Cos/9,7 + abs(Cos/9)))),
+        "vfootlpos" = FootTraceL:position() + max(0,Sin)*(FootTraceL:hitNormal() ?: G_WorldZ),
+        "vfootrpos" = FootTraceR:position() + max(0,-Sin)*(FootTraceR:hitNormal() ?: G_WorldZ),
+        "nmovespeed" = A_WalkMoveSpeed,
+        "nframerate" = _PHI^2*0.45
+    )
+}
+
+
+#----------------------------------------------------------------
+function table anim__RUN_F() {
+    local Sin = sin(90 + A_FrameLoop)
+    local Cos = cos(90 + A_FrameLoop)
+    local FootTraceL = -rangerOffset(A_RunPelvisZ,Root:toWorld(A_RunStrideY),-G_WorldZ):distance()*G_WorldZ*0.5
+    local FootTraceR = -rangerOffset(A_RunPelvisZ,Root:toWorld(-A_RunStrideY),-G_WorldZ):distance()*G_WorldZ*0.5
+
+    return table(
+        "vpelvispos" = Root:toWorld(vec(0,Sin*A_RunStrideY:y(),abs(cos(90 + A_FrameLoop))*A_RunPelvisZ*0.25):rotate(30,0,0)),
+        "qpelvisang" = quat(Root:toWorld(ang(20 + abs(Cos)*5,-Cos*15,0))),
+        "vfootlpos" = Root:toWorld(FootTraceL:rotate(-Cos*60,0,0) + FootTraceL:rotate(-(Cos + Sin)*60 + 60,0,0) + A_RunStrideY),
+        "vfootrpos" = Root:toWorld(FootTraceR:rotate(Cos*60,0,0) + FootTraceR:rotate((Cos + Sin)*60 + 60,0,0) - A_RunStrideY),
+        "nmovespeed" = A_RunMoveSpeed,
+        "nframerate" = _PHI^2*0.45
+    )
+}
+function table anim__RUN_B() {
+    local Sin = sin(270 + A_FrameLoop)
+    local Cos = cos(270 + A_FrameLoop)
+
+    local FootTraceL = -rangerOffset(A_RunPelvisZ,Root:toWorld(A_RunStrideY),-G_WorldZ):distance()*G_WorldZ*0.5
+    local FootTraceR = -rangerOffset(A_RunPelvisZ,Root:toWorld(-A_RunStrideY),-G_WorldZ):distance()*G_WorldZ*0.5
+
+    return table(
+        "vpelvispos" = Root:toWorld(vec(0,-Sin*A_RunStrideY:y()*0.5,cos(270 + A_FrameLoop*2)*A_RunPelvisZ*0.1):rotate(-30,0,0)),
+        "qpelvisang" = quat(Root:toWorld(ang(-10 - abs(Cos)*5,-Cos*15,0))),
+        "vfootlpos" = Root:toWorld(FootTraceL:rotate(-Cos*60,0,0) + FootTraceL:rotate(-(Cos/2 + Sin)*60 - 60,0,0) + A_RunStrideY),
+        "vfootrpos" = Root:toWorld(FootTraceR:rotate(Cos*60,0,0) + FootTraceR:rotate((Cos/2 + Sin)*60 - 60,0,0) - A_RunStrideY),
+        "nmovespeed" = A_RunMoveSpeed,
+        "nframerate" = _PHI^2*0.45
+    )
+}
+function table anim__RUN_L() {
+    local Sin = sin(90 + A_FrameLoop)
+    local Cos = cos(90 + A_FrameLoop)
+
+    local Rotate = A_RunStrideY:rotate(0,90,0)
+    local FootTraceL = -rangerOffset(A_RunPelvisZ,Root:toWorld(Rotate),-G_WorldZ):distance()*G_WorldZ*0.5
+    local FootTraceR = -rangerOffset(A_RunPelvisZ,Root:toWorld(-Rotate),-G_WorldZ):distance()*G_WorldZ*0.5
+
+    return table(
+        "vpelvispos" = Root:toWorld(vec(0,-Sin*A_RunStrideY:y()*0.5,abs(cos(90 + A_FrameLoop))*A_RunPelvisZ*0.25)),
+        "qpelvisang" = quat(Root:toWorld(ang(0,-Cos*15 + 40,-20 - abs(Cos)*5))),
+        "vfootlpos" = Root:toWorld(FootTraceL:rotate(-Cos*60,90,0) + FootTraceL:rotate(-(Cos + Sin)*60 + 60,80,0) + Rotate + A_RunStrideY),
+        "vfootrpos" = Root:toWorld(FootTraceR:rotate(Cos*60,90,0) + FootTraceR:rotate((Cos + Sin)*60 + 60,80,0) - Rotate - A_RunStrideY),
+        "nmovespeed" = A_RunMoveSpeed,
+        "nframerate" = _PHI^2*0.45
+    )
+}
+function table anim__RUN_R() {
+    local Sin = sin(90 + A_FrameLoop)
+    local Cos = cos(90 + A_FrameLoop)
+
+    local Rotate = A_RunStrideY:rotate(0,-90,0)
+    local FootTraceL = -rangerOffset(A_RunPelvisZ,Root:toWorld(Rotate),-G_WorldZ):distance()*G_WorldZ*0.5
+    local FootTraceR = -rangerOffset(A_RunPelvisZ,Root:toWorld(-Rotate),-G_WorldZ):distance()*G_WorldZ*0.5
+
+    return table(
+        "vpelvispos" = Root:toWorld(vec(0,-Sin*A_RunStrideY:y()*0.5,abs(cos(90 + A_FrameLoop))*A_RunPelvisZ*0.25)),
+        "qpelvisang" = quat(Root:toWorld(ang(0,-Cos*15 - 40,20 + abs(Cos)*5))),
+        "vfootlpos" = Root:toWorld(FootTraceL:rotate(-Cos*60,-90,0) + FootTraceL:rotate(-(Cos + Sin)*60 + 60,-80,0) + Rotate + A_RunStrideY),
+        "vfootrpos" = Root:toWorld(FootTraceR:rotate(Cos*60,-90,0) + FootTraceR:rotate((Cos + Sin)*60 + 60,-80,0) - Rotate - A_RunStrideY),
+        "nmovespeed" = A_RunMoveSpeed,
+        "nframerate" = _PHI^2*0.45
+    )
+}
+
+
+#----------------------------------------------------------------
+function number linear(Y0,Y1,T) {
+    return (1 - T)*Y0 + Y1*T
+}
+function number cosine(Y0,Y1,T) {
+    local T = (1 - cosr(T*_PI))*0.5
+    return (1 - T)*Y0 + Y1*T
+}
+function table blend(Blend0:table,Blend1:table,T) {
+    if     (T == 0) { return Blend0 }
+    elseif (T == 1) { return Blend1 }
+    else {
+        local T = cosine(0,1,T)
+        local Blend2 = table()
+
+        foreach (K,V:quaternion = Blend0) {
+            Blend2[K,quaternion] = slerp(V,Blend1[K,quaternion],T)
+        }
+        foreach (K,V:vector = Blend0) {
+            Blend2[K,vector] = mix(Blend1[K,vector],V,T)
+        }
+        foreach (K,V:number = Blend0) {
+            Blend2[K,number] = (1 - T)*V + Blend1[K,number]*T
+        }
+
+        return Blend2
+    }
+}
+function table blendByName(Blend0:string,Blend1:string,T) {
+    if     (T == 0) { return Blend0()[table] }
+    elseif (T == 1) { return Blend1()[table] }
+    else {
+        return blend(Blend0()[table],Blend1()[table],T)
+    }
+}
+function table blendMovementByDirection(Type:string,Direction) {
+    local Direction = angnorm(Direction)
+    if (Direction == 0) {
+        return (Type + "F")()[table]
+    }
+    elseif (Direction == 90) {
+        return (Type + "L")()[table]
+    }
+    elseif (Direction == -90) {
+        return (Type + "R")()[table]
+    }
+    elseif (Direction == 180 | Direction == -180) {
+        return (Type + "B")()[table]
+    }
+    elseif (inrange(Direction,0,90)) {
+        return blendByName(Type + "F",Type + "L",abs(Direction/90))
+    }
+    elseif (inrange(Direction,-90,0)) {
+        return blendByName(Type + "F",Type + "R",abs(Direction/90))
+    }
+    elseif (inrange(Direction,90,180)) {
+        return blendByName(Type + "L",Type + "B",abs(Direction/90) - 1)
+    }
+    elseif (inrange(Direction,-180,-90)) {
+        return blendByName(Type + "R",Type + "B",abs(Direction/90) - 1)
+    }
+    else {
+        return table()
+    }
+}
+function table blendspaceNormalMotion() {
+    if (A_STATE_Speed == 0) {
+        return anim__WALK_IDLE()
+    }
+    elseif (A_STATE_Speed <= 0.5) {
+        if (A_STATE_Speed == 0.5) {
+            return blendMovementByDirection("anim__WALK_",A_STATE_Direction)
+        }
+        else {
+            return blend(anim__WALK_IDLE(),blendMovementByDirection("anim__WALK_",A_STATE_Direction),A_STATE_Speed*2)
+        }
+    }
+    else {
+        if (A_STATE_Speed == 1) {
+            return blendMovementByDirection("anim__RUN_",A_STATE_Direction)
+        }
+        else {
+            return blend(blendMovementByDirection("anim__WALK_",A_STATE_Direction),blendMovementByDirection("anim__RUN_",A_STATE_Direction),A_STATE_Speed*2 - 1)
+        }
+    }
+}

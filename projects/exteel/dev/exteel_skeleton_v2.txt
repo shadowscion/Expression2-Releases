@@ -1,0 +1,600 @@
+@name exteel/exteel_skeleton_v2
+@inputs Camera:wirelink [W A S D] [Shift Space] [Mouse1 Mouse2] [Active] [Entity]:entity
+@outputs
+@persist ANIM:table PHYS:entity [Ct Dt Ts] DEBUG
+@persist [GlobalZ GlobalY GlobalX GlobalV]:vector GlobalA:angle
+@trigger none
+
+#[
+    An mech/robot animation template based on the action game "Exteel"
+    by shadowscion
+
+    To wire:
+        - Spawn a SEAT
+        - Spawn a WIRE POD CONTROLLER
+        - Spawn a WIRE CAMERA CONTROLLER with the following options:
+            - CHECK   "coordinates local to parent"
+            - CHECK   "clientside movement"
+            - UNCHECK "localized movement"
+
+        - Link the pod and cam to the seat
+
+        - With the wiring tool selected,HOLD ALT and LEFT CLICK on the E2
+        - LEFT CLICK on the pod controller
+        - HOLD ALT and LEFT CLICK again
+
+        - Rewire the Camera:wirelink input to the camera controller entity
+
+        - Reload the E2
+]#
+
+if (first()) {
+
+    #-- SETTINGS
+    ANIM = table(
+        "Crouch_PelvisZ" = 0,
+        "Crouch_StrideY" = vec(0,0,0),
+        "Crouch_StrideX" = 0,
+        "Crouch_StrideZ" = 0,
+        "Crouch_IdleSway" = 0,
+        "Crouch_MoveSpeed" = 0,
+
+        "Walk_PelvisZ" = 0,
+        "Walk_StrideY" = vec(0,0,0),
+        "Walk_StrideX" = 0,
+        "Walk_StrideZ" = 0,
+        "Walk_IdleSway" = 0,
+        "Walk_MoveSpeed" = 0,
+
+        "Run_PelvisZ" = 0,
+        "Run_StrideY" = vec(0,0,0),
+        "Run_StrideX" = 0,
+        "Run_StrideZ" = 0,
+        "Run_MoveSpeed" = 0,
+
+        "FrameLoop" = 0
+    )
+
+    PHYS_Setup = table(
+        "EnableAirStrafe" = 1,        # enable quake style air strafing
+        "WalkSpeed"       = 250,      # walk speed in source units per second
+        "RunSpeed"        = 250,      # run speed in source units per second
+        "JumpHeight"      = 100,      # jump height in source units
+        "BBoxRadius"      = 10,       # bounding box radius in source units
+        "BBoxHeightReal"  = 72,       # bounding box height from head to toe in source units
+        "CamDistance"     = 100,
+        "CamOffset"       = vec()
+    )
+
+    DEBUG = 1
+
+    #[
+        I SUGGEST NOT EDITING
+        BELOW THIS COMMENT UNLESS
+        YOU KNOW WHAT YOU'RE DOING
+    ]#
+
+    function entity holoCreate(N,P,Pos:vector,Ang:angle,Scale:vector,Model:string,Material:string,Color:vector4,Shading) {
+        holoCreate(N)
+
+        local Parent = holoEntity(P)
+        if (Parent) { holoParent(N,P) } else { Parent = entity() }
+
+        holoPos(N,Parent:toWorld(Pos))
+        holoAng(N,Parent:toWorld(Ang))
+        holoScale(N,Scale)
+        holoModel(N,Model)
+        holoMaterial(N,Material)
+        holoColor(N,Color)
+        holoDisableShading(N,Shading)
+
+        return holoEntity(N)
+    }
+
+    #-- PHYS SETUP
+    #-- most are variables stored on the entity,to share and interact with other expression2s
+    PHYS = holoCreate(98765,0,vec(0,0,PHYS_Setup["BBoxHeightReal",number]),ang(),vec(DEBUG) / 12,"","",vec4(0,255,0,55),1)
+
+    PHYS["EnableAirStrafe",number] = PHYS_Setup["EnableAirStrafe",number]
+    PHYS["WalkSpeed",number] = PHYS_Setup["WalkSpeed",number]
+    PHYS["RunSpeed",number] = PHYS_Setup["RunSpeed",number]
+    PHYS["JumpHeight",number] = PHYS_Setup["JumpHeight",number]
+    PHYS["BBoxRadius",number] = PHYS_Setup["BBoxRadius",number]
+    PHYS["BBoxHeightReal",number] = PHYS_Setup["BBoxHeightReal",number]
+
+    PHYS["BBoxHeight",number] = PHYS["BBoxHeightReal",number] * 0.5
+    PHYS["BBoxMins",vector] = vec(PHYS["BBoxRadius",number],PHYS["BBoxRadius",number],PHYS["BBoxHeight",number]) *  -1
+    PHYS["BBoxMaxs",vector] = vec(PHYS["BBoxRadius",number],PHYS["BBoxRadius",number],0)
+    PHYS["Position",vector] = PHYS:pos()
+    PHYS["Velocity",vector] = vec()
+    PHYS["E2",entity] = entity()
+
+    if (DEBUG) {
+        holoCreate(98766,98765,vec(0,0,-PHYS["BBoxHeight",number] * 0.5),ang(),vec(PHYS["BBoxRadius",number] * 2,PHYS["BBoxRadius",number] * 2,PHYS["BBoxHeight",number]) / 12,"","models/wireframe",vec4(255,255,255,55),1)
+        holoCreate(98767,98766,vec(0,0,0),ang(),vec(PHYS["BBoxRadius",number] * 2,PHYS["BBoxRadius",number] * 2,PHYS["BBoxHeight",number]) / 12,"","",vec4(255,255,0,15),1)
+        holoCreate(98768,98765,vec(0,0,-PHYS["BBoxHeightReal",number] * 0.5),ang(),vec(PHYS["BBoxRadius",number] * 2,4,PHYS["BBoxHeightReal",number]) / 12,"","",vec4(255,0,0,55),1)
+        holoCreate(98769,98768,vec(0,0,0),ang(),vec(0.25,0.25,PHYS["BBoxHeightReal",number]) / 12,"","",vec4(0,0,255,255),1)
+    }
+
+    Camera["Parent",entity] = PHYS
+    Camera["Distance",number] = PHYS_Setup["CamDistance",number]
+    Camera["Position",vector] = PHYS_Setup["CamOffset",vector]
+
+    Ct = curtime()
+
+    GlobalZ = vec(0,0,1)
+    GlobalY = vec(0,1,0)
+    GlobalX = vec(1,0,0)
+    GlobalV = vec()
+    GlobalA = ang()
+
+    interval(60)
+
+
+    #-- ANIMATIONS
+    function number linear(Y0,Y1,T) {
+        return (1 - T) * Y0 + Y1 * T
+    }
+    function number cosine(Y0,Y1,T) {
+        local T = (1 - cosr(T * _PI)) * 0.5
+        return (1 - T) * Y0 + Y1 * T
+    }
+    function table blend(Blend0:table,Blend1:table,T) {
+        if     (T == 0) { return Blend0 }
+        elseif (T == 1) { return Blend1 }
+        else {
+            local T = cosine(0,1,T)
+            local Blend2 = table()
+
+            foreach (K,V:quaternion = Blend0) {
+                Blend2[K,quaternion] = slerp(V,Blend1[K,quaternion],T)
+            }
+            foreach (K,V:vector = Blend0) {
+                Blend2[K,vector] = mix(Blend1[K,vector],V,T)
+            }
+            foreach (K,V:number = Blend0) {
+                Blend2[K,number] = (1 - T) * V + Blend1[K,number] * T
+            }
+
+            return Blend2
+        }
+    }
+    function table blendByName(Blend0:string,Blend1:string,T) {
+        if     (T == 0) { return Blend0()[table] }
+        elseif (T == 1) { return Blend1()[table] }
+        else {
+            return blend(Blend0()[table],Blend1()[table],T)
+        }
+    }
+
+    function table anim__CROUCH_IDLE()  {
+        local FootTrace_L = rangerOffset(ANIM["Walk_PelvisZ",number],PHYS:toWorld(ANIM["Crouch_StrideY",vector]:setX(ANIM["Crouch_StrideX",number] * 0.5)),-GlobalZ)
+        local FootTrace_R = rangerOffset(ANIM["Walk_PelvisZ",number],PHYS:toWorld(ANIM["Crouch_StrideY",vector]:setX(ANIM["Crouch_StrideX",number] * -0.5)),-GlobalZ)
+
+        return table(
+            "v_pelvis_pos" = PHYS:toWorld(vec(0,cos(ANIM["FrameLoop",number] * 0.5) * ANIM["Crouch_IdleSway",number],sin(ANIM["FrameLoop",number]) * ANIM["Crouch_PelvisZ",number] - ANIM["Crouch_PelvisZ",number])),
+            "q_pelvis_ang" = quat(PHYS:toWorld(GlobalA)),
+            "v_foot_l_pos" = FootTrace_L:position(),
+            "v_foot_r_pos" = FootTrace_R:position(),
+            "n_move_speed" = 0,
+            "n_frame_rate" = 1
+        )
+    }
+    function table anim__CROUCH_F() {
+        local Sin = sin(90 + ANIM["FrameLoop",number]) * ANIM["Crouch_StrideZ",number]
+        local Cos = cos(90 + ANIM["FrameLoop",number]) * ANIM["Crouch_StrideX",number]
+    
+        local FootTrace_L = rangerOffset(ANIM["Walk_PelvisZ",number], PHYS:toWorld(ANIM["Crouch_StrideY",vector]:setX(Cos)), -GlobalZ)
+        local FootTrace_R = rangerOffset(ANIM["Walk_PelvisZ",number], PHYS:toWorld((-ANIM["Crouch_StrideY",vector]):setX(-Cos)), -GlobalZ)
+    
+        return table(
+            "v_pelvispos" = PHYS:toWorld(vec(0, 0, abs(Sin) * 0.25 - ANIM["Crouch_PelvisZ",number])),
+            "q_pelvisang" = quat(PHYS:toWorld(GlobalA)),
+            "v_footpos_l" = FootTrace_L:position() + max(0, -Sin) * (FootTrace_L:hitNormal() ?: GlobalZ),
+            "v_footpos_r" = FootTrace_R:position() + max(0, Sin) * (FootTrace_R:hitNormal() ?: GlobalZ),
+            "n_movespeed" = ANIM["Crouch_MoveSpeed",vector],
+            "n_framerate" = 1
+        )
+    }
+    function table anim__CROUCH_B() {
+        local Sin = sin(270 + ANIM["FrameLoop",number]) * ANIM["Crouch_StrideZ",number]
+        local Cos = cos(270 + ANIM["FrameLoop",number]) * ANIM["Crouch_StrideX",number]
+    
+        local FootTrace_L = rangerOffset(ANIM["Walk_PelvisZ",number], PHYS:toWorld(ANIM["Crouch_StrideY",vector]:setX(Cos)), -GlobalZ)
+        local FootTrace_R = rangerOffset(ANIM["Walk_PelvisZ",number], PHYS:toWorld((-ANIM["Crouch_StrideY",vector]):setX(-Cos)), -GlobalZ)
+    
+        return table(
+            "v_pelvispos" = PHYS:toWorld(vec(0, 0, abs(Sin) * 0.25 - ANIM["Crouch_PelvisZ",number])),
+            "q_pelvisang" = quat(PHYS:toWorld(GlobalA)),
+            "v_footpos_l" = FootTrace_L:position() + max(0, Sin) * (FootTrace_L:hitNormal() ?: GlobalZ),
+            "v_footpos_r" = FootTrace_R:position() + max(0, -Sin) * (FootTrace_R:hitNormal() ?: GlobalZ),
+            "n_movespeed" = ANIM["Crouch_MoveSpeed",vector],
+            "n_framerate" = 1
+        )
+    }
+    function table anim__CROUCH_L() {
+        local Sin = sin(90 + ANIM["FrameLoop",number]) * ANIM["Crouch_StrideZ",number]
+        local Cos = cos(90 + ANIM["FrameLoop",number]) * ANIM["Crouch_StrideX",number]
+    
+        local FootTrace_L = rangerOffset(ANIM["Walk_PelvisZ",number], PHYS:toWorld(vec(-ANIM["Crouch_StrideY",vector][2], ANIM["Crouch_StrideY",vector][2] + Cos, 0)), -GlobalZ)
+        local FootTrace_R = rangerOffset(ANIM["Walk_PelvisZ",number], PHYS:toWorld(vec(ANIM["Crouch_StrideY",vector][2], -ANIM["Crouch_StrideY",vector][2] - Cos, 0)), -GlobalZ)
+    
+        return table(
+            "v_pelvispos" = PHYS:toWorld(vec(0, 0, abs(Sin) * 0.25 - ANIM["Crouch_PelvisZ",number])),
+            "q_pelvisang" = quat(PHYS:toWorld(GlobalA)),
+            "v_footpos_l" = FootTrace_L:position() + max(0, -Sin) * (FootTrace_L:hitNormal() ?: GlobalZ),
+            "v_footpos_r" = FootTrace_R:position() + max(0, Sin) * (FootTrace_R:hitNormal() ?: GlobalZ),
+            "n_movespeed" = ANIM["Crouch_MoveSpeed",vector],
+            "n_framerate" = 1
+        )
+    }
+    function table anim__CROUCH_R() {
+        local Sin = sin(270 + ANIM["FrameLoop",number]) * ANIM["Crouch_StrideZ",number]
+        local Cos = cos(270 + ANIM["FrameLoop",number]) * ANIM["Crouch_StrideX",number]
+    
+        local FootTrace_L = rangerOffset(ANIM["Walk_PelvisZ",number], PHYS:toWorld(vec(ANIM["Crouch_StrideY",vector][2], ANIM["Crouch_StrideY",vector][2] + Cos, 0)), -GlobalZ)
+        local FootTrace_R = rangerOffset(ANIM["Walk_PelvisZ",number], PHYS:toWorld(vec(-ANIM["Crouch_StrideY",vector][2], -ANIM["Crouch_StrideY",vector][2] - Cos, 0)), -GlobalZ)
+    
+        return table(
+            "v_pelvispos" = PHYS:toWorld(vec(0, 0, abs(Sin) * 0.25 - ANIM["Crouch_PelvisZ",number])),
+            "q_pelvisang" = quat(PHYS:toWorld(GlobalA)),
+            "v_footpos_l" = FootTrace_L:position() + max(0, Sin) * (FootTrace_L:hitNormal() ?: GlobalZ),
+            "v_footpos_r" = FootTrace_R:position() + max(0, -Sin) * (FootTrace_R:hitNormal() ?: GlobalZ),
+            "n_movespeed" = ANIM["Crouch_MoveSpeed",vector],
+            "n_framerate" = 1
+        )
+    }
+
+    function table anim__WALK_IDLE() {
+        local FootTrace_L = rangerOffset(ANIM["Walk_PelvisZ",number],PHYS:toWorld(ANIM["Walk_StrideY",vector]:setX(ANIM["Walk_StrideX",number] * 0.5)),-GlobalZ)
+        local FootTrace_R = rangerOffset(ANIM["Walk_PelvisZ",number],PHYS:toWorld((-ANIM["Walk_StrideY",vector]):setX(-ANIM["Walk_StrideX",number] * 0.5)),-GlobalZ)
+    
+        return table(
+            "v_pelvispos" = PHYS:toWorld(vec(0,cos(ANIM["FrameLoop",number] * 0.5) * ANIM["Walk_IdleSway",number],sin(ANIM["FrameLoop",number]) * ANIM["Walk_IdleSway",number])),
+            "q_pelvisang" = quat(PHYS:toWorld(GlobalA)),
+            "v_footpos_l" = FootTrace_L:position(),
+            "v_footpos_r" = FootTrace_R:position(),
+            "n_movespeed" = 0,
+            "n_framerate" = 1
+        )
+    }
+    function table anim__WALK_F() {
+        local Sin = sin(90 + ANIM["FrameLoop",number]) * ANIM["Walk_StrideZ",number]
+        local Cos = cos(90 + ANIM["FrameLoop",number]) * ANIM["Walk_StrideX",number]
+    
+        local FootTrace_L = rangerOffset(ANIM["Walk_PelvisZ",number],PHYS:toWorld(ANIM["Walk_StrideY",vector]:setX(Cos)),-GlobalZ)
+        local FootTrace_R = rangerOffset(ANIM["Walk_PelvisZ",number],PHYS:toWorld((-ANIM["Walk_StrideY",vector]):setX(-Cos)),-GlobalZ)
+    
+        return table(
+            "v_pelvispos" = PHYS:toWorld(vec(0,0,abs(Sin) * 0.25)),
+            "q_pelvisang" = quat(PHYS:toWorld(ang(7 + abs(Cos),Cos,0))),
+            "v_footpos_l" = FootTrace_L:position() + max(0,-Sin) * (FootTrace_L:hitNormal() ?: GlobalZ),
+            "v_footpos_r" = FootTrace_R:position() + max(0,Sin) * (FootTrace_R:hitNormal() ?: GlobalZ),
+            "n_movespeed" = ANIM["Walk_MoveSpeed",number],
+            "n_framerate" = _PHI^2 - 0.25
+        )
+    }
+    function table anim__WALK_B() {
+        local Sin = sin(270 + ANIM["FrameLoop",number]) * ANIM["Walk_StrideZ",number]
+        local Cos = cos(270 + ANIM["FrameLoop",number]) * ANIM["Walk_StrideX",number]
+    
+        local FootTrace_L = rangerOffset(ANIM["Walk_PelvisZ",number],PHYS:toWorld(ANIM["Walk_StrideY",vector]:setX(Cos)),-GlobalZ)
+        local FootTrace_R = rangerOffset(ANIM["Walk_PelvisZ",number],PHYS:toWorld((-ANIM["Walk_StrideY",vector]):setX(-Cos)),-GlobalZ)
+    
+        return table(
+            "v_pelvispos" = PHYS:toWorld(vec(0,0,abs(Sin) * 0.25)),
+            "q_pelvisang" = quat(PHYS:toWorld(ang(-7 - abs(Cos),Cos,0))),
+            "v_footpos_l" = FootTrace_L:position() + max(0,Sin) * (FootTrace_L:hitNormal() ?: GlobalZ),
+            "v_footpos_r" = FootTrace_R:position() + max(0,-Sin) * (FootTrace_R:hitNormal() ?: GlobalZ),
+            "n_movespeed" = ANIM["Walk_MoveSpeed",number],
+            "n_framerate" = _PHI^2 - 0.25
+        )
+    }
+    function table anim__WALK_L() {
+        local Sin = sin(90 + ANIM["FrameLoop",number]) * ANIM["Walk_StrideZ",number]
+        local Cos = cos(90 + ANIM["FrameLoop",number]) * ANIM["Walk_StrideX",number]
+    
+        local FootTrace_L = rangerOffset(ANIM["Walk_PelvisZ",number],PHYS:toWorld(vec(-ANIM["Walk_StrideY",vector]:y(),ANIM["Walk_StrideY",vector]:y() + Cos,0)),-GlobalZ)
+        local FootTrace_R = rangerOffset(ANIM["Walk_PelvisZ",number],PHYS:toWorld(vec(ANIM["Walk_StrideY",vector]:y(),-ANIM["Walk_StrideY",vector]:y() - Cos,0)),-GlobalZ)
+    
+        return table(
+            "v_pelvispos" = PHYS:toWorld(vec(0,0,abs(Sin) * 0.25)),
+            "q_pelvisang" = quat(PHYS:toWorld(ang(0,Cos,-7 - abs(Cos)))),
+            "v_footpos_l" = FootTrace_L:position() + max(0,-Sin) * (FootTrace_L:hitNormal() ?: GlobalZ),
+            "v_footpos_r" = FootTrace_R:position() + max(0,Sin) * (FootTrace_R:hitNormal() ?: GlobalZ),
+            "n_movespeed" = ANIM["Walk_MoveSpeed",number],
+            "n_framerate" = _PHI^2 - 0.25
+        )
+    }
+    function table anim__WALK_R() {
+        local Sin = sin(270 + ANIM["FrameLoop",number]) * ANIM["Walk_StrideZ",number]
+        local Cos = cos(270 + ANIM["FrameLoop",number]) * ANIM["Walk_StrideX",number]
+    
+        local FootTrace_L = rangerOffset(ANIM["Walk_PelvisZ",number],PHYS:toWorld(vec(ANIM["Walk_StrideY",vector]:y(),ANIM["Walk_StrideY",vector]:y() + Cos,0)),-GlobalZ)
+        local FootTrace_R = rangerOffset(ANIM["Walk_PelvisZ",number],PHYS:toWorld(vec(-ANIM["Walk_StrideY",vector]:y(),-ANIM["Walk_StrideY",vector]:y() - Cos,0)),-GlobalZ)
+    
+        return table(
+            "v_pelvispos" = PHYS:toWorld(vec(0,0,abs(Sin) * 0.25)),
+            "q_pelvisang" = quat(PHYS:toWorld(ang(0,Cos,7 + abs(Cos)))),
+            "v_footpos_l" = FootTrace_L:position() + max(0,Sin) * (FootTrace_L:hitNormal() ?: GlobalZ),
+            "v_footpos_r" = FootTrace_R:position() + max(0,-Sin) * (FootTrace_R:hitNormal() ?: GlobalZ),
+            "n_movespeed" = ANIM["Walk_MoveSpeed",number],
+            "n_framerate" = _PHI^2 - 0.25
+        )
+    }
+    
+    function table anim__RUN_F() {
+        local Sin = sin(90 + ANIM["FrameLoop",number])
+        local Cos = cos(90 + ANIM["FrameLoop",number])
+        local FootTrace_L = -rangerOffset(ANIM["Run_PelvisZ",number],PHYS:toWorld(ANIM["Run_StrideY",vector]),-GlobalZ):distance() * GlobalZ * 0.5
+        local FootTrace_R = -rangerOffset(ANIM["Run_PelvisZ",number],PHYS:toWorld(-ANIM["Run_StrideY",vector]),-GlobalZ):distance() * GlobalZ * 0.5
+    
+        return table(
+            "v_pelvispos" = PHYS:toWorld(vec(0,Sin * ANIM["Run_StrideY",vector]:y(),-cos(90 + ANIM["FrameLoop",number] * 2) * ANIM["Run_PelvisZ",number] * 0.1):rotate(30,0,0)),
+            "q_pelvisang" = quat(PHYS:toWorld(ang(20 + abs(Cos) * 5,-Cos * 15,0))),
+            "v_footpos_l" = PHYS:toWorld(FootTrace_L:rotate(-Cos * 60,0,0) + FootTrace_L:rotate(-(Cos + Sin) * 60 + 60,0,0) + ANIM["Run_StrideY",vector]),
+            "v_footpos_r" = PHYS:toWorld(FootTrace_R:rotate(Cos * 60,0,0) + FootTrace_R:rotate((Cos + Sin) * 60 + 60,0,0) - ANIM["Run_StrideY",vector]),
+            "n_movespeed" = ANIM["Run_MoveSpeed",number],
+            "n_framerate" = _PHI^2 - 0.5
+        )
+    }
+    function table anim__RUN_B() {
+        local Sin = sin(270 + ANIM["FrameLoop",number])
+        local Cos = cos(270 + ANIM["FrameLoop",number])
+    
+        local FootTrace_L = -rangerOffset(ANIM["Run_PelvisZ",number],PHYS:toWorld(ANIM["Run_StrideY",vector]),-GlobalZ):distance() * GlobalZ * 0.5
+        local FootTrace_R = -rangerOffset(ANIM["Run_PelvisZ",number],PHYS:toWorld(-ANIM["Run_StrideY",vector]),-GlobalZ):distance() * GlobalZ * 0.5
+    
+        return table(
+            "v_pelvispos" = PHYS:toWorld(vec(0,-Sin * ANIM["Run_StrideY",vector]:y() * 0.5,cos(270 + ANIM["FrameLoop",number] * 2) * ANIM["Run_PelvisZ",number] * 0.1):rotate(-30,0,0)),
+            "q_pelvisang" = quat(PHYS:toWorld(ang(-10 - abs(Cos) * 5,-Cos * 15,0))),
+            "v_footpos_l" = PHYS:toWorld(FootTrace_L:rotate(-Cos * 60,0,0) + FootTrace_L:rotate(-(Cos / 2 + Sin) * 30 - 30,0,0) + ANIM["Run_StrideY",vector]),
+            "v_footpos_r" = PHYS:toWorld(FootTrace_R:rotate(Cos * 60,0,0) + FootTrace_R:rotate((Cos / 2 + Sin) * 30 - 30,0,0) - ANIM["Run_StrideY",vector]),
+            "n_movespeed" = ANIM["Run_MoveSpeed",number] * 0.75,
+            "n_framerate" = _PHI^2 - 0.5
+        )
+    }
+    function table anim__RUN_L() {
+        local Sin = sin(90 + ANIM["FrameLoop",number])
+        local Cos = cos(90 + ANIM["FrameLoop",number])
+    
+        local Rotate = ANIM["Run_StrideY",vector]:rotate(0,90,0)
+        local FootTrace_L = -rangerOffset(ANIM["Run_PelvisZ",number],PHYS:toWorld(Rotate),-GlobalZ):distance() * GlobalZ * 0.5
+        local FootTrace_R = -rangerOffset(ANIM["Run_PelvisZ",number],PHYS:toWorld(-Rotate),-GlobalZ):distance() * GlobalZ * 0.5
+    
+        return table(
+            "v_pelvispos" = PHYS:toWorld(vec(0,-Sin * ANIM["Run_StrideY",vector]:y() * 0.5,-cos(90 + ANIM["FrameLoop",number] * 2) * ANIM["Run_PelvisZ",number] * 0.05)),
+            "q_pelvisang" = quat(PHYS:toWorld(ang(0,-Cos * 15,-20 - abs(Cos) * 5))),
+            "v_footpos_l" = PHYS:toWorld(FootTrace_L:rotate(-Cos * 60,90,0) + FootTrace_L:rotate(-(Cos + Sin) * 30 + 30,90,0) + Rotate + ANIM["Run_StrideY",vector]),
+            "v_footpos_r" = PHYS:toWorld(FootTrace_R:rotate(Cos * 60,90,0) + FootTrace_R:rotate((Cos + Sin) * 30 + 30,90,0) - Rotate - ANIM["Run_StrideY",vector]),
+            "n_movespeed" = ANIM["Run_MoveSpeed",number],
+            "n_framerate" = _PHI^2 - 0.5
+        )
+    }
+    function table anim__RUN_R() {
+        local Sin = sin(90 + ANIM["FrameLoop",number])
+        local Cos = cos(90 + ANIM["FrameLoop",number])
+    
+        local Rotate = ANIM["Run_StrideY",vector]:rotate(0,-90,0)
+        local FootTrace_L = -rangerOffset(ANIM["Run_PelvisZ",number],PHYS:toWorld(Rotate),-GlobalZ):distance() * GlobalZ * 0.5
+        local FootTrace_R = -rangerOffset(ANIM["Run_PelvisZ",number],PHYS:toWorld(-Rotate),-GlobalZ):distance() * GlobalZ * 0.5
+    
+        return table(
+            "v_pelvispos" = PHYS:toWorld(vec(0,-Sin * ANIM["Run_StrideY",vector]:y() * 0.5,-cos(90 + ANIM["FrameLoop",number] * 2) * ANIM["Run_PelvisZ",number] * 0.05)),
+            "q_pelvisang" = quat(PHYS:toWorld(ang(0,-Cos * 15,20 + abs(Cos) * 5))),
+            "v_footpos_l" = PHYS:toWorld(FootTrace_L:rotate(-Cos * 60,-90,0) + FootTrace_L:rotate(-(Cos + Sin) * 30 + 30,-90,0) + Rotate + ANIM["Run_StrideY",vector]),
+            "v_footpos_r" = PHYS:toWorld(FootTrace_R:rotate(Cos * 60,-90,0) + FootTrace_R:rotate((Cos + Sin) * 30 + 30,-90,0) - Rotate - ANIM["Run_StrideY",vector]),
+            "n_movespeed" = ANIM["Run_MoveSpeed",number],
+            "n_framerate" = _PHI^2 - 0.5
+        )
+    }
+
+    function table blendMovementByDirection(Type:string,Direction) {
+        local Direction = angnorm(Direction)
+        if (Direction == 0) {
+            return (Type + "F")()[table]
+        }
+        elseif (Direction == 90) {
+            return (Type + "L")()[table]
+        }
+        elseif (Direction == -90) {
+            return (Type + "R")()[table]
+        }
+        elseif (Direction == 180 | Direction == -180) {
+            return (Type + "B")()[table]
+        }
+        elseif (inrange(Direction,0,90)) {
+            return blendByName(Type + "F",Type + "L",abs(Direction / 90))
+        }
+        elseif (inrange(Direction,-90,0)) {
+            return blendByName(Type + "F",Type + "R",abs(Direction / 90))
+        }
+        elseif (inrange(Direction,90,180)) {
+            return blendByName(Type + "L",Type + "B",abs(Direction / 90) - 1)
+        }
+        elseif (inrange(Direction,-180,-90)) {
+            return blendByName(Type + "R",Type + "B",abs(Direction / 90) - 1)
+        }
+        else {
+            return table()
+        }
+    }
+    function table blendspaceNormalMotion() {
+        if (PHYS["ANIMSTATE_Speed",number] == 0) {
+            if (PHYS["ANIMSTATE_Crouch",number] == 0) { return anim__WALK_IDLE() }
+            elseif (PHYS["ANIMSTATE_Crouch",number] == 1) { return anim__CROUCH_IDLE() }
+            else {
+                return blendByName("anim__WALK_IDLE","anim__CROUCH_IDLE",PHYS["ANIMSTATE_Crouch",number])
+            }
+        }
+        elseif (PHYS["ANIMSTATE_Speed",number] <= 0.5) {
+            if (PHYS["ANIMSTATE_Speed",number] == 0.5) {
+                if (PHYS["ANIMSTATE_Crouch",number] == 0) {
+                    return blendMovementByDirection("anim__WALK_",PHYS["ANIMSTATE_Direction",number])
+                }
+                elseif (PHYS["ANIMSTATE_Crouch",number] == 1) {
+                    return blendMovementByDirection("anim__CROUCH_",PHYS["ANIMSTATE_Direction",number])
+                }
+                else {
+                    return blend(blendMovementByDirection("anim__WALK_",PHYS["ANIMSTATE_Direction",number]),blendMovementByDirection("anim__CROUCH_",PHYS["ANIMSTATE_Direction",number]),PHYS["ANIMSTATE_Crouch",number])
+                }
+            }
+            else {
+                if (PHYS["ANIMSTATE_Crouch",number] == 0) {
+                    return blend(anim__WALK_IDLE(),blendMovementByDirection("anim__WALK_",PHYS["ANIMSTATE_Direction",number]),PHYS["ANIMSTATE_Speed",number] * 2)
+                }
+                elseif (PHYS["ANIMSTATE_Crouch",number] == 1) {
+                    return blend(anim__CROUCH_IDLE(),blendMovementByDirection("anim__CROUCH_",PHYS["ANIMSTATE_Direction",number]),PHYS["ANIMSTATE_Speed",number] * 2)
+                }
+                else {
+                    local B0 = blend(anim__WALK_IDLE(),blendMovementByDirection("anim__WALK_",PHYS["ANIMSTATE_Direction",number]),PHYS["ANIMSTATE_Speed",number] * 2)
+                    local B1 = blend(anim__CROUCH_IDLE(),blendMovementByDirection("anim__CROUCH_",PHYS["ANIMSTATE_Direction",number]),PHYS["ANIMSTATE_Speed",number] * 2)
+                    return blend(B0,B1,PHYS["ANIMSTATE_Crouch",number])
+                }
+            }
+        }
+        else {
+            if (PHYS["ANIMSTATE_Speed",number] == 1) {
+                return blendMovementByDirection("anim__RUN_",PHYS["ANIMSTATE_Direction",number])
+            }
+            else {
+                return blend(blendMovementByDirection("anim__WALK_",PHYS["ANIMSTATE_Direction",number]),blendMovementByDirection("anim__RUN_",PHYS["ANIMSTATE_Direction",number]),PHYS["ANIMSTATE_Speed",number] * 2 - 1)
+            }
+        }
+    }
+}
+
+if (clk()) {
+
+    #-- e2 execution
+    interval(60)
+
+    Ts = 1                      #-- timescale
+    Dt = (curtime() - Ct) * Ts  #-- delta time
+    Ct = curtime()
+
+    if (Active) {
+        #-- enable camera
+        Camera["Activated",number] = 1
+
+
+        #-- player setup
+        PHYS["Player",entity] = Entity:driver()
+        PHYS["EyeDir",vector] = Entity:toLocalAxis(PHYS["Player",entity]:eye()):setZ(0)
+
+
+        #-- movement input
+        PHYS["MoveDir",vector] = (W - S) * PHYS["EyeDir",vector] + PHYS["EyeDir",vector]:cross(vec(0,0,1)) * (D - A)
+        PHYS["MoveDir",vector] = PHYS["MoveDir",vector]:normalized()
+
+        local Speed = (PHYS["WalkSpeed",number] + PHYS["RunSpeed",number] * Shift) * Dt
+        local Gravity = 600 * Dt * Dt * -1
+
+
+        #-- jump input
+        if (PHYS["EnableAirStrafe",number]) {
+            if (!PHYS["HitGround",number]) {
+                local AirDir = PHYS["EyeDir",vector]:cross(vec(0,0,1)) * (D - A)
+                      AirDir = AirDir:normalized()
+
+                local DotVel = PHYS["Velocity",vector]:setZ(0):dot(AirDir)
+                local AirVel = 100 * Dt
+
+                if (DotVel + AirVel > PHYS["JumpSpeed",number]) {
+                    AirVel = PHYS["JumpSpeed",number] - DotVel
+                }
+
+                PHYS["Velocity",vector] = PHYS["Velocity",vector] + AirDir:setZ(0) * AirVel
+            }
+        }
+        if (PHYS["HitGround",number]) {
+            PHYS["Velocity",vector] = (PHYS["MoveDir",vector] * Speed):setZ(Space * sqrt(2 * abs(Gravity) * PHYS["JumpHeight",number]))
+            if (PHYS["Velocity",vector][3]) {
+                PHYS["JumpSpeed",number] = PHYS["Velocity",vector]:setZ(0):length()
+                PHYS["HitGround",number] = 0
+            }
+        }
+        else {
+            PHYS["Velocity",vector] = PHYS["Velocity",vector] + vec(0,0,Gravity)
+        }
+
+
+        #-- XY-axis velocity handler
+        PHYS["HitBBox",number] = 0
+
+        local Ranger = rangerOffsetHull(PHYS["Position",vector],PHYS["Position",vector] + PHYS["Velocity",vector],PHYS["BBoxMins",vector],PHYS["BBoxMaxs",vector])
+        if (Ranger:hit()) {
+            #-- resolve collisions
+            local TargetPos = PHYS["Position",vector] + PHYS["Velocity",vector]
+            local RangerPos = Ranger:position()
+            local RangerNormal = Ranger:hitNormal():setZ(0) * 1.05
+
+            Ranger = rangerOffsetHull(RangerPos,TargetPos - RangerNormal * (TargetPos - RangerPos):dot(RangerNormal),PHYS["BBoxMins",vector],PHYS["BBoxMaxs",vector])
+
+            #-- set new velocity
+            PHYS["Velocity",vector] = (Ranger:position() - PHYS["Position",vector]):setZ(PHYS["Velocity",vector][3])
+
+            PHYS["HitBBox",number] = 1
+        }
+
+
+        #-- Z-axis velocity handler
+        #-- vertical movement
+        local Normal = sign(PHYS["Velocity",vector]:z()) ?: -1
+        local Ranger = rangerOffset(999999999,PHYS["Position",vector] + PHYS["Velocity",vector]:setZ(0),vec(0,0,Normal))
+
+        #-- stick to downward slopes
+        if (PHYS["HitGround",number]) {
+            local GDot = PHYS["Velocity",vector]:normalized():setZ(0):dot(Ranger:hitNormal())
+            if (GDot > 0) {
+                PHYS["Position",vector][3] = Ranger:position():z() + PHYS["BBoxHeightReal",number]
+                PHYS["Velocity",vector][3] = 0
+                PHYS["HitGround",number] = 2
+            }
+        }
+
+        #-- downward movement
+        if (Normal == -1) {
+            local Ground = Ranger:position():z() + PHYS["BBoxHeightReal",number]
+
+            PHYS["Position",vector][3] = max(PHYS["Position",vector][3] + PHYS["Velocity",vector][3],Ground)
+            if (PHYS["Position",vector][3] <= Ground) {
+                PHYS["Position",vector][3] = Ground
+                PHYS["Velocity",vector][3] = 0
+                PHYS["HitGround",number] = 1
+            }
+            else {
+                PHYS["HitGround",number] = 0
+            }
+        }
+
+        #-- upward movement
+        else {
+            local Ceiling = Ranger:position():z() - PHYS["Velocity",vector][3]
+
+            PHYS["Position",vector][3] = min(PHYS["Position",vector][3],Ceiling)
+            if (PHYS["Position",vector][3] >= Ceiling) {
+                PHYS["Position",vector][3] = Ceiling
+                PHYS["Velocity",vector][3] = Gravity
+                PHYS["HitCeiling",number] = 1
+            }
+            else {
+                PHYS["HitCeiling",number] = 0
+            }
+        }
+
+        PHYS["Position",vector] = PHYS["Position",vector] + PHYS["Velocity",vector]
+
+        #-- debug
+        holoPos(98765,PHYS["Position",vector])
+
+        if (DEBUG) {
+            holoAng(98768,PHYS["EyeDir",vector]:toAngle())
+            holoColor(98768,PHYS["HitGround",number] | PHYS["HitCeiling",number] ? vec(255,0,0) : vec(0,255,0))
+            holoColor(98767,PHYS["HitBBox",number] ? vec(255,0,0) : vec(0,255,0))
+        }
+    }
+    else {
+        Camera["Activated",number] = 0
+    }
+}

@@ -1,0 +1,119 @@
+@name exteel/beta/model
+@persist [HN HS] [HT XT]:table Layout:table L_A L_B L_Total
+
+
+#----------------------------------------------------------------
+function number spawn_holograms(Shading,Factor){
+    timer("spawn",15)
+
+    while(perf()&HS<HN&holoCanCreate()){
+        HS++
+
+        local Data = HT[HS,array]
+        local Index = Data[1,number]
+        local Parent = holoEntity(Data[2,number])?:entity()
+
+        holoCreate(Index)
+        holoPos(Index,Parent:toWorld(Data[3,vector]*Factor))
+        holoAng(Index,Parent:toWorld(Data[4,angle]))
+        holoParent(Index,Parent)
+
+        holoScale(Index,Data[5,vector]*Factor)
+        holoModel(Index,Data[6,string])
+        holoMaterial(Index,Data[7,string])
+        holoColor(Index,Data[8,vector4])
+
+        if (Shading == 1 | Data[9,number]) {
+            holoDisableShading(Index,1)
+        }
+
+        if (XT[Index,array]) {
+            local CN = XT[Index,array]:count()
+            for (I = 1,CN,2) {
+                local RCN = ceil(I/2)
+                local Pos = XT[Index,array][I,vector]
+                local Dir = XT[Index,array][I+1,vector]
+                holoClipEnabled(Index,RCN,1)
+                holoClip(Index,RCN,Pos*Factor,Dir,0)
+            }
+        }
+    }
+
+    if(HS >= HN){
+        stoptimer("spawn")
+        printColor(vec(225,255,225),"\nFinished spawning "+HS+" holograms.")
+    }
+
+    return  HS >= HN
+}
+
+
+#----------------------------------------------------------------
+local Vec = vec()
+local Ang = ang()
+
+local Material0 = ""
+
+local Color0 = vec4(255,255,255,255)
+
+
+#----------------------------------------------------------------
+local RatioUnit = 12
+local BoneScale = vec(6/12)
+local BoneModel = ""
+local BoneColor = vec4(255,255,255,255)
+
+#[
+    Bones
+]#
+
+#-- pelvis
+HN++,HT[HN,array] = array(1,0,vec(0,0,RatioUnit/0.3+RatioUnit/0.36+RatioUnit/0.9),ang(),vec(),"","",vec4())
+HN++,HT[HN,array] = array(2,1,vec(),ang(),BoneScale,BoneModel,"",BoneColor)
+
+#-- torso
+HN++,HT[HN,array] = array(3,2,vec(0,0,RatioUnit/0.9),ang(),BoneScale,BoneModel,"",BoneColor)
+
+#-- head
+HN++,HT[HN,array] = array(4,3,vec(0,0,RatioUnit/0.43),ang(),BoneScale,BoneModel,"",BoneColor)
+
+#-- legs
+HN++,HT[HN,array] = array(5,2,vec(0,RatioUnit/0.833,0),ang(0,10,5),BoneScale,BoneModel,"",BoneColor)
+HN++,HT[HN,array] = array(6,5,vec(0,0,-RatioUnit/0.3),ang(),BoneScale,BoneModel,"",BoneColor)
+HN++,HT[HN,array] = array(7,6,vec(0,0,-RatioUnit/0.36),ang(),BoneScale,BoneModel,"",BoneColor)
+
+HN++,HT[HN,array] = array(8,2,vec(0,-RatioUnit/0.833,0),ang(0,-10,-5),BoneScale,BoneModel,"",BoneColor)
+HN++,HT[HN,array] = array(9,8,vec(0,0,-RatioUnit/0.3),ang(),BoneScale,BoneModel,"",BoneColor)
+HN++,HT[HN,array] = array(10,9,vec(0,0,-RatioUnit/0.36),ang(),BoneScale,BoneModel,"",BoneColor)
+
+#-- arms
+HN++,HT[HN,array] = array(11,3,vec(0,RatioUnit/0.693,RatioUnit/0.53),ang(0,0,10),BoneScale,BoneModel,"",BoneColor)
+HN++,HT[HN,array] = array(12,11,vec(0,RatioUnit/0.693,0),ang(0,0,0),BoneScale,BoneModel,"",BoneColor)
+HN++,HT[HN,array] = array(13,12,vec(0,0,-RatioUnit/0.514),ang(0,0,-5),BoneScale,BoneModel,"",BoneColor)
+HN++,HT[HN,array] = array(14,13,vec(0,0,-RatioUnit/0.643),ang(),BoneScale,BoneModel,"",BoneColor)
+
+HN++,HT[HN,array] = array(15,3,vec(0,-RatioUnit/0.693,RatioUnit/0.53),ang(0,0,-10),BoneScale,BoneModel,"",BoneColor)
+HN++,HT[HN,array] = array(16,15,vec(0,-RatioUnit/0.693,0),ang(0,0,0),BoneScale,BoneModel,"",BoneColor)
+HN++,HT[HN,array] = array(17,16,vec(0,0,-RatioUnit/0.514),ang(0,0,5),BoneScale,BoneModel,"",BoneColor)
+HN++,HT[HN,array] = array(18,17,vec(0,0,-RatioUnit/0.643),ang(),BoneScale,BoneModel,"",BoneColor)
+
+function number icos(A,B,C) {
+    return acos((A^2 + B^2 - C^2) / (2 * A * B))
+}
+
+function quat_ik(NHip,NKnee,NFoot,LengthA,LengthB,Base:entity,Target:vector,FOOT) {
+    local Origin = holoEntity(NHip):pos()
+    local AxisLocal = Base:toLocalAxis(Target - Origin)
+
+    #local AxisAngle = AxisLocal:toAngle():setRoll(-bearing(Target,Base:angles(),Origin)) #-- forward knee
+    local AxisAngle = AxisLocal:toAngle():setRoll(-bearing(Origin,Base:angles(),Target)) #-- reverse knee
+
+    local LengthC = min(AxisLocal:length(),LengthA + LengthB - 0.05)
+    local AxisQuat = quat(AxisAngle) * qRotation(vec(0,1,0),270 - icos(LengthC,LengthA,LengthB))
+
+    holoAng(NHip,Base:toWorld(AxisQuat:toAngle()))
+    holoAng(NKnee,holoEntity(NHip):toWorld(ang(-icos(LengthB,LengthA,LengthC) + 180,0,0)))
+
+    local FootAngle = ang(-90,0,0)
+    holoAng(NFoot,slerp(quat(Base:toWorld(FootAngle)),quat(holoEntity(NKnee):toWorld(FootAngle)),FOOT):toAngle())
+}

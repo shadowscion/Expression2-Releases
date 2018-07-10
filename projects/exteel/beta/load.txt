@@ -1,0 +1,250 @@
+@name exteel/beta/load
+#----------------------------------------------------------------
+@inputs Camera:wirelink [W A S D] [Mouse1 Mouse2] [Shift Space] [Active] [Entity]:entity
+
+
+#----------------------------------------------------------------
+@outputs Ops Cpu [G_Dt G_Ct] TR:vector TL:vector
+
+
+#-- General variables --------------------------------------------
+@persist [G_Dt G_Ct G_Ts]
+
+
+#-- Physics variables -------------------------------------------
+@persist [P_MoveDir P_Position P_Velocity P_BBoxMins P_BBoxMaxs]:vector [P_Angle]:angle [P_Entity]:entity
+@persist [P_HitBBox P_HitCeiling P_HitGround P_EnableAirStrafe P_JumpHeight P_JumpSpeed P_BBoxHeight P_BBoxHeightReal P_BBoxRadius]
+
+
+#-- Animation variables -----------------------------------------
+@persist [A_InputBlend]
+
+
+#----------------------------------------------------------------
+@trigger none
+
+
+#----------------------------------------------------------------
+if (first()) {
+    #include "exteel/beta/model"
+    #include "exteel/beta/anim"
+
+    timer("spawn",100)
+}
+
+
+#----------------------------------------------------------------
+if (clk("spawn")) {
+    local Done = spawn_holograms(0,1)
+    if (Done) {
+        timer("main",90)
+
+
+        #-- Model settings
+        L_C = 12
+        L_A = abs(holoEntity(5):toLocal(holoEntity(6):pos()):z())
+        L_B = abs(holoEntity(6):toLocal(holoEntity(7):pos()):z()) + L_C
+        L_W = abs(holoEntity(2):toLocal(holoEntity(5):pos()):y())*1.5
+
+        L_Total = L_A + L_B
+
+        A_WalkPelvisZ = L_Total*0.95
+        A_WalkStrideX = L_B
+        A_WalkStrideZ = L_A/2
+        A_WalkStrideY = vec(0,L_W*1.1,0)
+        A_WalkIdleSway = 0 #0.05
+
+        A_RunPelvisZ = A_WalkPelvisZ
+        A_RunStrideY = A_WalkStrideY/2
+
+        A_WalkMoveSpeed = A_WalkStrideX*2*_PI
+        A_RunMoveSpeed = A_RunPelvisZ*2*_PI
+
+
+        #-- Physics settings
+        P_JumpHeight      = A_WalkPelvisZ * 3
+        P_BBoxHeightReal  = A_WalkPelvisZ
+        P_BBoxRadius      = A_WalkPelvisZ / 2
+
+
+        #-- Physics variables and setup
+        P_Entity = Root = holoEntity(1),holoUnparent(1)
+
+        P_BBoxHeight = P_BBoxHeightReal*0.5
+        P_BBoxMins = -vec(P_BBoxRadius,P_BBoxRadius,P_BBoxHeight)
+        P_BBoxMaxs = vec(P_BBoxRadius,P_BBoxRadius,0)
+        P_Position = entity():pos() + vec(0,0,A_WalkPelvisZ)
+        P_Velocity = vec()
+
+        Camera["Parent",entity] = P_Entity
+        Camera["Distance",number] = 100
+        Camera["Position",vector] = vec()
+
+
+        #-- General variables
+        G_WorldZ = vec(0,0,1)
+        G_Ct = curtime()
+    }
+}
+
+
+#----------------------------------------------------------------
+if (clk("main")) {
+
+    #-- Timers
+    timer("main",90)
+
+    G_Dt = curtime() - G_Ct      #delta time
+    G_Ct = curtime()             #current time
+
+    #G_Dt *= 0.25
+
+    if (Active) {
+        #-- Player and inputs
+        Camera["Activated",number] = 1
+
+        A_InputBlend += clamp((S ? (S|A|D) : (W|A|D)*2)*0.5 - A_InputBlend,-G_Dt*0.5,G_Dt)
+
+        A_STATE_Hover += clamp(Shift - A_STATE_Hover, -G_Dt, G_Dt)
+
+        local P_EyeDir = Entity:toLocalAxis(Entity:driver():eye()):setZ(0)
+        if (A_InputBlend) {
+            P_Angle = P_EyeDir:toAngle()
+        }
+        if (W|S) {
+            P_MoveDir = (W - S)*P_EyeDir
+        }
+        if (A|D) {
+            P_MoveDir += P_EyeDir:cross(G_WorldZ)*(D - A)
+        }
+        P_MoveDir = P_MoveDir:normalized()
+
+        local C_Speed = (A_LayerOutput["nmovespeed",number]*A_LayerOutput["nframerate",number])*G_Dt #-- grab novespeed from blended anim
+        local C_Gravity = -600*G_Dt*G_Dt
+
+
+        #-- Jump and gravity
+        if (P_HitGround) {
+            P_Velocity = (P_MoveDir*C_Speed):setZ(Space*sqrt(2*abs(C_Gravity)*P_JumpHeight))
+            if (P_Velocity[3]) {
+                P_JumpSpeed = P_Velocity:setZ(0):length()
+                P_HitGround = 0
+            }
+        }
+        else {
+            P_Velocity += vec(0,0,C_Gravity)
+        }
+
+
+        #-- XYAxis velocity
+        P_HitBBox = 0
+
+        local BBoxTrace = rangerOffsetHull(P_Position,P_Position + P_Velocity,P_BBoxMins,P_BBoxMaxs)
+        if (BBoxTrace:hit()) {
+            local CheckPos = P_Position + P_Velocity
+            local CheckHit = BBoxTrace:position()
+            local CheckDir = BBoxTrace:hitNormal():setZ(0)*1.05
+
+            BBoxTrace = rangerOffsetHull(CheckHit,CheckPos - CheckDir*(CheckPos - CheckHit):dot(CheckDir),P_BBoxMins,P_BBoxMaxs)
+
+            P_Velocity = (BBoxTrace:position() - P_Position):setZ(P_Velocity[3])
+            P_HitBBox = 1
+        }
+
+
+        #-- ZAxis velocity
+        local UpDown = sign(P_Velocity[3]) ?: -1
+        local GTrace = rangerOffset(9999999,P_Position + P_Velocity:setZ(0),vec(0,0,UpDown))
+
+        if (P_HitGround) {
+            local GDot = P_Velocity:normalized():setZ(0):dot(GTrace:hitNormal())
+            if (GDot > 0) {
+                P_Position[3] = GTrace:position()[3] + P_BBoxHeightReal
+                P_Velocity[3] = 0
+                P_HitGround = 2
+            }
+        }
+        if (UpDown == -1) {
+            local Ground = GTrace:position()[3] + P_BBoxHeightReal
+
+            P_Position[3] = max(P_Position[3] + P_Velocity[3],Ground)
+            if (P_Position[3] <= Ground) {
+                P_Position[3] = Ground
+                P_Velocity[3] = 0
+                P_HitGround = 1
+            }
+            else {
+                P_HitGround = 0
+            }
+        }
+        else {
+            local Ceiling = GTrace:position()[3] - P_Velocity[3]
+
+            P_Position[3] = min(P_Position[3],Ceiling)
+            if (P_Position[3] >= Ceiling) {
+                P_Position[3] = Ceiling
+                P_Velocity[3] = C_Gravity
+                P_HitCeiling = 1
+            }
+            else {
+                P_HitCeiling = 0
+            }
+        }
+
+
+        #-- Integrate velocity
+        P_Position += P_Velocity
+
+        holoPos(1,P_Position)
+        holoAng(1,P_Angle)
+
+        Root["Velocity",vector] = Root:toLocalAxis(P_Velocity)
+
+
+        #-- Animation overlay
+        A_FrameLoop += A_LayerOutput["nframerate",number]*360*G_Dt
+
+        A_STATE_Direction = atan(P_MoveDir[2],P_MoveDir[1]) - atan(P_EyeDir[2],P_EyeDir[1])
+        A_STATE_Speed = A_InputBlend
+
+        A_LayerOutput = finalBlend()
+        #if (Shift) { A_LayerOutput = anim__HOVER_LOOP() } else { A_LayerOutput = blendspaceNormalMotion() }
+
+        local Aim = P_Entity:toLocal(Entity:toLocalAxis(Entity:driver():eye()):toAngle())
+        local PMod = vec(0,0,-abs(Aim[1]/4) - abs(Aim[2]/4))
+
+        holoPos(2,P_Entity:toWorld(A_LayerOutput["vpelvispos",vector] + PMod))
+        holoAng(2,P_Entity:toWorld(A_LayerOutput["qpelvisang",quaternion]:toAngle() + Aim/2))
+        holoAng(3,holoEntity(2):toWorld(Aim/2))
+        holoAng(4,P_Entity:toWorld(Aim))
+
+        quat_ik(5,6,7,L_A,L_B,holoEntity(2),A_LayerOutput["vfootlpos",vector],A_STATE_Speed )
+        quat_ik(8,9,10,L_A,L_B,holoEntity(2),A_LayerOutput["vfootrpos",vector],A_STATE_Speed )
+
+        local ArmCos = cos(45 + A_FrameLoop)*A_STATE_Speed
+        local ArmAng = holoEntity(3):angles()
+        ArmAng = ArmAng:rotateAroundAxis(ArmAng:up(),-ArmCos*15 - 15)
+        ArmAng = ArmAng:rotateAroundAxis(ArmAng:forward(),-ArmCos*15)
+
+        holoAng(11,ArmAng)
+        holoAng(12,holoEntity(11):toWorld(ang(-ArmCos*25-25,0,0)))
+        holoAng(13,holoEntity(12):toWorld(ang(-ArmCos*35-65,0,0)))
+
+        local ArmCos = cos(45 + A_FrameLoop)*A_STATE_Speed
+        local ArmAng = holoEntity(3):angles()
+        ArmAng = ArmAng:rotateAroundAxis(ArmAng:up(),-ArmCos*15 + 15)
+        ArmAng = ArmAng:rotateAroundAxis(ArmAng:forward(),-ArmCos*15)
+
+        holoAng(15,ArmAng)
+        holoAng(16,holoEntity(15):toWorld(ang(ArmCos*25-25,0,0)))
+        holoAng(17,holoEntity(16):toWorld(ang(ArmCos*35-65,0,0)))
+
+
+    }
+    else {
+        Camera["Activated",number] = 0
+    }
+
+    Ops = ops()
+    Cpu = cpuUsage()*1000000
+}

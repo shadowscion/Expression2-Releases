@@ -1,0 +1,330 @@
+@name exteel2/spawn
+# INPUTS
+@inputs Camera:wirelink [W A S D] [Mouse1 Mouse2] [Shift Space] [Active] [Entity]:entity
+
+# OUTPUTS
+@outputs Ops Cpu Input Test Test2 PHYS_Velocity:vector C_Speed
+
+# MISC
+@trigger none
+@model models/maxofs2d/hover_plate.mdl
+
+
+if (first()) {
+    #if (!->Camera | !->Entity) { error("Wire it first ya dingus!") }
+
+    #include "exteel2/model"
+
+    # ENTITY SETUP
+    entity():setMaterial("beer/wiremod/gate_e2")
+    timer("spawn", 100)
+}
+
+if (clk("spawn")) {
+    if (spawn_holograms(0,1)) {
+        # ENTITY CONFIGS
+        MDL_PelvisEntity1 = holoEntity(1)
+        MDL_PelvisEntity2 = holoEntity(2)
+        MDL_TorsoEntity = holoEntity(3)
+
+        PHYS_Entity = holoEntity(9000)
+
+
+        # IDLE CONFIGS
+        CFG_IDLE_StrideX = MDL_LegL_D*0.5
+        CFG_IDLE_StrideY = MDL_LegL_A*1.5
+
+
+        # WALK CONFIGS
+        CFG_WALK_StrideX = MDL_LegL_D
+        CFG_WALK_StrideY = MDL_LegL_A
+        CFG_WALK_StrideZ = MDL_LegL_B
+        CFG_WALK_PelvisZ_Offset = 0
+        CFG_WALK_FrameRate = _PHI - (2 / 3)
+
+        CFG_WALK_PelvisZ = MDL_PelvisZ                  # usually total leg length, don't change
+        CFG_WALK_MoveSpeed = CFG_WALK_StrideX*2*_PI     # don't change
+
+
+        # RUN CONFIGS
+        CFG_RUN_StrideY = MDL_LegL_A*0.66
+        CFG_RUN_PelvisZ_Offset = 0
+        CFG_RUN_FrameRate = _PHI - (3 / 4)
+
+        CFG_RUN_PelvisZ = MDL_PelvisZ                   # usually total leg length, don't change
+        CFG_RUN_MoveSpeed = CFG_RUN_PelvisZ*2*_PI       # don't change
+
+
+        # ARM CONFIGS
+        CFG_ArmX = 0
+        CFG_ArmY = MDL_ArmL_A
+        CFG_ArmZ = MDL_ArmL_B + MDL_ArmL_C
+
+
+        # HOVER CONFIGS
+        CFG_HOVER_FootZ = MDL_LegL_D
+        CFG_HOVER_PelvisZ_Offset = MDL_LegL_D*0.5
+
+
+        # TORSO CONFIGS
+        CFG_Torso_MaxAng = ang(30,30,30)
+
+
+        # JUMP CONFIGS
+        PHYS_JumpHeight = MDL_TotalZ*2
+
+
+        # PHYS SETUP
+        PHYS_BBoxHeight = MDL_TotalZ
+        PHYS_BBoxRadius = 30
+        PHYS_BBoxZ = PHYS_BBoxHeight*0.5
+        PHYS_BBoxMins = vec(PHYS_BBoxRadius,PHYS_BBoxRadius,PHYS_BBoxZ)*-1
+        PHYS_BBoxMaxs = vec(PHYS_BBoxRadius,PHYS_BBoxRadius,0)
+
+        PHYS_Position = entity():pos() + vec(0,0,PHYS_BBoxHeight)
+
+        holoPos(holoIndex(PHYS_Entity),PHYS_Position)
+
+
+        # MISC SETUP
+        Ct = curtime()
+
+        Camera["Parent",entity] = PHYS_Entity
+        Camera["Distance",number] = 100
+        Camera["Position",vector] = vec()
+
+        timer("main",100)
+    }
+}
+
+if (clk("main")) {
+    timer("main",90)
+
+    Dt = curtime() - Ct
+    Ct = curtime()
+
+    if (Active) {
+        #-- player and inputs
+        Camera["Activated",number] = 1
+
+        PHYS_EyeDir = Entity:toLocalAxis(Entity:driver():eye())
+        PHYS_EyeDirNoZ = PHYS_EyeDir:setZ(0)
+        if (W|S) {
+            PHYS_MoveDir = (W - S)*PHYS_EyeDirNoZ
+        }
+        if (A|D) {
+            PHYS_MoveDir += PHYS_EyeDirNoZ:cross(LIB_WorldU)*(D - A)
+        }
+        PHYS_MoveDir = PHYS_MoveDir:normalized()
+
+        if (ANIM_StateNext != "anim__MJUMP") {
+            C_Speed = (ANIM_Output["n_movespeed",number]*ANIM_Output["n_framerate",number])*Dt #-- grab novespeed from blended anim
+        }
+
+        #local C_Gravity = -fromUnit("m", 9.81)*Dt*Dt#*Dt #-(fromUnit("m", 9.81) / 0.75)*Dt*Dt# -600*Dt*Dt
+        local C_Gravity = -2000 * Dt * Dt
+
+        #-- jump and gravity
+        if (PHYS_HitGround) {
+
+            PHYS_Velocity = (PHYS_MoveDir*C_Speed):setZ(Space*sqrt(0 - 2*C_Gravity*PHYS_JumpHeight))
+
+            if (PHYS_Velocity[3]) {
+                PHYS_HitGround = 0
+                ANIM_StateNext = "anim__MJUMP"
+                MDL_TorsoEntity:soundPlay("jump", 0, "weapons/physcannon/energy_disintegrate5.wav"), soundPitch("jump", 64)
+            }
+            else {
+                ANIM_StateNext = "anim__MOVEMENT"
+            }
+        }
+        else {
+            if (D | A) {
+                local AirDir = PHYS_EyeDirNoZ:cross(LIB_WorldU):normalized()*(D - A)
+                PHYS_Velocity = (AirDir * C_Speed):setZ(PHYS_Velocity[3])
+            }
+
+            PHYS_Velocity += vec(0,0,C_Gravity)
+        }
+
+        #-- XYAxis velocity
+        PHYS_HitBBox = 0
+
+        local BBoxTrace = rangerOffsetHull(PHYS_Position,PHYS_Position + PHYS_Velocity,PHYS_BBoxMins,PHYS_BBoxMaxs)
+        if (BBoxTrace:hit()) {
+            local CheckPos = PHYS_Position + PHYS_Velocity
+            local CheckHit = BBoxTrace:position()
+            local CheckDir = BBoxTrace:hitNormal():setZ(0)*1.05
+
+            BBoxTrace = rangerOffsetHull(CheckHit,CheckPos - CheckDir*(CheckPos - CheckHit):dot(CheckDir),PHYS_BBoxMins,PHYS_BBoxMaxs)
+
+            PHYS_Velocity = (BBoxTrace:position() - PHYS_Position):setZ(PHYS_Velocity[3])
+            PHYS_HitBBox = 1
+        }
+
+
+        #-- ZAxis velocity
+        local UpDown = sign(PHYS_Velocity[3]) ?: -1
+        local GTrace = rangerOffset(9999999,PHYS_Position + PHYS_Velocity:setZ(0),vec(0,0,UpDown))
+
+        if (PHYS_HitGround) {
+            local GDot = PHYS_Velocity:normalized():setZ(0):dot(GTrace:hitNormal())
+            if (GDot > 0) {
+                PHYS_Position[3] = GTrace:position()[3] + PHYS_BBoxHeight
+                PHYS_Velocity[3] = 0
+                PHYS_HitGround = 2
+            }
+        }
+        if (UpDown == -1) {
+            local Ground = GTrace:position()[3] + PHYS_BBoxHeight
+
+            PHYS_Position[3] = max(PHYS_Position[3] + PHYS_Velocity[3],Ground)
+            if (PHYS_Position[3] <= Ground) {
+                PHYS_Position[3] = Ground
+                PHYS_Velocity[3] = 0
+                PHYS_HitGround = 1
+            }
+            else {
+                PHYS_HitGround = 0
+            }
+        }
+        else {
+            local Ceiling = GTrace:position()[3] - PHYS_Velocity[3]
+
+            PHYS_Position[3] = min(PHYS_Position[3],Ceiling)
+            if (PHYS_Position[3] >= Ceiling) {
+                PHYS_Position[3] = Ceiling
+                PHYS_Velocity[3] = C_Gravity
+                PHYS_HitCeiling = 1
+            }
+            else {
+                PHYS_HitCeiling = 0
+            }
+        }
+
+
+        # STATE MACHINE
+#[        switch (ANIM_StateLast) {
+            case "anim_MOVEMENT_WEAPON_NONE",
+                Input += clamp((S ? (S|A|D) : (W|A|D)*2)*0.5 - Input,-Dt,Dt)
+
+                if (ANIM_Transition == 1) {
+                    if (owner():keyAttack2()) {
+                        ANIM_Transition = 0
+                        ANIM_StateNext = "anim_MOVEMENT_WEAPON_LANCE"
+                    }
+                }
+            break
+            case "anim_MOVEMENT_WEAPON_LANCE",
+                Input += clamp((W|A|S|D) - Input,-Dt,Dt)
+
+                if (ANIM_Transition == 1) {
+                    if (owner():keyAttack2()) {
+                        ANIM_Transition = 0
+                        ANIM_StateNext = "anim_MOVEMENT_WEAPON_NONE"
+                    }
+                }
+            break
+        }]#
+
+        Input += clamp(Shift + (S ? (S|A|D) + Shift : (W|A|D)*2)*0.5 - Input,-Dt/2,Dt/2)
+
+
+        # STATE BLENDER INPUTS
+        local A = Input
+        local B = atan(PHYS_MoveDir[2],PHYS_MoveDir[1]) - atan(PHYS_EyeDir[2],PHYS_EyeDir[1])
+
+        if (ANIM_StateNext == "anim__MJUMP") {
+            A = rangerOffset(PHYS_JumpHeight+PHYS_BBoxHeight,PHYS_Position,vec(0,0,-1)):fraction()
+        }
+        else {
+            A = Input
+        }
+
+        # MOVE PHYSICS
+        PHYS_Position += PHYS_Velocity
+        if (Input) {
+            PHYS_Angle = PHYS_EyeDirNoZ:toAngle()
+        }
+
+        holoPos(9000,PHYS_Position)
+        holoAng(9000,PHYS_Angle)
+
+
+        #local CDir = PHYS_Position - holoEntity(6666):pos()
+        #holoPos(6666, holoEntity(6666):pos() + CDir:normalized() * min(CDir:length(),2000)*Dt)
+        #holoPos(6666,mix(PHYS_Position,holoEntity(6666):pos(),0.75))
+
+
+        # STATE BLENDER
+        ANIM_Loop += ANIM_Output["n_framerate",number]*360*Dt
+
+        #if (changed(ANIM_StateNext)) { ANIM_Transition = 0 }
+
+        if (ANIM_Transition == 1) {
+            ANIM_Input = ANIM_StateNext(A,B)[table]
+        }
+        else {
+            ANIM_Transition = min(ANIM_Transition + Dt,1)
+            ANIM_Input = blend_TABLE(ANIM_StateLast(A,B)[table],ANIM_StateNext(A,B)[table],ANIM_Transition)
+
+            if (ANIM_Transition == 1) {
+                ANIM_StateLast = ANIM_StateNext
+            }
+        }
+
+        ANIM_Layer += clamp(owner():keyAttack1() - ANIM_Layer,-Dt,Dt)
+
+        if (ANIM_Layer) {
+            if (ANIM_Layer == 1) {
+                ANIM_Input = ANIM_Input:merge(anim__HANDGUN_AIM())
+            }
+            else {
+                ANIM_Input = ANIM_Input:merge(blend_TABLE(anim__HANDGUN_AIM(),ANIM_Input,1-ANIM_Layer))
+            }
+        }
+
+        ANIM_Output = ANIM_Input
+
+        # HOLOGRAMS
+        holoPos(2,MDL_PelvisEntity1:toWorld(ANIM_Output["v_pelvis2",vector]))
+        holoAng(2,MDL_PelvisEntity1:toWorld(ANIM_Output["q_pelvis2",quaternion]:toAngle()))
+        holoAng(3,MDL_PelvisEntity2:toWorld(ANIM_Output["q_torso",quaternion]:toAngle()))
+        holoAng(4,MDL_TorsoEntity:toWorld(ANIM_Output["q_torso",quaternion]:toAngle()))
+
+        ik_leg(5,6,7,8,ANIM_Output["v_foot_l",vector])
+        ik_leg(9,10,11,12,ANIM_Output["v_foot_r",vector])
+
+        ik_arm(13,14,15,16,1,MDL_TorsoEntity:toWorld(ANIM_Output["v_hand_l",vector]))
+        ik_arm(17,18,19,20,-1,MDL_TorsoEntity:toWorld(ANIM_Output["v_hand_r",vector]))
+
+        if (Input) {
+            if (Input <= 1) {
+                if (PHYS_HitGround & ANIM_HalfLoop < ANIM_Loop) {
+                    ANIM_HalfLoop = ANIM_Loop + 180
+
+                    soundStop("feet")
+                    soundStop("feet2")
+
+                    holoEntity(randint(5,10)):soundPlay("feet", 0, "npc/strider/strider_step4.wav"), soundPitch("feet",60)
+                    holoEntity(randint(10,15)):soundPlay("feet2", 0, "npc/dog/dog_servo5.wav"), soundVolume("feet2", 0.85), soundPitch("feet2",60)
+                }
+            }
+            else {
+                if (!MDL_TorsoEntity["BoostSound",number]) {
+                    MDL_TorsoEntity["BoostSound",number] = 1
+                    MDL_TorsoEntity:soundPlay("hoverboost", 0, "thrusters/rocket04.wav")
+                }
+
+                soundVolume("hoverboost", Input - 1)
+                soundPitch("hoverboost", Input*12 + 30 + PHYS_MoveDir:dot(PHYS_EyeDir)*25)
+            }
+        }
+    }
+    else {
+        Camera["Activated",number] = 0
+    }
+
+    Ops = ops()
+    Cpu = cpuUsage()*1000000
+}

@@ -1,0 +1,206 @@
+@name exteel2/model
+
+# MDL
+@persist [MDL_LegL_A MDL_LegL_B MDL_LegL_C MDL_LegL_D MDL_LegL_E MDL_LegL_F]
+@persist [MDL_ArmL_A MDL_ArmL_B MDL_ArmL_C MDL_ArmL_D]
+@persist [MDL_PelvisZ MDL_PelvisZInv MDL_TorsoZ MDL_HeadZ MDL_TotalZ]
+
+# HOLOGRAM
+@persist HN HS HT:table XT:table
+
+
+#include "exteel2/anim"
+
+
+# MDL CONFIG
+MDL_LegL_A = 18 # pelvis -> hip
+MDL_LegL_B = 75 # hip -> knee
+MDL_LegL_C = 30 # knee -> ankle
+MDL_LegL_D = 60 # ankle -> foot
+MDL_LegL_E = 20 # foot -> ground
+
+MDL_ArmL_A = 40 # torso -> shoulder1
+MDL_ArmL_B = 15 # shoulder1 -> shoulder2
+MDL_ArmL_C = 55 # shoulder2 -> elbow
+MDL_ArmL_D = 48 # elbow -> hand
+
+MDL_TorsoZ = 30
+MDL_HeadZ  = 48
+
+
+# MDL SETUP
+MDL_PelvisZ    = (MDL_LegL_B + MDL_LegL_C + MDL_LegL_D + MDL_LegL_E) * 0.75
+MDL_TotalZ     = (MDL_PelvisZ + MDL_TorsoZ + MDL_HeadZ)
+MDL_PelvisZInv = -(MDL_TotalZ - MDL_PelvisZ)
+MDL_LegL_F     = MDL_LegL_D + MDL_LegL_E*0.5
+
+
+# IK FUNCTIONS
+function ik_leg(A,B,C,D,Target:vector) {
+    local AE = holoEntity(A)
+    local AX = MDL_PelvisEntity2:toLocalAxis(Target - AE:pos())
+    local AA = AX:toAngle():setRoll(atan(AX[2],AX[1]))
+
+    holoAng(A,MDL_PelvisEntity2:toWorld(AA:rotateAroundAxis(AA:right(),(1 - min(1,AX:length()/(MDL_LegL_B + MDL_LegL_C) - 0.5))*90)))
+
+    local BE = holoEntity(B)
+    local BX = AE:toLocalAxis(Target - BE:pos())
+    local BD = min(BX:length(),MDL_LegL_C + MDL_LegL_F)
+
+    holoAng(B,AE:toWorld(ang(atan(-BX[3],BX[1]) + acos((BD^2 + MDL_LegL_C^2 - MDL_LegL_F^2)/(2*MDL_LegL_C*BD)),0,0)))
+    holoAng(C,BE:toWorld(ang(acos((MDL_LegL_F^2 + MDL_LegL_C^2 - BD^2)/(2*MDL_LegL_C*MDL_LegL_F)) + 180,0,0)))
+    #holoAng(D,(Target - holoEntity(D):pos()):toAngle())
+    #holoAng(S5,MoveBlend ? holoEntity(S4):angles() : BaseA:setPitch(0))
+}
+function ik_arm(A,B,C,D,Side,Target:vector) {
+    local BE = holoEntity(B)
+    local BX = MDL_TorsoEntity:toLocalAxis(Target - BE:pos())
+    local BA = BX:toAngle():setRoll(atan(BX[2],BX[1]))
+    local BD = min(BX:length(),MDL_ArmL_C + MDL_ArmL_D - 1)
+
+    holoAng(A,MDL_TorsoEntity:toWorld(BA))
+
+    local Dot = 0
+    if (Side == 1) {
+        Dot = min(0, BX:normalized():dot(vec(0,1,0)))
+    }
+    else {
+        Dot = max(0, BX:normalized():dot(vec(0,1,0)))
+    }
+
+    BA = BA:rotateAroundAxis(BA:forward(), -135*Dot)
+    BA = BA:rotateAroundAxis(BA:right(),-acos((BD^2 + MDL_ArmL_C^2 - MDL_ArmL_D^2)/(2*MDL_ArmL_C*BD)))
+
+    holoAng(B,MDL_TorsoEntity:toWorld(BA))
+    holoAng(C,BE:toWorld(ang(acos((MDL_ArmL_D^2 + MDL_ArmL_C^2 - BD^2)/(2*MDL_ArmL_C*MDL_ArmL_D)) + 180,0,0)))
+}
+
+
+# MDL HOLOGRAM DATA
+function number spawn_holograms(Shading,Factor){
+    timer("spawn",15)
+
+    while(perf()&HS<HN&holoCanCreate()){
+        HS++
+
+        local Data = HT[HS,array]
+        local Index = Data[1,number]
+        local Parent = holoEntity(Data[2,number])?:entity()
+
+        holoCreate(Index)
+        holoPos(Index,Parent:toWorld(Data[3,vector]*Factor))
+        holoAng(Index,Parent:toWorld(Data[4,angle]))
+        holoParent(Index,Parent)
+
+        holoScale(Index,Data[5,vector]*Factor)
+        holoModel(Index,Data[6,string])
+        holoMaterial(Index,Data[7,string])
+        holoColor(Index,Data[8,vector4])
+
+        if (Shading == 1 | Data[9,number]) {
+            holoDisableShading(Index,1)
+        }
+
+        if (XT[Index,array]) {
+            local CN = XT[Index,array]:count()
+            for (I = 1,CN,2) {
+                local RCN = ceil(I/2)
+                local Pos = XT[Index,array][I,vector]
+                local Dir = XT[Index,array][I+1,vector]
+                holoClipEnabled(Index,RCN,1)
+                holoClip(Index,RCN,Pos*Factor,Dir,0)
+            }
+        }
+    }
+
+    if(HS >= HN){
+        stoptimer("spawn")
+        printColor(vec(225,255,225),"\nFinished spawning "+HS+" holograms.")
+    }
+
+    return  HS >= HN
+}
+
+
+# BONE DATA
+local BoneScale = vec(12,12,12)/12
+local BoneModel = "icosphere"
+local BoneColor = vec4(255,255,255,255)
+
+local LinkScale = BoneScale*2 #-_PHI/12
+local LinkModel = "icosphere"
+local LinkColor = vec4(55,55,55,255)
+
+Ang = ang()
+Vec = vec()
+
+HT = HT:add(table(
+    # root
+    array(9000,0,vec(),Ang,BoneScale*4,"","",BoneColor:setW(25)),
+
+    # pelvis bones
+    array(1,9000,vec(0,0,MDL_PelvisZInv),Ang,BoneScale*4,"","",BoneColor:setW(25)),
+    array(2,1,vec(),Ang,BoneScale,BoneModel,"",BoneColor),
+
+    # torso bones
+    array(3,2,vec(0,0,MDL_TorsoZ),Ang,BoneScale,BoneModel,"",BoneColor),
+
+    # head bones
+    array(4,3,vec(0,0,MDL_HeadZ),Ang,BoneScale*vec(2,1,1),BoneModel,"",BoneColor),
+
+    # left leg bones
+    array(5,2,vec(0,MDL_LegL_A,0),Ang:setPitch(90),BoneScale,BoneModel,"",BoneColor),
+    array(6,5,vec(MDL_LegL_B,0,0),Ang,BoneScale,BoneModel,"",BoneColor),
+    array(7,6,vec(MDL_LegL_C,0,0),Ang,BoneScale,BoneModel,"",BoneColor),
+    array(8,7,vec(MDL_LegL_D,0,0),Ang,BoneScale,BoneModel,"",BoneColor),
+
+    # right leg bones
+    array(9,2,vec(0,-MDL_LegL_A,0),Ang:setPitch(90),BoneScale,BoneModel,"",BoneColor),
+    array(10,9,vec(MDL_LegL_B,0,0),Ang,BoneScale,BoneModel,"",BoneColor),
+    array(11,10,vec(MDL_LegL_C,0,0),Ang,BoneScale,BoneModel,"",BoneColor),
+    array(12,11,vec(MDL_LegL_D,0,0),Ang,BoneScale,BoneModel,"",BoneColor),
+
+    # left arm bones
+    array(13,3,vec(0,MDL_ArmL_A,MDL_HeadZ*0.85),Ang:setPitch(90),BoneScale,BoneModel,"",BoneColor),
+    array(14,13,vec(0,MDL_ArmL_B,0),Ang,BoneScale,BoneModel,"",BoneColor),
+    array(15,14,vec(MDL_ArmL_C,0,0),Ang,BoneScale,BoneModel,"",BoneColor),
+    array(16,15,vec(MDL_ArmL_D,0,0),Ang,BoneScale,BoneModel,"",BoneColor),
+
+    # right arm bones
+    array(17,3,vec(0,-MDL_ArmL_A,MDL_HeadZ*0.85),Ang:setPitch(90),BoneScale,BoneModel,"",BoneColor),
+    array(18,17,vec(0,-MDL_ArmL_B,0),Ang,BoneScale,BoneModel,"",BoneColor),
+    array(19,18,vec(MDL_ArmL_C,0,0),Ang,BoneScale,BoneModel,"",BoneColor),
+    array(20,19,vec(MDL_ArmL_D,0,0),Ang,BoneScale,BoneModel,"",BoneColor)
+))
+
+HT = HT:add(table(
+    # pelvis links
+    array(100,2,vec(0,0,MDL_TorsoZ/2),Ang,LinkScale:setZ(MDL_TorsoZ/12),LinkModel,"",LinkColor),
+
+    # torso links
+    array(101,3,vec(0,0,MDL_HeadZ/2),Ang,(LinkScale*_PHI):setZ(MDL_HeadZ/12),LinkModel,"",LinkColor),
+
+    # left leg links
+    array(102,5,vec(MDL_LegL_B/2,0,0),Ang,(LinkScale*1.2):setX(MDL_LegL_B/12),LinkModel,"",LinkColor),
+    array(103,6,vec(MDL_LegL_C/2,0,0),Ang,(LinkScale*1.0):setX(MDL_LegL_C/12),LinkModel,"",LinkColor),
+    array(104,7,vec(MDL_LegL_D/2,0,0),Ang,(LinkScale*0.8):setX(MDL_LegL_D/12),LinkModel,"",LinkColor),
+    array(105,8,vec(MDL_LegL_E/2,0,0),Ang,(LinkScale*0.6):setX(MDL_LegL_E/12),LinkModel,"",LinkColor),
+
+    # right leg links
+    array(106,9,vec(MDL_LegL_B/2,0,0),Ang,(LinkScale*1.2):setX(MDL_LegL_B/12),LinkModel,"",LinkColor),
+    array(107,10,vec(MDL_LegL_C/2,0,0),Ang,(LinkScale*1.0):setX(MDL_LegL_C/12),LinkModel,"",LinkColor),
+    array(108,11,vec(MDL_LegL_D/2,0,0),Ang,(LinkScale*0.8):setX(MDL_LegL_D/12),LinkModel,"",LinkColor),
+    array(109,12,vec(MDL_LegL_E/2,0,0),Ang,(LinkScale*0.6):setX(MDL_LegL_E/12),LinkModel,"",LinkColor),
+
+    # left arm links
+    array(110,13,vec(0,MDL_ArmL_B/2,0),Ang,(LinkScale*1.0):setY(MDL_ArmL_B/12),LinkModel,"",LinkColor),
+    array(111,14,vec(MDL_ArmL_C/2,0,0),Ang,(LinkScale*0.8):setX(MDL_ArmL_C/12),LinkModel,"",LinkColor),
+    array(112,15,vec(MDL_ArmL_D/2,0,0),Ang,(LinkScale*0.6):setX(MDL_ArmL_D/12),LinkModel,"",LinkColor),
+
+    # right arm links
+    array(113,17,vec(0,-MDL_ArmL_B/2,0),Ang,(LinkScale*1.0):setY(MDL_ArmL_B/12),LinkModel,"",LinkColor),
+    array(114,18,vec(MDL_ArmL_C/2,0,0),Ang,(LinkScale*0.8):setX(MDL_ArmL_C/12),LinkModel,"",LinkColor),
+    array(115,19,vec(MDL_ArmL_D/2,0,0),Ang,(LinkScale*0.6):setX(MDL_ArmL_D/12),LinkModel,"",LinkColor)
+))
+
+HN = HT:count()

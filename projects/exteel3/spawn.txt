@@ -1,0 +1,213 @@
+@name exteel3/spawn
+@outputs Ops Cpu Input
+@trigger none
+@model models/maxofs2d/hover_plate.mdl
+
+#-------------------------------
+#--
+if (first()) {
+    #include "exteel3/model"
+    #include "exteel3/anim"
+
+    timer("spawn",100)
+}
+
+
+#-------------------------------
+#--
+if (clk("spawn")) {
+    if (spawn_holograms(0,1)) {
+        #[
+         -----------------------
+            MODEL INFORMATION
+             (DON'T CHANGE)
+         -----------------------
+        ]#
+
+        holoUnparent(9000)
+
+        MDL_PelvisEntity1 = holoEntity(1)
+        MDL_PelvisEntity2 = holoEntity(2)
+        MDL_TorsoEntity = holoEntity(3)
+
+        setSkin("drab")
+
+        # MDL->LEG
+        MDL_LegA = abs(holoEntity(2):toLocal(holoEntity(5):pos()):y())
+        MDL_LegB = abs(holoEntity(5):toLocal(holoEntity(6):pos()):x())
+        MDL_LegC = abs(holoEntity(6):toLocal(holoEntity(7):pos()):x())
+        MDL_LegD = abs(holoEntity(7):toLocal(holoEntity(8):pos()):x())
+        MDL_LegE = 12
+        MDL_LegF = MDL_LegD + MDL_LegE*(1/2)
+
+        # MDL->ARM
+        MDL_ArmA = abs(holoEntity(3):toLocal(holoEntity(13):pos()):y())
+        MDL_ArmB = abs(holoEntity(13):toLocal(holoEntity(14):pos()):y())
+        MDL_ArmC = abs(holoEntity(14):toLocal(holoEntity(15):pos()):x())
+        MDL_ArmD = abs(holoEntity(15):toLocal(holoEntity(16):pos()):x())
+
+        # MDL->MISC
+        MDL_PelvisZ = (MDL_LegB + MDL_LegC + MDL_LegD + MDL_LegE)*(3/4)
+        MDL_TotalZ = MDL_PelvisZ + abs(holoEntity(2):toLocal(holoEntity(4):pos()):z())
+
+
+        #[
+         -----------------------
+              CAMERA CONFIGS
+         -----------------------
+        ]#
+
+        Camera["Parent",entity] = holoEntity(9000)
+        Camera["Distance",number] = 150
+        Camera["Position",vector] = vec()
+        Camera["Activated",number] = 1
+
+
+        #[
+         -----------------------
+               ANIM CONFIGS
+         -----------------------
+        ]#
+
+        # ANIM->IDLE
+        CFG_IDLE_StrideX = MDL_LegD*0.5
+        CFG_IDLE_StrideY = MDL_LegA*1.5
+
+        # ANIM->WALK
+        CFG_WALK_StrideX = MDL_LegD
+        CFG_WALK_StrideY = MDL_LegA
+        CFG_WALK_StrideZ = MDL_LegB
+        CFG_WALK_FrameRate = _PHI - (2/3)
+
+        # ANIM->RUN
+        CFG_RUN_StrideY = MDL_LegA*(2/3)
+        CFG_RUN_FrameRate =  _PHI - (3/4)
+
+        # ANIM->MISC
+        CFG_JumpHeight = MDL_TotalZ*2
+        CFG_TORSO_MaxAng = ang(45,45,45)
+
+        # ANIM->ARM
+        CFG_ArmX = 0
+        CFG_ArmY = MDL_ArmA + MDL_ArmB
+        CFG_ArmZ = MDL_ArmC + MDL_ArmD
+
+        # ANIM->HOVER
+        CFG_HOVER_FootZ = MDL_LegD
+        CFG_HOVER_PelvisZ_Offset = MDL_LegD*0.5
+
+
+        #[
+         -----------------------
+                ANIM SETUP
+              (DON'T CHANGE)
+         -----------------------
+        ]#
+
+        # ANIM->SETUP (DON'T CHANGE)
+        CFG_WALK_PelvisZ = MDL_PelvisZ
+        CFG_WALK_MoveSpeed = CFG_WALK_StrideX*2*_PI
+
+        CFG_RUN_PelvisZ = MDL_PelvisZ
+        CFG_RUN_MoveSpeed = CFG_RUN_PelvisZ*2*_PI
+
+
+        #[
+         -----------------------
+                PHYS SETUP
+              (DON'T CHANGE)
+         -----------------------
+        ]#
+        PHYS_BBoxHeight = MDL_TotalZ
+        PHYS_BBoxRadius = 30
+        PHYS_BBoxZ = PHYS_BBoxHeight*0.5
+        PHYS_BBoxMins = vec(PHYS_BBoxRadius,PHYS_BBoxRadius,PHYS_BBoxZ)*-1
+        PHYS_BBoxMaxs = vec(PHYS_BBoxRadius,PHYS_BBoxRadius,0)
+
+        PHYS_Position = entity():pos() + vec(0,0,PHYS_BBoxHeight)
+
+        holoPos(9000,PHYS_Position)
+
+        Ct = curtime()
+
+        timer("main",1000)
+        timer("parent_thrusters",10)
+
+        runOnChat(1)
+        runOnLast(1)
+    }
+}
+
+
+#-------------------------------
+#--
+if (clk("parent_thrusters") | last()) {
+    local T1 = Thruster1:entity()
+    local T2 = Thruster2:entity()
+
+    if (last()) {
+        T1:deparent()
+        T2:deparent()
+        T1:setAlpha(255)
+        T2:setAlpha(255)
+
+        T1["ready",number] = 0
+        T2["ready",number] = 0
+    }
+    else {
+        timer("parent_thrusters",100)
+
+        if (->Thruster1 & ->Thruster2) {
+            if (T1["ready",number] & T2["ready",number]) {
+                T1:parentTo(holoEntity(4999))
+                T2:parentTo(holoEntity(4999))
+
+                stoptimer("parent_thrusters")
+            }
+
+            T1:propFreeze(1)
+            T1:setPos(holoEntity(4999):toWorld(vec(0,7,-5)))
+            T1:setAng(holoEntity(4999):toWorld(ang(180,0,0)))
+            T1:setAlpha(0)
+
+            T2:propFreeze(1)
+            T2:setPos(holoEntity(4999):toWorld(vec(0,-7,-5)))
+            T2:setAng(holoEntity(4999):toWorld(ang(180,0,0)))
+            T2:setAlpha(0)
+
+            T1["ready",number] = 1
+            T2["ready",number] = 1
+
+            rangerFilter(T1)
+            rangerFilter(T2)
+            rangerPersist(1)
+        }
+    }
+}
+
+
+#-------------------------------
+#--
+if (clk("main")) {
+    main(90)
+}
+
+
+#-------------------------------
+#--
+if (chatClk(owner())) {
+    local Command = lastSaid():explode(" ")
+    switch (Command[1,string]) {
+        case "setskin",
+            setSkin(Command[2,string])
+            hideChat(1)
+        break
+        case "setcolor",
+            setColor(Command)
+            hideChat(1)
+        break
+        default,
+            hideChat(0)
+        break
+    }
+}

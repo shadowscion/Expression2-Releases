@@ -1,0 +1,426 @@
+@name exteel3/model
+
+#-------------------------------
+#-- HOLOGRAM
+@persist HN HS HT:table XT:table Layout:table
+
+
+#-------------------------------
+#-- HOLOGRAM
+function number spawn_holograms(Shading,Factor){
+    timer("spawn",15)
+
+    while(perf()&HS<HN&holoCanCreate()){
+        HS++
+
+        local Data = HT[HS,array]
+        local Index = Data[1,number]
+        local Parent = holoEntity(Data[2,number])?:entity()
+
+        holoCreate(Index)
+        holoPos(Index,Parent:toWorld(Data[3,vector]*Factor))
+        holoAng(Index,Parent:toWorld(Data[4,angle]))
+        holoParent(Index,Parent)
+
+        holoScale(Index,Data[5,vector]*Factor)
+        holoModel(Index,Data[6,string])
+        holoMaterial(Index,Data[7,string])
+        holoColor(Index,Data[8,vector4])
+
+        if (Shading == 1 | Data[9,number]) {
+            holoDisableShading(Index,1)
+        }
+
+        if (XT[Index,array]) {
+            local CN = XT[Index,array]:count()
+            for (I = 1,CN,2) {
+                local RCN = ceil(I/2)
+                local Pos = XT[Index,array][I,vector]
+                local Dir = XT[Index,array][I+1,vector]
+                holoClipEnabled(Index,RCN,1)
+                holoClip(Index,RCN,Pos*Factor,Dir,0)
+            }
+        }
+    }
+
+    if(HS >= HN){
+        stoptimer("spawn")
+        printColor(vec(225,255,225),"\nFinished spawning "+HS+" holograms.")
+    }
+
+    return  HS >= HN
+}
+
+local Vec = vec()
+local Ang = ang()
+
+local Material0 = ""
+local Material1 = "models/props_debris/plasterwall040c"
+local Material2 = "models/antlion/antlion_innards"
+local Material3 = "sprops/trans/lights/light_plastic"
+
+local Color0 = vec4(0,0,0,0)
+local Color1 = vec4(255,255,255,255)
+local Color2 = vec4(60,60,60,255)
+local Color3 = vec4(188,0,45,255)
+local Color4 = vec4(15,15,15,255)
+local Color5 = vec4(175,100,25,255)
+
+
+#-------------------------------
+#-- BONES: ROOT (HN = 1+)
+HN++,HT[HN,array] = array(9000,0,Vec,Ang,Vec,"",Material0,Color0)
+
+
+#-------------------------------
+#-- BONES: PELVIS (HN = 2+)
+HN++,HT[HN,array] = array(1,9000,vec(0,0,-78),Ang,Vec,"",Material0,Color0)
+HN++,HT[HN,array] = array(2,1,Vec,Ang,Vec,"",Material0,Color0)
+
+
+#-------------------------------
+#-- BONES: TORSO (HN = 4+)
+HN++,HT[HN,array] = array(3,2,vec(5,0,30),Ang,Vec,"",Material0,Color0)
+
+
+#-------------------------------
+#-- BONES: HEAD (HN = 5+)
+HN++,HT[HN,array] = array(4,3,vec(0,0,48),Ang,Vec,"",Material0,Color0)
+
+
+#-------------------------------
+#-- BONES: LEFT LEG (HN = 6+)
+HN++,HT[HN,array] = array(5,2,vec(0,36,0),ang(90,0,0),Vec,"",Material0,Color0)
+HN++,HT[HN,array] = array(6,5,vec(75,0,0),Ang,Vec,"",Material0,Color0)
+HN++,HT[HN,array] = array(7,6,vec(30,0,0),Ang,Vec,"",Material0,Color0)
+HN++,HT[HN,array] = array(8,7,vec(60,0,0),Ang,Vec,"",Material0,Color0)
+
+
+#-------------------------------
+#-- BONES: RIGHT LEG (HN = 10+)
+HN++,HT[HN,array] = array(9,2,vec(0,-36,0),ang(90,0,0),Vec,"",Material0,Color0)
+HN++,HT[HN,array] = array(10,9,vec(75,0,0),Ang,Vec,"",Material0,Color0)
+HN++,HT[HN,array] = array(11,10,vec(30,0,0),Ang,Vec,"",Material0,Color0)
+HN++,HT[HN,array] = array(12,11,vec(60,0,0),Ang,Vec,"",Material0,Color0)
+
+
+#-------------------------------
+#-- BONES: LEFT ARM (HN = 14+)
+HN++,HT[HN,array] = array(13,3,vec(-20,35,50),ang(90,0,0),Vec,"",Material0,Color0)
+HN++,HT[HN,array] = array(14,13,vec(0,30,0),Ang,Vec,"",Material0,Color0)
+HN++,HT[HN,array] = array(15,14,vec(55,0,0),Ang,Vec,"",Material0,Color0)
+HN++,HT[HN,array] = array(16,15,vec(48,0,0),Ang,Vec,"",Material0,Color0)
+
+
+#-------------------------------
+#-- BONES: RIGHT ARM (HN = 18+)
+HN++,HT[HN,array] = array(17,3,vec(-20,-35,50),ang(90,0,0),Vec,"",Material0,Color0)
+HN++,HT[HN,array] = array(18,17,vec(0,-30,0),Ang,Vec,"",Material0,Color0)
+HN++,HT[HN,array] = array(19,18,vec(55,0,0),Ang,Vec,"",Material0,Color0)
+HN++,HT[HN,array] = array(20,19,vec(48,0,0),Ang,Vec,"",Material0,Color0)
+
+
+#-------------------------------
+#-- VISUAL: PELVIS (HN = 22+)
+HN++,HT[HN,array] = array(101,2,vec(-26.3752,0,23.1822),ang(-80,0,0),vec(1.125,6,1),"models/sprops/triangles/right/size_1/rtri_12x12.mdl",Material1,Color1)
+HN++,HT[HN,array] = array(102,2,vec(-31.0637,0,-3.4076),ang(80,180,0),vec(1.125,6,1),"models/sprops/triangles/right/size_1/rtri_12x36.mdl",Material1,Color1)
+HN++,HT[HN,array] = array(103,2,vec(-0.3473,0,-1.9696),ang(80,180,-90),vec(1.125,1,6),"models/sprops/rectangles/size_5/rect_48x48x3.mdl",Material1,Color1)
+HN++,HT[HN,array] = array(104,2,vec(33.9095,0,2.2712),ang(-80,0,180),vec(1.125,6,1),"models/sprops/triangles/right/size_1_5/rtri_18x30.mdl",Material1,Color1)
+HN++,HT[HN,array] = array(105,2,vec(29.221,0,-24.3186),ang(10,0,180),vec(1,6,1.125),"models/sprops/triangles/right/size_1_5/rtri_18x18.mdl",Material1,Color1)
+HN++,HT[HN,array] = array(106,2,Vec,ang(10,0,0),vec(3,2.3568,2),"",Material1,Color2)
+HN++,HT[HN,array] = array(107,2,Vec,ang(10,0,90),vec(3,3,2.3568),"octagon",Material1,Color2)
+HN++,HT[HN,array] = array(108,2,Vec,ang(10,0,90),vec(2.25,2.25,2.9995),"rcylinder_thick",Material1,Color1)
+HN++,HT[HN,array] = array(109,2,Vec,ang(90,0,0),vec(1.25,1.25,3.75),"rcylinder",Material1,Color2)
+HN++,HT[HN,array] = array(110,2,Vec,ang(0,0,90),vec(1.25,1.25,5.25),"cylinder",Material1,Color2)
+HN++,HT[HN,array] = array(113,2,vec(5,0,20),Ang,vec(1.45,1.45,1.8),"hq_tube",Material1,Color2)
+
+
+#-------------------------------
+#-- VISUAL: TORSO (HN = 33+)
+HN++,HT[HN,array] = array(4100,3,vec(0,0,4),ang(180,0,0),vec(2,2,2),"models/sprops/misc/fittings/cred_12_6_short.mdl",Material1,Color2)
+HN++,HT[HN,array] = array(4101,3,vec(0.4,0,26.7),ang(90,90,0),vec(1.125,1,10),"models/sprops/rectangles/size_3_5/rect_30x30x3.mdl",Material1,Color1)
+HN++,HT[HN,array] = array(4103,3,vec(24.494,0,29.2),ang(90,0,0),vec(1,4,1),"models/sprops/geometry/qhex_42.mdl",Material1,Color2)
+HN++,HT[HN,array] = array(4104,3,vec(24.494,-10.5,29.2),ang(90,0,0),vec(1,3,1),"models/sprops/geometry/qhex_42.mdl",Material1,Color1)
+HN++,HT[HN,array] = array(4105,3,vec(24.494,10.5,29.2),ang(90,0,0),vec(1,3,1),"models/sprops/geometry/qhex_42.mdl",Material1,Color1)
+HN++,HT[HN,array] = array(4106,3,vec(22,0,20),Ang,vec(1,2,3),"rcube_thin",Material1,Color1)
+HN++,HT[HN,array] = array(4107,3,vec(22,0,5),ang(0,0,90),vec(1.1,1.1,2.5),"rcylinder_thin",Material1,Color1)
+HN++,HT[HN,array] = array(4108,3,vec(-2,19.5,29),ang(0,0,-90),vec(1,1,3),"models/sprops/rectangles/size_3_5/rect_30x48x3.mdl",Material1,Color1)
+HN++,HT[HN,array] = array(4109,3,vec(-2,19.5,50),Ang,vec(1,3,1),"models/sprops/triangles/right/size_1/rtri_12x48.mdl",Material1,Color1)
+HN++,HT[HN,array] = array(4110,3,vec(-2,-19.5,29),ang(0,0,-90),vec(1,1,3),"models/sprops/rectangles/size_3_5/rect_30x48x3.mdl",Material1,Color1)
+HN++,HT[HN,array] = array(4111,3,vec(-2,-19.5,50),Ang,vec(1,3,1),"models/sprops/triangles/right/size_1/rtri_12x48.mdl",Material1,Color1)
+HN++,HT[HN,array] = array(4112,3,vec(-34.95,0,35),ang(-90,0,0),vec(1,15.9,1),"models/sprops/triangles/right/size_1_5/rtri_18x42.mdl",Material1,Color1)
+HN++,HT[HN,array] = array(4113,3,vec(-26,0,6.3),ang(0,0,-180),vec(1,15.9,1),"models/sprops/geometry/hhex_36.mdl",Material1,Color1)
+HN++,HT[HN,array] = array(4114,3,vec(-18.709,29.95,46.422),ang(22.5,0,-90),vec(1,1,4),"models/sprops/rectangles/size_2_5/rect_18x72x3.mdl",Material1,Color1)
+HN++,HT[HN,array] = array(4115,3,vec(-16.135,29.95,29.119),ang(22.5,0,180),vec(1,4,1),"models/sprops/triangles/right/size_1/rtri_12x54.mdl",Material1,Color1)
+HN++,HT[HN,array] = array(4116,3,vec(-49.394,29.95,42.896),ang(-22.5,-180,-180),vec(1,4,1),"models/sprops/triangles/right/size_1/rtri_12x18.mdl",Material1,Color1)
+HN++,HT[HN,array] = array(4117,3,vec(-13.315,29.95,59.444),ang(22.5,0,0),vec(3,4,1),"models/sprops/geometry/hhex_24.mdl",Material1,Color1)
+HN++,HT[HN,array] = array(4120,3,vec(-18.709,-29.95,46.422),ang(22.5,0,-90),vec(1,1,4),"models/sprops/rectangles/size_2_5/rect_18x72x3.mdl",Material1,Color1)
+HN++,HT[HN,array] = array(4121,3,vec(-16.135,-29.95,29.119),ang(22.5,0,180),vec(1,4,1),"models/sprops/triangles/right/size_1/rtri_12x54.mdl",Material1,Color1)
+HN++,HT[HN,array] = array(4122,3,vec(-49.394,-29.95,42.896),ang(-22.5,-180,-180),vec(1,4,1),"models/sprops/triangles/right/size_1/rtri_12x18.mdl",Material1,Color1)
+HN++,HT[HN,array] = array(4123,3,vec(-13.315,-29.95,59.444),ang(22.5,0,0),vec(3,4,1),"models/sprops/geometry/hhex_24.mdl",Material1,Color1)
+HN++,HT[HN,array] = array(4126,3,vec(0,0,45),Ang,vec(2,2,1),"models/sprops/misc/fittings/cred_12_9_short.mdl",Material1,Color2)
+
+
+#-------------------------------
+#-- VISUAL: HEAD (HN = 55+)
+HN++,HT[HN,array] = array(4600,4,vec(10,0,7),ang(90,0,0),vec(0.35,0.35,0.7),"rcylinder",Material0,Color3)
+HN++,HT[HN,array] = array(4601,4,vec(0,0,8.25),Ang,vec(2.3,0.8,0.925),"cylinder",Material0,Color4)
+HN++,HT[HN,array] = array(4604,4,vec(0,0,15),ang(5,0,180),vec(0.35,0.25,0.35),"models/props_canal/boat002b.mdl",Material1,Color1)
+HN++,HT[HN,array] = array(4606,4,vec(-5,0,5),ang(-10,180,0),vec(0.31,0.2,0.4),"models/props_canal/boat002b.mdl",Material1,Color1)
+HN++,HT[HN,array] = array(4607,4,Vec,Ang,vec(1.15,1.15,1),"sphere3",Material1,Color2)
+HN++,HT[HN,array] = array(4608,4,vec(0,0,8.25),Ang,vec(2.415,0.84,0.9713),"cylinder",Material1,Color1)
+XT[4608,array] = array(vec(6,0,0),vec(-1,0,0))
+
+
+
+#-------------------------------
+#-- VISUAL: ROCKET PACK (HN = 61+)
+HN++,HT[HN,array] = array(4999,3,vec(-40,0,55),ang(30,0,0),vec(1,5,1),"",Material1,Color2)
+HN++,HT[HN,array] = array(5001,4999,vec(0,0,-15),ang(-180,-90,0),vec(0.2,0.2,0.5),"models/props_junk/TrashDumpster02.mdl",Material1,Color1)
+HN++,HT[HN,array] = array(5002,4999,vec(0,0,-25),ang(90,0,90),vec(4.5,2.1,1.5),"models/props_junk/CinderBlock01a.mdl",Material1,Color2)
+HN++,HT[HN,array] = array(5003,5002,vec(-15,0,0),ang(90,0,0),vec(2.5,1.5,1),"plane",Material2,Color5)
+
+#HN++,HT[HN,array] = array(5004,5002,vec(2*12,0,7),ang(90,0,0),vec(1.25,1.25,8)*0.9,"cone","",vec4(255),1)
+#HN++,HT[HN,array] = array(5005,5002,vec(2*12,0,-7),ang(90,0,0),vec(1.25,1.25,8)*0.9,"cone","",vec4(255),1)
+#HN++,HT[HN,array] = array(5006,5002,vec(2*12,0,7),ang(-90,0,0),-vec(1.25,1.25,8)*1.05,"cone","",vec4(195,120,45,255),1)
+#HN++,HT[HN,array] = array(5007,5002,vec(2*12,0,-7),ang(-90,0,0),-vec(1.25,1.25,8)*1.05,"cone","",vec4(195,120,45,255),1)
+
+
+#-------------------------------
+#-- VISUAL: LEFT LEG J1 (HN = 65+)
+HN++,HT[HN,array] = array(200,5,vec(0,12,0),ang(5,180,0),vec(1,1.5,1),"models/sprops/geometry/fhex_42.mdl",Material1,Color1)
+HN++,HT[HN,array] = array(201,5,vec(30.1641,12,-0.56),ang(5,180,-90),vec(1,1,1),"models/sprops/rectangles/size_3_5/rect_30x60x3.mdl",Material1,Color1)
+HN++,HT[HN,array] = array(202,5,vec(67.7207,12,-1.865),ang(15,180,0),vec(1,1,1),"models/sprops/misc/sq_holes/qsqhole_d0_36.mdl",Material1,Color1)
+HN++,HT[HN,array] = array(203,5,vec(63.8379,12,12.624),ang(15,180,-90),vec(1,1,1),"models/sprops/rectangles/size_2/rect_12x18x3.mdl",Material1,Color1)
+HN++,HT[HN,array] = array(204,5,vec(0,-12,0),ang(5,180,0),vec(1,1.5,1),"models/sprops/geometry/fhex_42.mdl",Material1,Color1)
+HN++,HT[HN,array] = array(205,5,vec(30.1641,-12,-0.56),ang(5,180,-90),vec(1,1,1),"models/sprops/rectangles/size_3_5/rect_30x60x3.mdl",Material1,Color1)
+HN++,HT[HN,array] = array(206,5,vec(67.7207,-12,-1.865),ang(15,180,0),vec(1,1,1),"models/sprops/misc/sq_holes/qsqhole_d0_36.mdl",Material1,Color1)
+HN++,HT[HN,array] = array(207,5,vec(63.8379,-12,12.624),ang(15,180,-90),vec(1,1,1),"models/sprops/rectangles/size_2/rect_12x18x3.mdl",Material1,Color1)
+HN++,HT[HN,array] = array(208,5,Vec,ang(5,180,0),vec(0.95,7,0.95),"models/sprops/geometry/fhex_42.mdl",Material1,Color2)
+HN++,HT[HN,array] = array(209,5,vec(30.1641,0,-0.56),ang(5,180,-90),vec(0.95,0.95,7),"models/sprops/rectangles/size_3_5/rect_30x60x3.mdl",Material1,Color2)
+HN++,HT[HN,array] = array(210,5,vec(21.5498,12,-11.711),ang(-26.802,0,0),vec(1,1,1),"models/sprops/triangles/right/size_2/rtri_24x60.mdl",Material1,Color1)
+HN++,HT[HN,array] = array(211,5,vec(21.5498,-12,-11.711),ang(-26.802,0,0),vec(1,1,1),"models/sprops/triangles/right/size_2/rtri_24x60.mdl",Material1,Color1)
+HN++,HT[HN,array] = array(212,5,vec(21.5498,0,-11.711),ang(-26.802,0,0),vec(0.95,7,0.95),"models/sprops/triangles/right/size_2/rtri_24x60.mdl",Material1,Color2)
+HN++,HT[HN,array] = array(213,5,vec(0,6,0),ang(-90,90,0),vec(1.6,1.6,2),"hq_tube",Material1,Color1)
+
+
+#-------------------------------
+#-- VISUAL: LEFT LEG SHIELD (HN = 79+)
+HN++,HT[HN,array] = array(250,5,vec(70,0,22),ang(-90,90,0),vec(1.3,1.6,1.6),"hexagon",Material1,Color1)
+HN++,HT[HN,array] = array(251,250,vec(0,20,0),Ang,vec(0.25,3,3),"",Material1,Color1)
+HN++,HT[HN,array] = array(254,251,vec(2,2,0),ang(90,0,0),vec(1.5,1.5,0.05),"hq_cylinder",Material1,Color3)
+HN++,HT[HN,array] = array(255,254,Vec,ang(0,0,90),vec(2,0.075,2),"models/sprops/misc/alphanum/alphanum_arrow_a.mdl",Material1,Color3)
+HN++,HT[HN,array] = array(253,250,vec(-3.1257,-17.7265,0),ang(-90,80,0),vec(1,1,2),"models/sprops/geometry/hhex_36.mdl",Material1,Color1)
+
+
+#-------------------------------
+#-- VISUAL: LEFT LEG J2 (HN = 84+)
+HN++,HT[HN,array] = array(300,6,Vec,ang(-90,90,0),vec(2.6,2.6,1.7063),"cylinder",Material1,Color2)
+HN++,HT[HN,array] = array(301,6,vec(22,0,0),ang(90,0,0),vec(2,6.825,5),"models/sprops/geometry/hhex_12.mdl",Material1,Color2)
+HN++,HT[HN,array] = array(302,6,Vec,ang(-90,90,0),vec(2,2,1.9),"cylinder",Material1,Color1)
+
+
+#-------------------------------
+#-- VISUAL: LEFT LEG J3 (HN = 87+)
+HN++,HT[HN,array] = array(350,7,Vec,ang(-90,90,0),vec(2,2,2),"hexagon",Material1,Color1)
+HN++,HT[HN,array] = array(351,7,vec(32,0,0),ang(90,0,0),vec(1.75,6.5,10),"models/sprops/geometry/hhex_12.mdl",Material1,Color2)
+HN++,HT[HN,array] = array(352,7,vec(26,0,8),ang(0,0,-90),vec(1,1,7),"models/sprops/rectangles/size_3/rect_24x36x3.mdl",Material1,Color1)
+HN++,HT[HN,array] = array(353,7,vec(21.416,0,20),ang(26.567,0,180),vec(1,7,1),"models/sprops/triangles/right/size_1/rtri_12x24.mdl",Material1,Color1)
+HN++,HT[HN,array] = array(354,7,vec(50,0,8),ang(-90,180,0),vec(1,7,1),"models/sprops/triangles/right/size_1/rtri_12x24.mdl",Material1,Color1)
+
+
+#-------------------------------
+#-- VISUAL: LEFT FOOT (HN = 92+)
+HN++,HT[HN,array] = array(400,8,vec(-8,0,0),ang(-90,90,0),vec(2,2,2.5),"hexagon",Material1,Color2)
+HN++,HT[HN,array] = array(401,8,vec(6,0,3.9),ang(-90,90,0),vec(0.75,0.75,3),"hexagon",Material1,Color1)
+HN++,HT[HN,array] = array(402,401,vec(20,0,10),ang(90,0,0),vec(1.25,2,7),"models/sprops/geometry/hhex_12.mdl",Material1,Color2)
+HN++,HT[HN,array] = array(403,401,vec(20,0,-10),ang(90,0,0),vec(1.25,2,7),"models/sprops/geometry/hhex_12.mdl",Material1,Color2)
+HN++,HT[HN,array] = array(404,401,vec(18,8,10),ang(0,90,90),vec(2,2.5,5),"models/sprops/geometry/qhex_18.mdl",Material1,Color1)
+HN++,HT[HN,array] = array(405,401,vec(18,8,-10),ang(0,90,90),vec(2,2.5,5),"models/sprops/geometry/qhex_18.mdl",Material1,Color1)
+HN++,HT[HN,array] = array(406,8,vec(6,0,-3.9),ang(-90,90,0),vec(0.75,0.75,3),"hexagon",Material1,Color1)
+HN++,HT[HN,array] = array(407,406,vec(-15,0,0),ang(-90,0,0),vec(3,2,6.25),"models/sprops/geometry/hhex_12.mdl",Material1,Color2)
+HN++,HT[HN,array] = array(408,406,vec(-15,10.5,0),ang(0,90,-90),vec(2.9,6,4),"models/sprops/geometry/qhex_18.mdl",Material1,Color1)
+
+
+#-------------------------------
+#-- VISUAL: RIGHT LEG J1 (HN = 101+)
+HN++,HT[HN,array] = array(2000,9,vec(0,12,0),ang(5,180,0),vec(1,1.5,1),"models/sprops/geometry/fhex_42.mdl",Material1,Color1)
+HN++,HT[HN,array] = array(2001,9,vec(30.1641,12,-0.56),ang(5,180,-90),vec(1,1,1),"models/sprops/rectangles/size_3_5/rect_30x60x3.mdl",Material1,Color1)
+HN++,HT[HN,array] = array(2002,9,vec(67.7207,12,-1.865),ang(15,-180,0),vec(1,1,1),"models/sprops/misc/sq_holes/qsqhole_d0_36.mdl",Material1,Color1)
+HN++,HT[HN,array] = array(2003,9,vec(63.8379,12,12.624),ang(15,-180,-90),vec(1,1,1),"models/sprops/rectangles/size_2/rect_12x18x3.mdl",Material1,Color1)
+HN++,HT[HN,array] = array(2004,9,vec(0,-12,0),ang(5,180,0),vec(1,1.5,1),"models/sprops/geometry/fhex_42.mdl",Material1,Color1)
+HN++,HT[HN,array] = array(2005,9,vec(30.1641,-12,-0.56),ang(5,180,-90),vec(1,1,1),"models/sprops/rectangles/size_3_5/rect_30x60x3.mdl",Material1,Color1)
+HN++,HT[HN,array] = array(2006,9,vec(67.7207,-12,-1.865),ang(15,-180,0),vec(1,1,1),"models/sprops/misc/sq_holes/qsqhole_d0_36.mdl",Material1,Color1)
+HN++,HT[HN,array] = array(2007,9,vec(63.8379,-12,12.624),ang(15,-180,-90),vec(1,1,1),"models/sprops/rectangles/size_2/rect_12x18x3.mdl",Material1,Color1)
+HN++,HT[HN,array] = array(2008,9,Vec,ang(5,180,0),vec(0.95,7,0.95),"models/sprops/geometry/fhex_42.mdl",Material1,Color2)
+HN++,HT[HN,array] = array(2009,9,vec(30.1641,0,-0.56),ang(5,180,-90),vec(0.95,0.95,7),"models/sprops/rectangles/size_3_5/rect_30x60x3.mdl",Material1,Color2)
+HN++,HT[HN,array] = array(2010,9,vec(21.5498,12,-11.711),ang(-26.802,0,0),vec(1,1,1),"models/sprops/triangles/right/size_2/rtri_24x60.mdl",Material1,Color1)
+HN++,HT[HN,array] = array(2011,9,vec(21.5498,-12,-11.711),ang(-26.802,0,0),vec(1,1,1),"models/sprops/triangles/right/size_2/rtri_24x60.mdl",Material1,Color1)
+HN++,HT[HN,array] = array(2012,9,vec(21.5498,0,-11.711),ang(-26.802,0,0),vec(0.95,7,0.95),"models/sprops/triangles/right/size_2/rtri_24x60.mdl",Material1,Color2)
+HN++,HT[HN,array] = array(2013,9,vec(0,-6,0),ang(-90,90,0),vec(1.6,1.6,2),"hq_tube",Material1,Color1)
+
+
+#-------------------------------
+#-- VISUAL: RIGHT LEG SHIELD (HN = 115+)
+HN++,HT[HN,array] = array(2050,9,vec(70,0,22),ang(-90,90,0),vec(1.3,1.6,1.6),"hexagon",Material1,Color1)
+HN++,HT[HN,array] = array(2051,2050,vec(0,20,0),Ang,vec(0.25,3,3),"",Material1,Color1)
+HN++,HT[HN,array] = array(2053,2050,vec(-3.1257,-17.7265,0),ang(-90,80,0),vec(1,1,2),"models/sprops/geometry/hhex_36.mdl",Material1,Color1)
+
+
+#-------------------------------
+#-- VISUAL: RIGHT LEG J2 (HN = 118+)
+HN++,HT[HN,array] = array(3000,10,Vec,ang(-90,90,0),vec(2.6,2.6,1.7063),"cylinder",Material1,Color2)
+HN++,HT[HN,array] = array(3001,10,vec(22,0,0),ang(90,0,0),vec(2,6.825,5),"models/sprops/geometry/hhex_12.mdl",Material1,Color2)
+HN++,HT[HN,array] = array(3002,10,Vec,ang(-90,90,0),vec(2,2,1.9),"cylinder",Material1,Color1)
+HN++,HT[HN,array] = array(3050,11,Vec,ang(-90,90,0),vec(2,2,2),"hexagon",Material1,Color1)
+
+
+#-------------------------------
+#-- VISUAL: RIGHT LEG J3 (HN = 122+)
+HN++,HT[HN,array] = array(3051,11,vec(32,0,0),ang(90,0,0),vec(1.75,6.5,10),"models/sprops/geometry/hhex_12.mdl",Material1,Color2)
+HN++,HT[HN,array] = array(3052,11,vec(26,0,8),ang(0,0,-90),vec(1,1,7),"models/sprops/rectangles/size_3/rect_24x36x3.mdl",Material1,Color1)
+HN++,HT[HN,array] = array(3053,11,vec(21.416,0,20),ang(26.567,0,-180),vec(1,7,1),"models/sprops/triangles/right/size_1/rtri_12x24.mdl",Material1,Color1)
+HN++,HT[HN,array] = array(3054,11,vec(50,0,8),ang(-90,180,0),vec(1,7,1),"models/sprops/triangles/right/size_1/rtri_12x24.mdl",Material1,Color1)
+
+
+#-------------------------------
+#-- VISUAL: RIGHT FOOT (HN = 126+)
+HN++,HT[HN,array] = array(4000,12,vec(-8,0,0),ang(-90,90,0),vec(2,2,2.5),"hexagon",Material1,Color2)
+HN++,HT[HN,array] = array(4001,12,vec(6,0,3.9),ang(-90,90,0),vec(0.75,0.75,3),"hexagon",Material1,Color1)
+HN++,HT[HN,array] = array(4002,12,vec(6,-10,23.9),ang(0,90,0),vec(1.25,2,7),"models/sprops/geometry/hhex_12.mdl",Material1,Color2)
+HN++,HT[HN,array] = array(4003,12,vec(6,10,23.9),ang(0,90,0),vec(1.25,2,7),"models/sprops/geometry/hhex_12.mdl",Material1,Color2)
+HN++,HT[HN,array] = array(4004,12,vec(-2,-10,21.9),ang(0,-180,0),vec(2,2.5,5),"models/sprops/geometry/qhex_18.mdl",Material1,Color1)
+HN++,HT[HN,array] = array(4005,12,vec(-2,10,21.9),ang(0,-180,0),vec(2,2.5,5),"models/sprops/geometry/qhex_18.mdl",Material1,Color1)
+HN++,HT[HN,array] = array(4006,12,vec(6,0,-3.9),ang(-90,90,0),vec(0.75,0.75,3),"hexagon",Material1,Color1)
+HN++,HT[HN,array] = array(4007,12,vec(6,0,-18.9),ang(0,-90,-180),vec(3,2,6.25),"models/sprops/geometry/hhex_12.mdl",Material1,Color2)
+HN++,HT[HN,array] = array(4008,12,vec(-4.5,0,-18.9),ang(0,-180,180),vec(2.9,6,4),"models/sprops/geometry/qhex_18.mdl",Material1,Color1)
+
+
+#-------------------------------
+#-- VISUAL: RIGHT ARM J1 (HN = 135+)
+HN++,HT[HN,array] = array(4200,17,Vec,Ang,vec(1.5,1.5,1.5),"rcylinder",Material1,Color2)
+HN++,HT[HN,array] = array(4201,17,vec(0,-15,0),ang(-90,90,0),vec(1.3,1.3,2),"cylinder",Material1,Color2)
+
+
+#-------------------------------
+#-- VISUAL: RIGHT ARM J2 (HN = 137+)
+HN++,HT[HN,array] = array(4250,18,vec(9.2607,0,-2),ang(0,0,-90),vec(0.9,1,6.75),"models/sprops/rectangles/size_3/rect_24x78x3.mdl",Material1,Color1)
+HN++,HT[HN,array] = array(4251,18,vec(-20.1387,0,19),ang(-90,0,0),vec(1,6.75,1),"models/sprops/triangles/right/size_1/rtri_12x18.mdl",Material1,Color1)
+HN++,HT[HN,array] = array(4252,18,vec(6.8613,0,19),Ang,vec(1,6.75,1),"models/sprops/triangles/right/size_1_5/rtri_18x42.mdl",Material1,Color1)
+HN++,HT[HN,array] = array(4253,18,vec(56.2607,0,-2),ang(90,-180,0),vec(1,6.75,1),"models/sprops/misc/sq_holes/qsqhole_d0_48.mdl",Material1,Color1)
+HN++,HT[HN,array] = array(4254,18,vec(0,10,0),ang(-90,-90,0),vec(2.35,2.35,1),"models/sprops/misc/fittings/cred_12_9_short.mdl",Material1,Color1)
+HN++,HT[HN,array] = array(4255,18,vec(0,-10,0),ang(-90,90,0),vec(2.35,2.35,1),"models/sprops/misc/fittings/cred_12_9_short.mdl",Material1,Color1)
+
+
+#-------------------------------
+#-- VISUAL: RIGHT ARM J3 (HN = 143+)
+HN++,HT[HN,array] = array(4300,19,Vec,ang(-83.5,0,90),vec(2,2,1.35),"octagon",Material1,Color2)
+HN++,HT[HN,array] = array(4301,19,vec(24.8393,0,-2.8301),ang(83.5,180,180),vec(2.5,4,6),"models/sprops/geometry/qhex_18.mdl",Material1,Color1)
+
+
+#-------------------------------
+#-- VISUAL: LEFT ARM J1 (HN = 145+)
+HN++,HT[HN,array] = array(4400,13,Vec,Ang,vec(1.5,1.5,1.5),"rcylinder",Material1,Color2)
+HN++,HT[HN,array] = array(4401,13,vec(0,15,0),ang(-90,90,0),vec(1.3,1.3,2),"cylinder",Material1,Color2)
+
+
+#-------------------------------
+#-- VISUAL: LEFT ARM J2 (HN = 147+)
+HN++,HT[HN,array] = array(4450,14,vec(9.2607,0,-2),ang(0,0,-90),vec(0.9,1,6.75),"models/sprops/rectangles/size_3/rect_24x78x3.mdl",Material1,Color1)
+HN++,HT[HN,array] = array(4451,14,vec(-20.1387,0,19),ang(-90,0,0),vec(1,6.75,1),"models/sprops/triangles/right/size_1/rtri_12x18.mdl",Material1,Color1)
+HN++,HT[HN,array] = array(4452,14,vec(6.8613,0,19),Ang,vec(1,6.75,1),"models/sprops/triangles/right/size_1_5/rtri_18x42.mdl",Material1,Color1)
+HN++,HT[HN,array] = array(4453,14,vec(56.2607,0,-2),ang(90,-180,0),vec(1,6.75,1),"models/sprops/misc/sq_holes/qsqhole_d0_48.mdl",Material1,Color1)
+HN++,HT[HN,array] = array(4454,14,vec(0,-10,0),ang(-90,90,0),vec(2.35,2.35,1),"models/sprops/misc/fittings/cred_12_9_short.mdl",Material1,Color1)
+HN++,HT[HN,array] = array(4455,14,vec(0,10,0),ang(-90,-90,0),vec(2.35,2.35,1),"models/sprops/misc/fittings/cred_12_9_short.mdl",Material1,Color1)
+
+
+#-------------------------------
+#-- VISUAL: LEFT ARM J3 (HN = 153+)
+HN++,HT[HN,array] = array(4500,15,Vec,ang(-83.5,0,90),vec(2,2,1.35),"octagon",Material1,Color2)
+HN++,HT[HN,array] = array(4501,15,vec(24.8393,0,-2.8301),ang(83.5,180,180),vec(2.5,4,6),"models/sprops/geometry/qhex_18.mdl",Material1,Color1)
+
+
+#-------------------------------
+#-- SKINNING
+local Empty = array(vec4(255,255,255,255),"",0)
+local Skins = table(
+    "default" = table(
+        "1" = array(vec4(60,60,60,255),"models/props_debris/plasterwall040c"),
+        "2" = array(vec4(255,255,255,255),"models/props_debris/plasterwall040c"),
+        "3" = array(vec4(188,0,45,255),"models/props_debris/plasterwall040c"),
+        "4" = array(vec4(188,0,45,255),"")
+    ),
+
+    "green" = table(
+        "1" = array(vec4(60,60,60,255),"models/props_debris/plasterwall040c"),
+        "2" = array(vec4(107,142,35,255),"models/props_debris/plasterwall040c"),
+        "3" = array(vec4(188,0,45,255),"models/props_debris/plasterwall040c"),
+        "4" = array(vec4(188,0,45,255),"")
+    ),
+
+    "drab" = table(
+        "1" = array(vec4(60,60,60,255),"models/props_debris/plasterwall040c"),
+        "2" = array(vec4(84,79,61,255),"models/props_debris/plasterwall040c"),
+        "3" = array(vec4(184,179,161,255),"models/props_debris/plasterwall040c"),
+        "4" = array(vec4(188,0,45,255),"")
+    ),
+
+    "none" = table(
+        "1" = Empty,"2" = Empty,"3" = Empty,"4" = Empty,"5" = Empty,"6" = Empty,"7" = Empty,"8" = Empty
+    )
+)
+
+Layout = table(
+   "skins" = Skins,
+
+    #-- [60,60,60,255]
+    "1" = array(4500,4401,4400,4300,4201,4200,4007,4003,4002,4000,3051,3001,3000,2012,2009,2008,407,403,402,400,351,
+            301,300,212,209,208,5002,4999,4607,4126,4103,4100,113,110,109,107,106),
+
+    #-- [255,255,255,255]
+    "2" = array(4501,4455,4454,4453,4452,4451,4450,4301,4255,4254,4253,4252,4251,4250,4008,4006,4005,4004,4001,3054,3053,
+            3052,3050,3002,2053,2051,2050,2013,2011,2010,2007,2006,2005,2004,2003,2002,2001,2000,408,406,405,404,401,354,
+            353,352,350,302,253,251,250,213,211,210,207,206,205,204,203,202,201,200,5001,4608,4606,4604,4123,4122,4121,
+            4120,4117,4116,4115,4114,4113,4112,4111,4110,4109,4108,4107,4106,4105,4104,4101,108,105,104,103,102,101),
+
+    #-- [188,0,45,255]
+    "3" = array(255,254),
+
+    "4" = array(4600)
+)
+
+function setColor(SRGB:array) {
+    if (SRGB:count() >= 5 & Layout[SRGB[2,string],array]) {
+        local Color = vec4(
+            SRGB[3,string]:toNumber(),
+            SRGB[4,string]:toNumber(),
+            SRGB[5,string]:toNumber(),
+            255)
+
+        if (SRGB[6,string] != "") { Color:setW(SRGB[6,string]:toNumber()) }
+
+        local Holograms = Layout[SRGB[2,string],array]
+        for (N = 1,Holograms:count()) {
+            holoColor(Holograms[N,number],Color)
+        }
+    }
+}
+
+function setSkin(Name:string) {
+    if (!Layout["skins",table][Name,table]) { return }
+
+    local Skin = Layout["skins",table][Name,table]
+    foreach (K,V:array = Skin) {
+        if (Layout:exists(K)) {
+            local Color = V[1,vector4]
+            local Material = V[2,string]
+            local Holograms = Layout[K,array]
+
+            for (N = 1,Holograms:count()) {
+                holoColor(Holograms[N,number],Color)
+                holoMaterial(Holograms[N,number],Material)
+                holoDisableShading(Holograms[N,number],V[3,number])
+            }
+        }
+    }
+}

@@ -1,0 +1,996 @@
+@name exteel3/anim
+
+#-------------------------------
+#-- INPUTS
+@inputs Camera:wirelink [W A S D] [Shift Space] [R] [Mouse1 Mouse2] [Active] [Entity]:entity
+@inputs [Thruster1 Thruster2]:wirelink
+
+
+#-------------------------------
+#-- MISC
+@persist [Dt Ct] [LIB_WorldU LIB_WorldD LIB_WorldV]:vector [LIB_WorldA]:angle Ready
+
+
+#-------------------------------
+#-- CONFIG
+@persist [CFG_WALK_StrideX CFG_WALK_StrideY CFG_WALK_StrideZ CFG_WALK_PelvisZ CFG_WALK_MoveSpeed CFG_WALK_FrameRate]
+@persist [CFG_RUN_StrideY CFG_RUN_PelvisZ CFG_RUN_MoveSpeed CFG_RUN_FrameRate]
+@persist [CFG_IDLE_StrideX CFG_IDLE_StrideY] [CFG_HOVER_FootZ CFG_HOVER_PelvisZ_Offset]
+@persist [CFG_TORSO_MaxAng]:angle [CFG_JumpHeight]
+@persist [CFG_ArmX CFG_ArmY CFG_ArmZ]
+
+
+#-------------------------------
+#-- MODEL
+@persist [MDL_LegA MDL_LegB MDL_LegC MDL_LegD MDL_LegE MDL_LegF]
+@persist [MDL_ArmA MDL_ArmB MDL_ArmC MDL_ArmD]
+@persist [MDL_PelvisZ MDL_TotalZ]
+@persist [MDL_PelvisEntity1 MDL_PelvisEntity2 MDL_TorsoEntity]:entity
+
+
+#-------------------------------
+#-- PHYSICS
+@persist [PHYS_BBoxHeight PHYS_BBoxRadius] [PHYS_BBoxZ] [PHYS_BBoxMins PHYS_BBoxMaxs]:vector
+@persist [PHYS_Position PHYS_Velocity PHYS_MoveDir PHYS_EyeDir]:vector [PHYS_Angle]:angle
+@persist [PHYS_HitGround PHYS_HitCeiling PHYS_HitBBox] [PHYS_MoveSpeed PHYS_MoveSpeed_Update]
+
+#-------------------------------
+#-- ANIM
+@persist [Input] [ANIM_Loop ANIM_HalfLoop] [ANIM_Transition] [ANIM_Output]:table [ANIM_StateNext ANIM_StateLast]:string
+
+
+#-------------------------------
+#-- LIB
+LIB_WorldD = vec(0,0,-1)
+LIB_WorldU = vec(0,0,1)
+LIB_WorldV = vec(0,0,0)
+LIB_WorldA = ang(0,0,0)
+
+function number entity:soundPlay(ID:string,Sound:string,Pitch,Vol) {
+    soundStop(ID)
+
+    This:soundPlay(ID,0,Sound)
+    soundPitch(ID,Pitch)
+    soundVolume(ID,Vol)
+
+    return 1
+}
+
+function ik_leg(A,B,C,D,Target:vector) {
+    local AE = holoEntity(A)
+    local AX = MDL_PelvisEntity2:toLocalAxis(Target - AE:pos())
+    local AA = AX:toAngle():setRoll(atan(AX[2],AX[1]))
+
+    holoAng(A,MDL_PelvisEntity2:toWorld(AA:rotateAroundAxis(AA:right(),(1 - min(1,AX:length()/(MDL_LegB + MDL_LegC) - 0.5))*90)))
+
+    local BE = holoEntity(B)
+    local BX = AE:toLocalAxis(Target - BE:pos())
+    local BD = min(BX:length(),MDL_LegC + MDL_LegF)
+
+    holoAng(B,AE:toWorld(ang(atan(-BX[3],BX[1]) + acos((BD^2 + MDL_LegC^2 - MDL_LegF^2)/(2*MDL_LegC*BD)),0,0)))
+    holoAng(C,BE:toWorld(ang(acos((MDL_LegF^2 + MDL_LegC^2 - BD^2)/(2*MDL_LegC*MDL_LegF)) + 180,0,0)))
+    #holoAng(D,(Target - holoEntity(D):pos()):toAngle())
+    #holoAng(S5,MoveBlend ? holoEntity(S4):angles() : BaseA:setPitch(0))
+}
+function ik_arm(A,B,C,D,Side,Target:vector) {
+    local BE = holoEntity(B)
+    local BX = MDL_TorsoEntity:toLocalAxis(Target - BE:pos())
+    local BA = BX:toAngle():setRoll(atan(BX[2],BX[1]))
+    local BD = min(BX:length(),MDL_ArmC + MDL_ArmD - 1)
+
+    holoAng(A,MDL_TorsoEntity:toWorld(BA))
+
+    local Dot = 0
+    if (Side == 1) {
+        Dot = min(0,BX:normalized():dot(vec(0,1,0)))
+    }
+    else {
+        Dot = max(0,BX:normalized():dot(vec(0,1,0)))
+    }
+
+    BA = BA:rotateAroundAxis(BA:forward(),-135*Dot)
+    BA = BA:rotateAroundAxis(BA:right(),-acos((BD^2 + MDL_ArmC^2 - MDL_ArmD^2)/(2*MDL_ArmC*BD)))
+
+    holoAng(B,MDL_TorsoEntity:toWorld(BA))
+    holoAng(C,BE:toWorld(ang(acos((MDL_ArmD^2 + MDL_ArmC^2 - BD^2)/(2*MDL_ArmC*MDL_ArmD)) + 180,0,0)))
+}
+
+
+#-------------------------------
+#-- ANIMATIONS
+ANIM_StateLast = "state__MOVEMENT"
+ANIM_StateNext = "state__MOVEMENT"
+
+function number linear(Y0,Y1,T) {
+    return (1 - T)*Y0 + Y1*T
+}
+function number cosine(Y0,Y1,T) {
+    local T = (1 - cosr(T*_PI))*0.5
+    return (1 - T)*Y0 + Y1*T
+}
+function table blend_TABLE(Blend0:table,Blend1:table,T) {
+    if     (T == 0) { return Blend0 }
+    elseif (T == 1) { return Blend1 }
+    else {
+        local T = cosine(0,1,T)
+        local Blend2 = table()
+
+        foreach (K,V:quaternion = Blend0) {
+            Blend2[K,quaternion] = slerp(V,Blend1[K,quaternion],T)
+        }
+        foreach (K,V:vector = Blend0) {
+            Blend2[K,vector] = mix(Blend1[K,vector],V,T)
+        }
+        foreach (K,V:number = Blend0) {
+            Blend2[K,number] = (1 - T)*V + Blend1[K,number]*T
+        }
+
+        return Blend2
+    }
+}
+function table blend_BY_NAME(Blend0:string,Blend1:string,T) {
+    if     (T == 0) { return Blend0()[table] }
+    elseif (T == 1) { return Blend1()[table] }
+    else {
+        return blend_TABLE(Blend0()[table],Blend1()[table],T)
+    }
+}
+function table blend_MOVEMENT_BY_DIRECTION(Type:string,Direction) {
+    local Direction = angnorm(Direction)
+    if (Direction == 0) {
+        return (Type + "F")()[table]
+    }
+    elseif (Direction == 90) {
+        return (Type + "L")()[table]
+    }
+    elseif (Direction == -90) {
+        return (Type + "R")()[table]
+    }
+    elseif (Direction == 180 | Direction == -180) {
+        return (Type + "B")()[table]
+    }
+    elseif (inrange(Direction,0,90)) {
+        return blend_BY_NAME(Type + "F",Type + "L",abs(Direction/90))
+    }
+    elseif (inrange(Direction,-90,0)) {
+        return blend_BY_NAME(Type + "F",Type + "R",abs(Direction/90))
+    }
+    elseif (inrange(Direction,90,180)) {
+        return blend_BY_NAME(Type + "L",Type + "B",abs(Direction/90) - 1)
+    }
+    elseif (inrange(Direction,-180,-90)) {
+        return blend_BY_NAME(Type + "R",Type + "B",abs(Direction/90) - 1)
+    }
+    else {
+        return table()
+    }
+}
+
+# ANIMATIONS
+# JUMP
+function table anim__JUMP_LOOP(XValue,YValue) {
+    local Sin = sin(90 + ANIM_Loop)
+    local Cos = cos(90 + ANIM_Loop)
+
+    local L = rangerOffset(CFG_WALK_PelvisZ,MDL_PelvisEntity1:toWorld(vec(Cos*CFG_IDLE_StrideX,CFG_IDLE_StrideY,0)),LIB_WorldD)
+    local R = rangerOffset(CFG_WALK_PelvisZ,MDL_PelvisEntity1:toWorld(vec(-Cos*CFG_IDLE_StrideX,-CFG_IDLE_StrideY,0)),LIB_WorldD)
+
+    return table(
+        # TORSO
+        "q_torso" = quat(clamp(MDL_PelvisEntity2:toLocal(PHYS_EyeDir:toAngle()),-CFG_TORSO_MaxAng,CFG_TORSO_MaxAng)),
+
+        # PELVIS
+        "v_pelvis2" = vec(),
+        "q_pelvis2" = quat(ang()),
+
+        # FEET
+        "v_foot_l" = L:position() + CFG_HOVER_FootZ*(L:hitNormal() ?: LIB_WorldU),
+        "v_foot_r" = R:position(),
+
+        # HANDS
+        "v_hand_l" = vec(CFG_ArmX,CFG_ArmY,-CFG_ArmZ) + vec(0,CFG_ArmY*2,CFG_ArmZ)*XValue,
+        "v_hand_r" = vec(CFG_ArmX,-CFG_ArmY,-CFG_ArmZ) + vec(0,-CFG_ArmY*2,CFG_ArmZ)*XValue,
+
+        # ROOT
+        "n_framerate" = 1,
+        "n_movespeed" = PHYS_Velocity:setZ(0):length()
+    )
+}
+
+
+# ANIMATIONS
+# HOVER
+function table anim__HOVER_F() {
+    local L = rangerOffset(CFG_WALK_PelvisZ,MDL_PelvisEntity1:toWorld(vec(-CFG_IDLE_StrideX,CFG_IDLE_StrideY,0)),LIB_WorldD)
+    local R = rangerOffset(CFG_WALK_PelvisZ,MDL_PelvisEntity1:toWorld(vec(-CFG_IDLE_StrideX,-CFG_IDLE_StrideY,0)),LIB_WorldD)
+
+    return table(
+        # TORSO
+        "q_torso" = quat(clamp(MDL_PelvisEntity2:toLocal(PHYS_EyeDir:toAngle()),-CFG_TORSO_MaxAng,CFG_TORSO_MaxAng)),
+
+        # PELVIS
+        "v_pelvis2" = vec(0,0,CFG_HOVER_PelvisZ_Offset),
+        "q_pelvis2" = quat(ang(45,0,0)),
+
+        # FEET
+        "v_foot_l" = L:position() + CFG_HOVER_FootZ*(L:hitNormal() ?: LIB_WorldU),
+        "v_foot_r" = R:position() + CFG_HOVER_FootZ*(R:hitNormal() ?: LIB_WorldU),
+
+        # HANDS
+        "v_hand_l" = vec(CFG_ArmX - CFG_WALK_StrideX,CFG_ArmY,-CFG_ArmZ),
+        "v_hand_r" = vec(CFG_ArmX - CFG_WALK_StrideX,-CFG_ArmY,-CFG_ArmZ),
+
+        # ROOT
+        "n_framerate" = 1,
+        "n_movespeed" = CFG_RUN_MoveSpeed*2
+    )
+}
+function table anim__HOVER_B() {
+    local L = rangerOffset(CFG_WALK_PelvisZ,MDL_PelvisEntity1:toWorld(vec(CFG_IDLE_StrideX,CFG_IDLE_StrideY,0)),LIB_WorldD)
+    local R = rangerOffset(CFG_WALK_PelvisZ,MDL_PelvisEntity1:toWorld(vec(CFG_IDLE_StrideX,-CFG_IDLE_StrideY,0)),LIB_WorldD)
+
+    return table(
+        # TORSO
+        "q_torso" = quat(clamp(MDL_PelvisEntity2:toLocal(PHYS_EyeDir:toAngle()),-CFG_TORSO_MaxAng,CFG_TORSO_MaxAng)) * qRotation(vec(0,-15,0)),
+
+        # PELVIS
+        "v_pelvis2" = vec(0,0,CFG_HOVER_PelvisZ_Offset),
+        "q_pelvis2" = quat(ang(-45,0,0)),
+
+        # FEET
+        "v_foot_l" = L:position() + CFG_HOVER_FootZ*(L:hitNormal() ?: LIB_WorldU),
+        "v_foot_r" = R:position() + CFG_HOVER_FootZ*(R:hitNormal() ?: LIB_WorldU),
+
+        # HANDS
+        "v_hand_l" = vec(CFG_ArmX + CFG_WALK_StrideX,CFG_ArmY,-CFG_ArmZ),
+        "v_hand_r" = vec(CFG_ArmX + CFG_WALK_StrideX,-CFG_ArmY,-CFG_ArmZ),
+
+        # ROOT
+        "n_framerate" = 1,
+        "n_movespeed" = CFG_RUN_MoveSpeed*2
+    )
+}
+function table anim__HOVER_L() {
+    local L = rangerOffset(CFG_WALK_PelvisZ,MDL_PelvisEntity1:toWorld(vec(0,CFG_IDLE_StrideY,0):rotate(0,90,0)),LIB_WorldD)
+    local R = rangerOffset(CFG_WALK_PelvisZ,MDL_PelvisEntity1:toWorld(vec(0,-CFG_IDLE_StrideY,0):rotate(0,90,0)),LIB_WorldD)
+
+    return table(
+        # TORSO
+        "q_torso" = quat(clamp(MDL_PelvisEntity2:toLocal(PHYS_EyeDir:toAngle()),-CFG_TORSO_MaxAng,CFG_TORSO_MaxAng)),
+
+        # PELVIS
+        "v_pelvis2" = vec(0,0,CFG_HOVER_PelvisZ_Offset),
+        "q_pelvis2" = quat(ang(0,45,-15)),
+
+        # FEET
+        "v_foot_l" = L:position() + CFG_HOVER_FootZ*(L:hitNormal() ?: LIB_WorldU),
+        "v_foot_r" = R:position() + CFG_HOVER_FootZ*(R:hitNormal() ?: LIB_WorldU),
+
+        # HANDS
+        "v_hand_l" = vec(CFG_ArmX,CFG_ArmY,-CFG_ArmZ),
+        "v_hand_r" = vec(CFG_ArmX,-CFG_ArmY,-CFG_ArmZ),
+
+        # ROOT
+        "n_framerate" = 1,
+        "n_movespeed" = CFG_RUN_MoveSpeed*2
+    )
+}
+function table anim__HOVER_R() {
+    local L = rangerOffset(CFG_WALK_PelvisZ,MDL_PelvisEntity1:toWorld(vec(0,CFG_IDLE_StrideY,0):rotate(0,-90,0)),LIB_WorldD)
+    local R = rangerOffset(CFG_WALK_PelvisZ,MDL_PelvisEntity1:toWorld(vec(0,-CFG_IDLE_StrideY,0):rotate(0,-90,0)),LIB_WorldD)
+
+    return table(
+        # TORSO
+        "q_torso" = quat(clamp(MDL_PelvisEntity2:toLocal(PHYS_EyeDir:toAngle()),-CFG_TORSO_MaxAng,CFG_TORSO_MaxAng)),
+
+        # PELVIS
+        "v_pelvis2" = vec(0,0,CFG_HOVER_PelvisZ_Offset),
+        "q_pelvis2" = quat(ang(0,-45,15)),
+
+        # FEET
+        "v_foot_l" = L:position() + CFG_HOVER_FootZ*(L:hitNormal() ?: LIB_WorldU),
+        "v_foot_r" = R:position() + CFG_HOVER_FootZ*(R:hitNormal() ?: LIB_WorldU),
+
+        # HANDS
+        "v_hand_l" = vec(CFG_ArmX,CFG_ArmY,-CFG_ArmZ),
+        "v_hand_r" = vec(CFG_ArmX,-CFG_ArmY,-CFG_ArmZ),
+
+        # ROOT
+        "n_framerate" = 1,
+        "n_movespeed" = CFG_RUN_MoveSpeed*2
+    )
+}
+
+
+# ANIMATIONS
+# IDLE
+function table anim__IDLE() {
+    local L = rangerOffset(CFG_WALK_PelvisZ,MDL_PelvisEntity1:toWorld(vec(CFG_IDLE_StrideX,CFG_IDLE_StrideY,0)),LIB_WorldD)
+    local R = rangerOffset(CFG_WALK_PelvisZ,MDL_PelvisEntity1:toWorld(vec(-CFG_IDLE_StrideX,-CFG_IDLE_StrideY,0)),LIB_WorldD)
+
+    return table(
+        # TORSO
+        "q_torso" = quat(clamp(MDL_PelvisEntity2:toLocal(PHYS_EyeDir:toAngle()),-CFG_TORSO_MaxAng,CFG_TORSO_MaxAng)),
+
+        # PELVIS
+        "v_pelvis2" = vec(0,0,sin(90 + ANIM_Loop)*CFG_WALK_StrideZ*0.01),
+        "q_pelvis2" = quat(ang(0,0,0)),
+
+        # FEET
+        "v_foot_l" = L:position(),
+        "v_foot_r" = R:position(),
+
+        # HANDS
+        "v_hand_l" = vec(CFG_ArmX,CFG_ArmY,-CFG_ArmZ),
+        "v_hand_r" = vec(CFG_ArmX,-CFG_ArmY,-CFG_ArmZ),
+
+        # ROOT
+        "n_framerate" = 1,
+        "n_movespeed" = 1
+    )
+}
+
+
+# ANIMATIONS
+# WALK
+function table anim__WALK_F() {
+    local Sin = sin(90 + ANIM_Loop)
+    local Cos = cos(90 + ANIM_Loop)
+
+    local L = rangerOffset(CFG_WALK_PelvisZ,MDL_PelvisEntity1:toWorld(vec(Cos*CFG_WALK_StrideX,CFG_WALK_StrideY,0)),LIB_WorldD)
+    local R = rangerOffset(CFG_WALK_PelvisZ,MDL_PelvisEntity1:toWorld(vec(-Cos*CFG_WALK_StrideX,-CFG_WALK_StrideY,0)),LIB_WorldD)
+
+    return table(
+        # TORSO
+        "q_torso" = quat(clamp(MDL_PelvisEntity2:toLocal(PHYS_EyeDir:toAngle()),-CFG_TORSO_MaxAng,CFG_TORSO_MaxAng)),
+
+        # PELVIS
+        "v_pelvis2" = vec(0,0,abs(Sin*CFG_WALK_StrideZ*0.25)),
+        "q_pelvis2" = quat(ang(7 + abs(Cos*7),Cos*7,0)),
+
+        # FEET
+        "v_foot_l" = L:position() + max(0,-Sin*CFG_WALK_StrideZ)*(L:hitNormal() ?: LIB_WorldU),
+        "v_foot_r" = R:position() + max(0,Sin*CFG_WALK_StrideZ)*(R:hitNormal() ?: LIB_WorldU),
+
+        # HANDS
+        "v_hand_l" = vec(CFG_ArmX + Sin*CFG_WALK_StrideX*0.5,CFG_ArmY,-CFG_ArmZ):rotate(0,-Cos*15,0),
+        "v_hand_r" = vec(CFG_ArmX - Sin*CFG_WALK_StrideX*0.5,-CFG_ArmY,-CFG_ArmZ):rotate(0,-Cos*15,0),
+
+        # ROOT
+        "n_framerate" = CFG_WALK_FrameRate,
+        "n_movespeed" = CFG_WALK_MoveSpeed
+    )
+}
+function table anim__WALK_B() {
+    local Sin = sin(270 + ANIM_Loop)
+    local Cos = cos(270 + ANIM_Loop)
+
+    local L = rangerOffset(CFG_WALK_PelvisZ,MDL_PelvisEntity1:toWorld(vec(Cos*CFG_WALK_StrideX,CFG_WALK_StrideY,0)),LIB_WorldD)
+    local R = rangerOffset(CFG_WALK_PelvisZ,MDL_PelvisEntity1:toWorld(vec(-Cos*CFG_WALK_StrideX,-CFG_WALK_StrideY,0)),LIB_WorldD)
+
+    return table(
+        # TORSO
+        "q_torso" = quat(clamp(MDL_PelvisEntity2:toLocal(PHYS_EyeDir:toAngle()),-CFG_TORSO_MaxAng,CFG_TORSO_MaxAng)),
+
+        # PELVIS
+        "v_pelvis2" = vec(0,0,abs(Sin*CFG_WALK_StrideZ*0.25)),
+        "q_pelvis2" = quat(ang(-7 - abs(Cos*7),Cos*7,0)),
+
+        # FEET
+        "v_foot_l" = L:position() + max(0,Sin*CFG_WALK_StrideZ)*(L:hitNormal() ?: LIB_WorldU),
+        "v_foot_r" = R:position() + max(0,-Sin*CFG_WALK_StrideZ)*(R:hitNormal() ?: LIB_WorldU),
+
+        # HANDS
+        "v_hand_l" = vec(CFG_ArmX + Sin*CFG_WALK_StrideX*0.5,CFG_ArmY,-CFG_ArmZ):rotate(0,-Cos*15,0),
+        "v_hand_r" = vec(CFG_ArmX - Sin*CFG_WALK_StrideX*0.5,-CFG_ArmY,-CFG_ArmZ):rotate(0,-Cos*15,0),
+
+        # ROOT
+        "n_framerate" = CFG_WALK_FrameRate,
+        "n_movespeed" = CFG_WALK_MoveSpeed
+    )
+}
+function table anim__WALK_L() {
+    local Sin = sin(90 + ANIM_Loop)
+    local Cos = cos(90 + ANIM_Loop)
+
+    local L = rangerOffset(CFG_WALK_PelvisZ,MDL_PelvisEntity1:toWorld(vec(CFG_WALK_StrideY,CFG_WALK_StrideY + Cos*CFG_WALK_StrideX,0)),LIB_WorldD)
+    local R = rangerOffset(CFG_WALK_PelvisZ,MDL_PelvisEntity1:toWorld(vec(-CFG_WALK_StrideY,-CFG_WALK_StrideY - Cos*CFG_WALK_StrideX,0)),LIB_WorldD)
+
+    return table(
+        # TORSO
+        "q_torso" = quat(clamp(MDL_PelvisEntity2:toLocal(PHYS_EyeDir:toAngle()),-CFG_TORSO_MaxAng,CFG_TORSO_MaxAng)),
+
+        # PELVIS
+        "v_pelvis2" = vec(0,0,abs(Sin*CFG_WALK_StrideZ*0.25)),
+        "q_pelvis2" = quat(ang(0,Cos*7,-7 - abs(Cos*7))),
+
+        # FEET
+        "v_foot_l" = L:position() + max(0,-Sin*CFG_WALK_StrideZ)*(L:hitNormal() ?: LIB_WorldU),
+        "v_foot_r" = R:position() + max(0,Sin*CFG_WALK_StrideZ)*(R:hitNormal() ?: LIB_WorldU),
+
+        # HANDS
+        "v_hand_l" = vec(CFG_ArmX + Sin*CFG_WALK_StrideX*0.5,CFG_ArmY,-CFG_ArmZ):rotate(0,-Cos*15 + 30,0),
+        "v_hand_r" = vec(CFG_ArmX - Sin*CFG_WALK_StrideX*0.5,-CFG_ArmY,-CFG_ArmZ):rotate(0,-Cos*15 + 30,0),
+
+        # ROOT
+        "n_framerate" = CFG_WALK_FrameRate,
+        "n_movespeed" = CFG_WALK_MoveSpeed
+    )
+}
+function table anim__WALK_R() {
+    local Sin = sin(270 + ANIM_Loop)
+    local Cos = cos(270 + ANIM_Loop)
+
+    local L = rangerOffset(CFG_WALK_PelvisZ,MDL_PelvisEntity1:toWorld(vec(-CFG_WALK_StrideY,CFG_WALK_StrideY + Cos*CFG_WALK_StrideX,0)),LIB_WorldD)
+    local R = rangerOffset(CFG_WALK_PelvisZ,MDL_PelvisEntity1:toWorld(vec(CFG_WALK_StrideY,-CFG_WALK_StrideY - Cos*CFG_WALK_StrideX,0)),LIB_WorldD)
+
+    return table(
+        # TORSO
+        "q_torso" = quat(clamp(MDL_PelvisEntity2:toLocal(PHYS_EyeDir:toAngle()),-CFG_TORSO_MaxAng,CFG_TORSO_MaxAng)),
+
+        # PELVIS
+        "v_pelvis2" = vec(0,0,abs(Sin*CFG_WALK_StrideZ*0.25)),
+        "q_pelvis2" = quat(ang(0,Cos*7,7 + abs(Cos*7))),
+
+        # FEET
+        "v_foot_l" = L:position() + max(0,Sin*CFG_WALK_StrideZ)*(L:hitNormal() ?: LIB_WorldU),
+        "v_foot_r" = R:position() + max(0,-Sin*CFG_WALK_StrideZ)*(R:hitNormal() ?: LIB_WorldU),
+
+        # HANDS
+        "v_hand_l" = vec(CFG_ArmX + Sin*CFG_WALK_StrideX*0.5,CFG_ArmY,-CFG_ArmZ):rotate(0,-Cos*15 - 30,0),
+        "v_hand_r" = vec(CFG_ArmX - Sin*CFG_WALK_StrideX*0.5,-CFG_ArmY,-CFG_ArmZ):rotate(0,-Cos*15 - 30,0),
+
+        # ROOT
+        "n_framerate" = CFG_WALK_FrameRate,
+        "n_movespeed" = CFG_WALK_MoveSpeed
+    )
+}
+
+
+# ANIMATIONS
+# RUN
+function table anim__RUN_F() {
+    local Sin = sin(90 + ANIM_Loop)
+    local Cos = cos(90 + ANIM_Loop)
+
+    local L = -rangerOffset(CFG_RUN_PelvisZ,MDL_PelvisEntity1:toWorld(vec(0,CFG_RUN_StrideY,0)),LIB_WorldD):distance()*LIB_WorldU*0.5
+    local R = -rangerOffset(CFG_RUN_PelvisZ,MDL_PelvisEntity1:toWorld(vec(0,-CFG_RUN_StrideY,0)),LIB_WorldD):distance()*LIB_WorldU*0.5
+
+    return table(
+        # TORSO
+        "q_torso" = quat(0.5*clamp(MDL_PelvisEntity2:toLocal(PHYS_EyeDir:toAngle()),-CFG_TORSO_MaxAng,CFG_TORSO_MaxAng)),
+
+        # PELVIS
+        "v_pelvis2" = vec(0,Sin*CFG_RUN_StrideY,abs(cos(90 + ANIM_Loop))*CFG_RUN_PelvisZ*0.25):rotate(30,0,0),
+        "q_pelvis2" = quat(ang(20 + abs(Cos)*5,-Cos*15,0)),
+
+        # FEET
+        "v_foot_l" = MDL_PelvisEntity1:toWorld(L:rotate(-Cos*60,0,0) + L:rotate(-(Cos + Sin)*60 + 60,0,0) + vec(0,CFG_RUN_StrideY,0)),
+        "v_foot_r" = MDL_PelvisEntity1:toWorld(R:rotate(Cos*60,0,0) + R:rotate((Cos + Sin)*60 + 60,0,0) - vec(0,CFG_RUN_StrideY,0)),
+
+        # HANDS
+        "v_hand_l" = vec(CFG_WALK_StrideX*0.5,CFG_ArmY,-CFG_ArmZ):rotate(-Cos*60 - 45,0,0),
+        "v_hand_r" = vec(CFG_WALK_StrideX*0.5,-CFG_ArmY,-CFG_ArmZ):rotate(Cos*60 - 45,0,0),
+
+        # ROOT
+        "n_movespeed" = CFG_RUN_MoveSpeed,
+        "n_framerate" = CFG_RUN_FrameRate
+    )
+}
+function table anim__RUN_B() {
+    local Sin = sin(270 + ANIM_Loop)
+    local Cos = cos(270 + ANIM_Loop)
+
+    local L = -rangerOffset(CFG_RUN_PelvisZ,MDL_PelvisEntity1:toWorld(vec(0,CFG_RUN_StrideY,0)),LIB_WorldD):distance()*LIB_WorldU*0.5
+    local R = -rangerOffset(CFG_RUN_PelvisZ,MDL_PelvisEntity1:toWorld(vec(0,-CFG_RUN_StrideY,0)),LIB_WorldD):distance()*LIB_WorldU*0.5
+
+    return table(
+        # TORSO
+        "q_torso" = quat(0.5*clamp(MDL_PelvisEntity2:toLocal(PHYS_EyeDir:toAngle()),-CFG_TORSO_MaxAng,CFG_TORSO_MaxAng)),
+
+        # PELVIS
+        "v_pelvis2" = vec(0,-Sin*CFG_RUN_StrideY*0.5,cos(270 + ANIM_Loop*2)*CFG_RUN_PelvisZ*0.1):rotate(-30,0,0),
+        "q_pelvis2" = quat(ang(-10 - abs(Cos)*5,-Cos*15,0)),
+
+        # FEET
+        "v_foot_l" = MDL_PelvisEntity1:toWorld(L:rotate(-Cos*60,0,0) + L:rotate(-(Cos/2 + Sin)*60 - 60,0,0) + vec(0,CFG_RUN_StrideY,0)),
+        "v_foot_r" = MDL_PelvisEntity1:toWorld(R:rotate(Cos*60,0,0) + R:rotate((Cos/2 + Sin)*60 - 60,0,0) - vec(0,CFG_RUN_StrideY,0)),
+
+        # HANDS
+        "v_hand_l" = vec(0,CFG_ArmY,-CFG_ArmZ):rotate(-Cos*60,0,0),
+        "v_hand_r" = vec(0,-CFG_ArmY,-CFG_ArmZ):rotate(Cos*60,0,0),
+
+        # ROOT
+        "n_movespeed" = CFG_RUN_MoveSpeed,
+        "n_framerate" = CFG_RUN_FrameRate
+    )
+}
+function table anim__RUN_L() {
+    local Sin = sin(90 + ANIM_Loop)
+    local Cos = cos(90 + ANIM_Loop)
+
+    local Rotate = vec(0,CFG_RUN_StrideY,0):rotate(0,90,0)
+    local L = -rangerOffset(CFG_RUN_PelvisZ,MDL_PelvisEntity1:toWorld(Rotate),LIB_WorldD):distance()*LIB_WorldU*0.5
+    local R = -rangerOffset(CFG_RUN_PelvisZ,MDL_PelvisEntity1:toWorld(-Rotate),LIB_WorldD):distance()*LIB_WorldU*0.5
+
+    return table(
+        # TORSO
+        "q_torso" = quat(0.5*clamp(MDL_PelvisEntity2:toLocal(PHYS_EyeDir:toAngle()),-CFG_TORSO_MaxAng,CFG_TORSO_MaxAng)),
+
+        # PELVIS
+        "v_pelvis2" = vec(0,-Sin*CFG_RUN_StrideY*0.5,abs(cos(90 + ANIM_Loop))*CFG_RUN_PelvisZ*0.25),
+        "q_pelvis2" = quat(ang(0,-Cos*15 + 40,-20 - abs(Cos)*5)),
+
+        # FEET
+        "v_foot_l" = MDL_PelvisEntity1:toWorld(L:rotate(-Cos*60,90,0) + L:rotate(-(Cos + Sin)*60 + 60,80,0) + Rotate + vec(0,CFG_RUN_StrideY,0)),
+        "v_foot_r" = MDL_PelvisEntity1:toWorld(R:rotate(Cos*60,90,0) + R:rotate((Cos + Sin)*60 + 60,80,0) - Rotate - vec(0,CFG_RUN_StrideY,0)),
+
+        # HANDS
+        "v_hand_l" = vec(CFG_WALK_StrideX*0.5,CFG_ArmY,-CFG_ArmZ):rotate(-Cos*60,0,0),
+        "v_hand_r" = vec(CFG_WALK_StrideX*0.5,-CFG_ArmY,-CFG_ArmZ):rotate(Cos*60,0,0),
+
+        # ROOT
+        "n_movespeed" = CFG_RUN_MoveSpeed,
+        "n_framerate" = CFG_RUN_FrameRate
+    )
+}
+function table anim__RUN_R() {
+    local Sin = sin(90 + ANIM_Loop)
+    local Cos = cos(90 + ANIM_Loop)
+
+    local Rotate = vec(0,CFG_RUN_StrideY,0):rotate(0,-90,0)
+    local L = -rangerOffset(CFG_RUN_PelvisZ,MDL_PelvisEntity1:toWorld(Rotate),LIB_WorldD):distance()*LIB_WorldU*0.5
+    local R = -rangerOffset(CFG_RUN_PelvisZ,MDL_PelvisEntity1:toWorld(-Rotate),LIB_WorldD):distance()*LIB_WorldU*0.5
+
+    return table(
+        # TORSO
+        "q_torso" = quat(0.5*clamp(MDL_PelvisEntity2:toLocal(PHYS_EyeDir:toAngle()),-CFG_TORSO_MaxAng,CFG_TORSO_MaxAng)),
+
+        # PELVIS
+        "v_pelvis2" = vec(0,-Sin*CFG_RUN_StrideY*0.5,abs(cos(90 + ANIM_Loop))*CFG_RUN_PelvisZ*0.25),
+        "q_pelvis2" = quat(ang(0,-Cos*15 - 40,20 + abs(Cos)*5)),
+
+        # FEET
+        "v_foot_l" = MDL_PelvisEntity1:toWorld(L:rotate(-Cos*60,-90,0) + L:rotate(-(Cos + Sin)*60 + 60,-80,0) + Rotate + vec(0,CFG_RUN_StrideY,0)),
+        "v_foot_r" = MDL_PelvisEntity1:toWorld(R:rotate(Cos*60,-90,0) + R:rotate((Cos + Sin)*60 + 60,-80,0) - Rotate - vec(0,CFG_RUN_StrideY,0)),
+
+        # HANDS
+        "v_hand_l" = vec(CFG_WALK_StrideX*0.5,CFG_ArmY,-CFG_ArmZ):rotate(-Cos*60,0,0),
+        "v_hand_r" = vec(CFG_WALK_StrideX*0.5,-CFG_ArmY,-CFG_ArmZ):rotate(Cos*60,0,0),
+
+        # ROOT
+        "n_movespeed" = CFG_RUN_MoveSpeed,
+        "n_framerate" = CFG_RUN_FrameRate
+    )
+}
+function table state__MOVEMENT(XValue,YValue) {
+    if (XValue == 0) {
+        return anim__IDLE()
+    }
+    elseif (XValue <= 0.5) {
+        if (XValue == 0.5) {
+            return blend_MOVEMENT_BY_DIRECTION("anim__WALK_",YValue)
+        }
+        else {
+            return blend_TABLE(anim__IDLE(),blend_MOVEMENT_BY_DIRECTION("anim__WALK_",YValue),XValue*2)
+        }
+    }
+    elseif (XValue <= 1) {
+        if (XValue == 1) {
+            return blend_MOVEMENT_BY_DIRECTION("anim__RUN_",YValue)
+        }
+        else {
+            return blend_TABLE(blend_MOVEMENT_BY_DIRECTION("anim__WALK_",YValue),blend_MOVEMENT_BY_DIRECTION("anim__RUN_",YValue),XValue*2 - 1)
+        }
+    }
+    else {
+        if (XValue == 2) {
+            return blend_MOVEMENT_BY_DIRECTION("anim__HOVER_",YValue)
+        }
+        else {
+            return blend_TABLE(blend_MOVEMENT_BY_DIRECTION("anim__RUN_",YValue),blend_MOVEMENT_BY_DIRECTION("anim__HOVER_",YValue),XValue - 1)
+        }
+    }
+}
+function table state__JUMP(XValue,YValue) {
+    if (XValue) {
+        return blend_TABLE(state__MOVEMENT(Input,YValue),anim__JUMP_LOOP(XValue,YValue),XValue)
+    }
+    else {
+        return anim__JUMP_LOOP(XValue,YValue)
+    }
+}
+
+#[
+function table wep__HANDGUN_AIM(XValue) {
+    local Dir = PHYS_EyeDir
+    local Aim = MDL_TorsoEntity:toLocal(rangerOffset(99999,MDL_TorsoEntity:pos(),Dir):position())
+
+    return table(
+        "v_hand_l" = Aim,
+        "v_hand_r" = Aim
+    )
+}
+function table wep__GATLING_AIM(XValue) {
+    local GDir = MDL_TorsoEntity:toLocalAxis(PHYS_EyeDir)
+    local GPos = GDir*CFG_ArmY*1.25 + GDir:cross(LIB_WorldU)*CFG_ArmY
+
+    holoPos(21,MDL_TorsoEntity:toWorld(GPos - vec(0,0,CFG_ArmY)))
+    holoAng(21,MDL_TorsoEntity:toWorld(GDir:toAngle()))
+
+    return table(
+        "v_hand_l" = MDL_TorsoEntity:toLocal(holoEntity(21):toWorld(vec(0,10,0))),
+        "v_hand_r" = MDL_TorsoEntity:toLocal(holoEntity(21):toWorld(vec(-60,0,15)))
+    )
+
+}
+]#
+
+#-------------------------------
+#-- CORE
+function dt() {
+    Dt = curtime() - Ct
+    Ct = curtime()
+}
+
+function main(Interval) {
+    timer("main",Interval),dt()
+
+    if (Active) {
+        #-- player and inputs
+        Camera["Activated",number] = 1
+
+        PHYS_EyeDir = Entity:toLocalAxis(Entity:driver():eye())
+        PHYS_EyeDirNoZ = PHYS_EyeDir:setZ(0)
+        if (W|S) {
+            PHYS_MoveDir = (W - S)*PHYS_EyeDirNoZ
+        }
+        if (A|D) {
+            PHYS_MoveDir += PHYS_EyeDirNoZ:cross(LIB_WorldU)*(D - A)
+        }
+        PHYS_MoveDir = PHYS_MoveDir:normalized()
+
+        if (PHYS_MoveSpeed_Update) {
+            PHYS_MoveSpeed = (ANIM_Output["n_movespeed",number]*ANIM_Output["n_framerate",number])*Dt
+            PHYS_MoveSpeed_Update = 0
+        }
+
+        local C_Gravity = -2000 * Dt * Dt
+
+        #-- jump and gravity
+        if (PHYS_HitGround) {
+            PHYS_Velocity = (PHYS_MoveDir*PHYS_MoveSpeed):setZ(Space*sqrt(0 - 2*C_Gravity*CFG_JumpHeight))
+            if (PHYS_Velocity[3]) {
+                PHYS_HitGround = 0
+                ANIM_StateNext = "state__JUMP"
+                MDL_TorsoEntity:soundPlay("jsound1","weapons/physcannon/energy_disintegrate5.wav",64,1)
+            }
+            else {
+                ANIM_StateNext = "state__MOVEMENT"
+            }
+        }
+        else {
+            if (D | A) {
+                local AirDir = PHYS_EyeDirNoZ:cross(LIB_WorldU):normalized()*(D - A)
+                PHYS_Velocity = (AirDir * PHYS_MoveSpeed):setZ(PHYS_Velocity[3])
+            }
+            PHYS_Velocity += vec(0,0,C_Gravity)
+        }
+
+
+        #-- XYAxis velocity
+        PHYS_HitBBox = 0
+
+        local BBoxTrace = rangerOffsetHull(PHYS_Position,PHYS_Position + PHYS_Velocity,PHYS_BBoxMins,PHYS_BBoxMaxs)
+        if (BBoxTrace:hit()) {
+            local CheckPos = PHYS_Position + PHYS_Velocity
+            local CheckHit = BBoxTrace:position()
+            local CheckDir = BBoxTrace:hitNormal():setZ(0)*1.05
+
+            BBoxTrace = rangerOffsetHull(CheckHit,CheckPos - CheckDir*(CheckPos - CheckHit):dot(CheckDir),PHYS_BBoxMins,PHYS_BBoxMaxs)
+
+            PHYS_Velocity = (BBoxTrace:position() - PHYS_Position):setZ(PHYS_Velocity[3])
+            PHYS_HitBBox = 1
+        }
+
+
+        #-- ZAxis velocity
+        local UpDown = sign(PHYS_Velocity[3]) ?: -1
+        local GTrace = rangerOffset(9999999,PHYS_Position + PHYS_Velocity:setZ(0),vec(0,0,UpDown))
+
+        if (PHYS_HitGround) {
+            local GDot = PHYS_Velocity:normalized():setZ(0):dot(GTrace:hitNormal())
+            if (GDot > 0) {
+                PHYS_Position[3] = GTrace:position()[3] + PHYS_BBoxHeight
+                PHYS_Velocity[3] = 0
+                PHYS_HitGround = 2
+            }
+        }
+        if (UpDown == -1) {
+            local Ground = GTrace:position()[3] + PHYS_BBoxHeight
+
+            PHYS_Position[3] = max(PHYS_Position[3] + PHYS_Velocity[3],Ground)
+            if (PHYS_Position[3] <= Ground) {
+                PHYS_Position[3] = Ground
+                PHYS_Velocity[3] = 0
+                PHYS_HitGround = 1
+            }
+            else {
+                PHYS_HitGround = 0
+            }
+        }
+        else {
+            local Ceiling = GTrace:position()[3] - PHYS_Velocity[3]
+
+            PHYS_Position[3] = min(PHYS_Position[3],Ceiling)
+            if (PHYS_Position[3] >= Ceiling) {
+                PHYS_Position[3] = Ceiling
+                PHYS_Velocity[3] = C_Gravity
+                PHYS_HitCeiling = 1
+            }
+            else {
+                PHYS_HitCeiling = 0
+            }
+        }
+
+        # MOVE PHYSICS
+        PHYS_Position += PHYS_Velocity
+        if (Input) {
+            PHYS_Angle = PHYS_EyeDirNoZ:toAngle()
+        }
+
+        holoPos(9000,PHYS_Position)
+        holoAng(9000,PHYS_Angle)
+
+
+        # STATES
+        local SA = 0
+        local SB = 0
+
+        switch (ANIM_StateNext) {
+            case "state__MOVEMENT",
+                Input += clamp(Shift + (S ? (S|A|D) + Shift : (W|A|D)*2)*0.5 - Input,-Dt,Dt)
+
+                SA = Input
+                SB = atan(PHYS_MoveDir[2],PHYS_MoveDir[1]) - atan(PHYS_EyeDir[2],PHYS_EyeDir[1])
+
+                # sound effects
+                if (Input) {
+                    if (PHYS_HitGround & Input <= 1) {
+                        if (ANIM_HalfLoop < ANIM_Loop) {
+                            ANIM_HalfLoop = ANIM_Loop + 180
+
+                            holoEntity(randint(5,7)):soundPlay("fsound1","npc/strider/strider_step4.wav",60,0.65)
+                            holoEntity(randint(8,10)):soundPlay("fsound2","npc/dog/dog_servo5.wav",60,0.65)
+                        }
+                    }
+                    else {
+                        if (!MDL_PelvisEntity2["bsound1",number]) {
+                            MDL_PelvisEntity2["bsound1",number] = MDL_PelvisEntity2:soundPlay("bsound1","thrusters/rocket04.wav",100,1)
+                        }
+                        if (Input <= 1) {
+                            MDL_PelvisEntity2["bsound1",number] = 0
+                            soundStop("bsound1")
+                        }
+                        soundVolume("bsound1",Input - 1)
+                        soundPitch("bsound1",Input*12 + 30 + PHYS_MoveDir:dot(PHYS_EyeDir)*25)
+                    }
+                }
+
+                PHYS_MoveSpeed_Update = 1
+            break
+
+            case "state__JUMP",
+                SA = rangerOffset(CFG_JumpHeight + PHYS_BBoxHeight,PHYS_Position,LIB_WorldD):fraction()
+                SB = atan(PHYS_MoveDir[2],PHYS_MoveDir[1]) - atan(PHYS_EyeDir[2],PHYS_EyeDir[1])
+            break
+
+            default,
+                ANIM_StateNext = ANIM_StateLast = "state__MOVEMENT"
+            break
+        }
+
+        # STATE BLENDER
+        ANIM_Loop += ANIM_Output["n_framerate",number]*360*Dt
+
+#        if (ANIM_Transition == 1) {
+            ANIM_Input = ANIM_StateNext(SA,SB)[table]
+#        }
+#[        else {
+            ANIM_Transition = min(ANIM_Transition + Dt,1)
+            ANIM_Input = blend_TABLE(ANIM_StateLast(SA,SB)[table],ANIM_StateNext(SA,SB)[table],ANIM_Transition)
+
+            if (ANIM_Transition == 1) {
+                ANIM_StateLast = ANIM_StateNext
+            }
+        }]#
+
+        ANIM_Output = ANIM_Input
+
+
+        # HOLOGRAMS
+        holoPos(2,MDL_PelvisEntity1:toWorld(ANIM_Output["v_pelvis2",vector]))
+        holoAng(2,MDL_PelvisEntity1:toWorld(ANIM_Output["q_pelvis2",quaternion]:toAngle()))
+        holoAng(3,MDL_PelvisEntity2:toWorld(ANIM_Output["q_torso",quaternion]:toAngle()))
+        holoAng(4,MDL_TorsoEntity:toWorld(ANIM_Output["q_torso",quaternion]:toAngle()))
+
+        ik_leg(5,6,7,8,ANIM_Output["v_foot_l",vector])
+        ik_leg(9,10,11,12,ANIM_Output["v_foot_r",vector])
+
+#[        if (changed(R) & R) {
+            ARM_State = (ARM_State == "wep__GATLING_AIM" ? "wep__HANDGUN_AIM" : "wep__GATLING_AIM")
+            switch (ARM_State) {
+                case "wep__GATLING_AIM",
+                    ARM_Blend = 1
+                    holoAlpha(21,255)
+                    holoAlpha(22,0)
+                    holoAlpha(23,0)
+                break
+                case "wep__HANDGUN_AIM",
+                     ARM_Blend = 0
+                    holoAlpha(21,0)
+                    holoAlpha(22,255)
+                    holoAlpha(23,255)
+                break
+            }
+        }
+        switch (ARM_State) {
+            case "wep__GATLING_AIM",
+
+            break
+            case "wep__HANDGUN_AIM",
+                ARM_Blend += clamp(Mouse1 - ARM_Blend,-Dt*2,Dt*2)
+            break
+        }
+
+
+
+        if (ARM_Blend) {
+            if (ARM_Blend == 1) {
+                ANIM_Input = ANIM_Input:merge(ARM_State(ARM_Blend)[table])
+            }
+            else {
+                ANIM_Input = ANIM_Input:merge(blend_TABLE(ARM_State(ARM_Blend)[table],ANIM_Input,1-ARM_Blend))
+            }
+        }
+
+        ANIM_Output = ANIM_Input]#
+
+        ik_arm(13,14,15,16,1,MDL_TorsoEntity:toWorld(ANIM_Output["v_hand_l",vector]))
+        ik_arm(17,18,19,20,-1,MDL_TorsoEntity:toWorld(ANIM_Output["v_hand_r",vector]))
+
+        Thruster1["A",number] = Thruster2["A",number] = Input > 1
+    }
+
+    Ops = ops()
+    Cpu = cpuUsage()*1000000
+}
+
+#[
+# MDL->LEG
+MDL_LegA =
+MDL_LegB =
+MDL_LegC =
+MDL_LegD =
+MDL_LegE =
+MDL_LegF =
+
+# MDL->ARM
+MDL_ArmA =
+MDL_ArmB =
+MDL_ArmC =
+MDL_ArmD =
+
+# MDL->MISC
+MDL_PelvisZ =
+MDL_TotalZ =
+
+# ANIM->WALK
+CFG_WALK_StrideX =
+CFG_WALK_StrideY =
+CFG_WALK_StrideZ =
+CFG_WALK_PelvisZ =
+CFG_WALK_MoveSpeed =
+CFG_WALK_FrameRate =
+
+# ANIM->RUN
+CFG_RUN_StrideY =
+CFG_RUN_PelvisZ =
+CFG_RUN_MoveSpeed =
+CFG_RUN_FrameRate =
+
+# ANIM->MISC
+CFG_JumpHeight = 0
+CFG_TORSO_MaxAng = ang()
+]#
+
+#[
+#-------------------------------
+#-- VALIDATOR: Confirms model has been configured.
+
+@persist CHECK:table [CHECK_SPAWN_N] [CHECK_SPAWN_V]:vector
+
+CHECK_SPAWN_N = 0.0123456789
+CHECK_SPAWN_V = vec(CHECK_SPAWN_N,0,0)
+
+function core__VALIDATOR_DEFAULTS() {
+    # MDL->LEG
+    MDL_LegA = MDL_LegB = MDL_LegC = MDL_LegD = MDL_LegE = MDL_LegF = CHECK_SPAWN_N
+
+    # MDL->ARM
+    MDL_ArmA = MDL_ArmB = MDL_ArmC = MDL_ArmD = CHECK_SPAWN_N
+
+    # MDL->MISC
+    MDL_PelvisZ = MDL_TotalZ = CHECK_SPAWN_N
+
+    # ANIM->WALK
+    CFG_WALK_StrideX = CFG_WALK_StrideY = CFG_WALK_StrideZ = CFG_WALK_PelvisZ = CFG_WALK_MoveSpeed = CFG_WALK_FrameRate = CHECK_SPAWN_N
+
+    # ANIM->RUN
+    CFG_RUN_StrideY = CFG_RUN_PelvisZ = CFG_RUN_MoveSpeed = CFG_RUN_FrameRate = CHECK_SPAWN_N
+}
+function core__VALIDATOR_POPULATE() {
+    CHECK = table()
+
+    # MDL->LEG
+    CHECK = CHECK:add(table(
+        "MDL_LegA" = MDL_LegA,
+        "MDL_LegB" = MDL_LegB,
+        "MDL_LegC" = MDL_LegC,
+        "MDL_LegD" = MDL_LegD,
+        "MDL_LegE" = MDL_LegE,
+        "MDL_LegF" = MDL_LegF
+    ))
+
+    # MDL->ARM
+    CHECK = CHECK:add(table(
+        "MDL_ArmA" = MDL_ArmA,
+        "MDL_ArmB" = MDL_ArmB,
+        "MDL_ArmC" = MDL_ArmC,
+        "MDL_ArmD" = MDL_ArmD
+    ))
+
+    # MDL->MISC
+    CHECK = CHECK:add(table(
+        "MDL_PelvisZ" = MDL_PelvisZ,
+        "MDL_TotalZ" = MDL_TotalZ
+    ))
+
+    # ANIM->WALK
+    CHECK = CHECK:add(table(
+        "CFG_WALK_StrideX" = CFG_WALK_StrideX,
+        "CFG_WALK_StrideY" = CFG_WALK_StrideY,
+        "CFG_WALK_StrideZ" = CFG_WALK_StrideZ,
+        "CFG_WALK_PelvisZ" = CFG_WALK_PelvisZ,
+        "CFG_WALK_MoveSpeed" = CFG_WALK_MoveSpeed,
+        "CFG_WALK_FrameRate" = CFG_WALK_FrameRate
+    ))
+
+    # ANIM->RUN
+    CHECK = CHECK:add(table(
+       "CFG_RUN_StrideY" = CFG_RUN_StrideY,
+       "CFG_RUN_PelvisZ" = CFG_RUN_PelvisZ,
+       "CFG_RUN_MoveSpeed" = CFG_RUN_MoveSpeed,
+       "CFG_RUN_FrameRate" = CFG_RUN_FrameRate
+    ))
+}
+function core__VALIDATOR_CHECK() {
+    core__VALIDATOR_POPULATE()
+
+    local Error = array(vec(240,96,96),"ERROR: ",vec(228,228,228),"The following settings were not configured:\n")
+
+    foreach (VariableName,VariableValue:number = CHECK) {
+        if (VariableValue == CHECK_SPAWN_N) {
+            Error:pushVector(vec(160,240,160))
+            Error:pushString(VariableName + " = \n")
+        }
+    }
+
+    if (Error:count() > 4) {
+        printColor(Error)
+        owner():soundPlay("error",0,"common/bugreporter_failed.wav")
+    }
+}
+
+core__VALIDATOR_DEFAULTS()
+]#

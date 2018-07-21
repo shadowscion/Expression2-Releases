@@ -1,22 +1,26 @@
 @name exteel3/spawn
-@outputs Ops Cpu Input
+@outputs Ops Cpu Input ARM_Blend
 @trigger none
 @model models/maxofs2d/hover_plate.mdl
 
 #-------------------------------
 #--
 if (first()) {
+    if (!->Camera) { exit() }
+    
+    Factor = 1
+    
     #include "exteel3/model"
     #include "exteel3/anim"
 
-    timer("spawn",100)
+    timer("spawn",500)
 }
 
 
 #-------------------------------
 #--
 if (clk("spawn")) {
-    if (spawn_holograms(0,1)) {
+    if (spawn_holograms(0,Factor)) {
         #[
          -----------------------
             MODEL INFORMATION
@@ -31,13 +35,16 @@ if (clk("spawn")) {
         MDL_TorsoEntity = holoEntity(3)
 
         setSkin("drab")
-
+        
+        alphaGatling(0)
+        alphaHandgun(0)
+        
         # MDL->LEG
         MDL_LegA = abs(holoEntity(2):toLocal(holoEntity(5):pos()):y())
         MDL_LegB = abs(holoEntity(5):toLocal(holoEntity(6):pos()):x())
         MDL_LegC = abs(holoEntity(6):toLocal(holoEntity(7):pos()):x())
         MDL_LegD = abs(holoEntity(7):toLocal(holoEntity(8):pos()):x())
-        MDL_LegE = 12
+        MDL_LegE = 12*Factor
         MDL_LegF = MDL_LegD + MDL_LegE*(1/2)
 
         # MDL->ARM
@@ -76,7 +83,7 @@ if (clk("spawn")) {
         # ANIM->WALK
         CFG_WALK_StrideX = MDL_LegD
         CFG_WALK_StrideY = MDL_LegA
-        CFG_WALK_StrideZ = MDL_LegB
+        CFG_WALK_StrideZ = MDL_LegB/2
         CFG_WALK_FrameRate = _PHI - (2/3)
 
         # ANIM->RUN
@@ -156,31 +163,32 @@ if (clk("parent_thrusters") | last()) {
     }
     else {
         timer("parent_thrusters",100)
-
-        if (->Thruster1 & ->Thruster2) {
-            if (T1["ready",number] & T2["ready",number]) {
-                T1:parentTo(holoEntity(4999))
-                T2:parentTo(holoEntity(4999))
-
-                stoptimer("parent_thrusters")
+        if (T1:type() == "gmod_wire_thruster" & T2:type() == "gmod_wire_thruster") {
+            if (->Thruster1 & ->Thruster2) {
+                if (T1["ready",number] & T2["ready",number]) {
+                    T1:parentTo(holoEntity(4999))
+                    T2:parentTo(holoEntity(4999))
+    
+                    stoptimer("parent_thrusters")
+                }
+    
+                T1:propFreeze(1)
+                T1:setPos(holoEntity(4999):toWorld(vec(0,7,-5)))
+                T1:setAng(holoEntity(4999):toWorld(ang(180,0,0)))
+                T1:setAlpha(1)
+    
+                T2:propFreeze(1)
+                T2:setPos(holoEntity(4999):toWorld(vec(0,-7,-5)))
+                T2:setAng(holoEntity(4999):toWorld(ang(180,0,0)))
+                T2:setAlpha(1)
+    
+                T1["ready",number] = 1
+                T2["ready",number] = 1
+    
+                rangerFilter(T1)
+                rangerFilter(T2)
+                rangerPersist(1)
             }
-
-            T1:propFreeze(1)
-            T1:setPos(holoEntity(4999):toWorld(vec(0,7,-5)))
-            T1:setAng(holoEntity(4999):toWorld(ang(180,0,0)))
-            T1:setAlpha(0)
-
-            T2:propFreeze(1)
-            T2:setPos(holoEntity(4999):toWorld(vec(0,-7,-5)))
-            T2:setAng(holoEntity(4999):toWorld(ang(180,0,0)))
-            T2:setAlpha(0)
-
-            T1["ready",number] = 1
-            T2["ready",number] = 1
-
-            rangerFilter(T1)
-            rangerFilter(T2)
-            rangerPersist(1)
         }
     }
 }

@@ -2,7 +2,7 @@
 
 #-------------------------------
 #-- HOLOGRAM
-@persist HN HS HT:table XT:table Layout:table
+@persist HN HS HT:table XT:table Layout:table Factor
 
 
 #-------------------------------
@@ -109,7 +109,7 @@ HN++,HT[HN,array] = array(12,11,vec(60,0,0),Ang,Vec,"",Material0,Color0)
 HN++,HT[HN,array] = array(13,3,vec(-20,35,50),ang(90,0,0),Vec,"",Material0,Color0)
 HN++,HT[HN,array] = array(14,13,vec(0,30,0),Ang,Vec,"",Material0,Color0)
 HN++,HT[HN,array] = array(15,14,vec(55,0,0),Ang,Vec,"",Material0,Color0)
-HN++,HT[HN,array] = array(16,15,vec(48,0,0),Ang,Vec,"",Material0,Color0)
+HN++,HT[HN,array] = array(16,15,vec(48,0,0),Ang,vec(0.8),"",Material1,Color2)
 
 
 #-------------------------------
@@ -117,7 +117,7 @@ HN++,HT[HN,array] = array(16,15,vec(48,0,0),Ang,Vec,"",Material0,Color0)
 HN++,HT[HN,array] = array(17,3,vec(-20,-35,50),ang(90,0,0),Vec,"",Material0,Color0)
 HN++,HT[HN,array] = array(18,17,vec(0,-30,0),Ang,Vec,"",Material0,Color0)
 HN++,HT[HN,array] = array(19,18,vec(55,0,0),Ang,Vec,"",Material0,Color0)
-HN++,HT[HN,array] = array(20,19,vec(48,0,0),Ang,Vec,"",Material0,Color0)
+HN++,HT[HN,array] = array(20,19,vec(48,0,0),Ang,vec(0.8),"",Material1,Color2)
 
 
 #-------------------------------
@@ -341,6 +341,26 @@ HN++,HT[HN,array] = array(4501,15,vec(24.8393,0,-2.8301),ang(83.5,180,180),vec(2
 
 
 #-------------------------------
+#-- VISUAL: GATLING
+HN++,HT[HN,array] = array(8000,1,vec(0,0,0),ang(0,0,0),vec(),"","",vec4())
+
+HN++,HT[HN,array] = array(8001,8000,vec(-25,0,0),ang(90,0,0),vec(2.45,2.45,4.25),"rcylinder",Material1,Color2)
+HN++,HT[HN,array] = array(8002,8000,vec(0,0,0),ang(0,0,90),vec(7.3,2.8,0.5),"hq_stube_thin",Material1,Color1)
+HN++,HT[HN,array] = array(8003,8000,vec(13.8,0,0),ang(90,0,0),vec(1.9,1.9,4.25),"cylinder",Material1,Color1)
+HN++,HT[HN,array] = array(8004,8000,vec(7.3*6-1,0,0),ang(90,0,0),vec(2,2,0.5),"hq_cylinder",Material1,Color2)
+HN++,HT[HN,array] = array(8005,8000,vec(7.3*10,0,4.5),ang(90,0,0),vec(1,1,5),"hq_tube",Material1,Color2)
+HN++,HT[HN,array] = array(8006,8000,vec(0,0,0),ang(90,0,0),vec(2.75,2.75*2,0.5),"hq_stube_thin",Material1,Color2)
+HN++,HT[HN,array] = array(8007,8000,vec(7.3*6-3,0,0),ang(90,40,0),vec(2.75,2.75*2,0.5),"hq_stube_thin",Material1,Color2)
+
+XT[8006,array] = array(vec(),vec(0,-1,0))
+XT[8007,array] = array(vec(),vec(0,1,0))
+
+HN++,HT[HN,array] = array(8050,16,vec(1,0,-17),ang(0,0,0),vec(4.15),"models/weapons/w_smg_mac10.mdl","",vec4(155,155,155,255))
+HN++,HT[HN,array] = array(8051,20,vec(1,0,-17),ang(0,0,0),vec(4.15),"models/weapons/w_smg_mac10.mdl","",vec4(155,155,155,255))
+
+
+
+#-------------------------------
 #-- SKINNING
 local Empty = array(vec4(255,255,255,255),"",0)
 local Skins = table(
@@ -381,7 +401,7 @@ Layout = table(
     "2" = array(4501,4455,4454,4453,4452,4451,4450,4301,4255,4254,4253,4252,4251,4250,4008,4006,4005,4004,4001,3054,3053,
             3052,3050,3002,2053,2051,2050,2013,2011,2010,2007,2006,2005,2004,2003,2002,2001,2000,408,406,405,404,401,354,
             353,352,350,302,253,251,250,213,211,210,207,206,205,204,203,202,201,200,5001,4608,4606,4604,4123,4122,4121,
-            4120,4117,4116,4115,4114,4113,4112,4111,4110,4109,4108,4107,4106,4105,4104,4101,108,105,104,103,102,101),
+            4120,4117,4116,4115,4114,4113,4112,4111,4110,4109,4108,4107,4106,4105,4104,4101,108,105,104,103,102,101,8002,8003),
 
     #-- [188,0,45,255]
     "3" = array(255,254),

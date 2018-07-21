@@ -36,7 +36,7 @@
 
 #-------------------------------
 #-- ANIM
-@persist [Input] [ANIM_Loop ANIM_HalfLoop] [ANIM_Transition] [ANIM_Output]:table [ANIM_StateNext ANIM_StateLast]:string
+@persist [Input] [ANIM_Loop ANIM_HalfLoop] [ANIM_Transition] [ANIM_Output]:table [ANIM_StateNext ANIM_StateLast]:string ARM_State:string ARM_Blend
 
 
 #-------------------------------
@@ -55,7 +55,6 @@ function number entity:soundPlay(ID:string,Sound:string,Pitch,Vol) {
 
     return 1
 }
-
 function ik_leg(A,B,C,D,Target:vector) {
     local AE = holoEntity(A)
     local AX = MDL_PelvisEntity2:toLocalAxis(Target - AE:pos())
@@ -94,7 +93,15 @@ function ik_arm(A,B,C,D,Side,Target:vector) {
     holoAng(B,MDL_TorsoEntity:toWorld(BA))
     holoAng(C,BE:toWorld(ang(acos((MDL_ArmD^2 + MDL_ArmC^2 - BD^2)/(2*MDL_ArmC*MDL_ArmD)) + 180,0,0)))
 }
-
+function alphaGatling(N) {
+    for (I = 8001, 8007) {
+        holoAlpha(I, N ? 255 : 0)    
+    }
+}
+function alphaHandgun(N) {
+    holoAlpha(8050, N ? 255 : 0)  
+    holoAlpha(8051, N ? 255 : 0)  
+}
 
 #-------------------------------
 #-- ANIMATIONS
@@ -313,8 +320,8 @@ function table anim__IDLE() {
         "q_torso" = quat(clamp(MDL_PelvisEntity2:toLocal(PHYS_EyeDir:toAngle()),-CFG_TORSO_MaxAng,CFG_TORSO_MaxAng)),
 
         # PELVIS
-        "v_pelvis2" = vec(0,0,sin(90 + ANIM_Loop)*CFG_WALK_StrideZ*0.01),
-        "q_pelvis2" = quat(ang(0,0,0)),
+        "v_pelvis2" = vec(),
+        "q_pelvis2" = quat(ang()),
 
         # FEET
         "v_foot_l" = L:position(),
@@ -345,7 +352,7 @@ function table anim__WALK_F() {
         "q_torso" = quat(clamp(MDL_PelvisEntity2:toLocal(PHYS_EyeDir:toAngle()),-CFG_TORSO_MaxAng,CFG_TORSO_MaxAng)),
 
         # PELVIS
-        "v_pelvis2" = vec(0,0,abs(Sin*CFG_WALK_StrideZ*0.25)),
+        "v_pelvis2" = vec(0,0,abs(Sin*CFG_WALK_StrideZ*0.5)),
         "q_pelvis2" = quat(ang(7 + abs(Cos*7),Cos*7,0)),
 
         # FEET
@@ -373,7 +380,7 @@ function table anim__WALK_B() {
         "q_torso" = quat(clamp(MDL_PelvisEntity2:toLocal(PHYS_EyeDir:toAngle()),-CFG_TORSO_MaxAng,CFG_TORSO_MaxAng)),
 
         # PELVIS
-        "v_pelvis2" = vec(0,0,abs(Sin*CFG_WALK_StrideZ*0.25)),
+        "v_pelvis2" = vec(0,0,abs(Sin*CFG_WALK_StrideZ*0.5)),
         "q_pelvis2" = quat(ang(-7 - abs(Cos*7),Cos*7,0)),
 
         # FEET
@@ -401,7 +408,7 @@ function table anim__WALK_L() {
         "q_torso" = quat(clamp(MDL_PelvisEntity2:toLocal(PHYS_EyeDir:toAngle()),-CFG_TORSO_MaxAng,CFG_TORSO_MaxAng)),
 
         # PELVIS
-        "v_pelvis2" = vec(0,0,abs(Sin*CFG_WALK_StrideZ*0.25)),
+        "v_pelvis2" = vec(0,0,abs(Sin*CFG_WALK_StrideZ*0.5)),
         "q_pelvis2" = quat(ang(0,Cos*7,-7 - abs(Cos*7))),
 
         # FEET
@@ -429,7 +436,7 @@ function table anim__WALK_R() {
         "q_torso" = quat(clamp(MDL_PelvisEntity2:toLocal(PHYS_EyeDir:toAngle()),-CFG_TORSO_MaxAng,CFG_TORSO_MaxAng)),
 
         # PELVIS
-        "v_pelvis2" = vec(0,0,abs(Sin*CFG_WALK_StrideZ*0.25)),
+        "v_pelvis2" = vec(0,0,abs(Sin*CFG_WALK_StrideZ*0.5)),
         "q_pelvis2" = quat(ang(0,Cos*7,7 + abs(Cos*7))),
 
         # FEET
@@ -458,19 +465,19 @@ function table anim__RUN_F() {
 
     return table(
         # TORSO
-        "q_torso" = quat(0.5*clamp(MDL_PelvisEntity2:toLocal(PHYS_EyeDir:toAngle()),-CFG_TORSO_MaxAng,CFG_TORSO_MaxAng)),
+        "q_torso" = quat(ang(30,0,0)) * qRotation(vec(0,0,Cos*20)),
 
         # PELVIS
-        "v_pelvis2" = vec(0,Sin*CFG_RUN_StrideY,abs(cos(90 + ANIM_Loop))*CFG_RUN_PelvisZ*0.25):rotate(30,0,0),
-        "q_pelvis2" = quat(ang(20 + abs(Cos)*5,-Cos*15,0)),
+        "v_pelvis2" = vec(0,Sin*CFG_RUN_StrideY*0.25,abs(cos(90 + ANIM_Loop))*CFG_RUN_PelvisZ*0.25):rotate(30,0,0),
+        "q_pelvis2" = quat(ang(20 + abs(Cos)*5,-Cos*10,0)),
 
         # FEET
         "v_foot_l" = MDL_PelvisEntity1:toWorld(L:rotate(-Cos*60,0,0) + L:rotate(-(Cos + Sin)*60 + 60,0,0) + vec(0,CFG_RUN_StrideY,0)),
         "v_foot_r" = MDL_PelvisEntity1:toWorld(R:rotate(Cos*60,0,0) + R:rotate((Cos + Sin)*60 + 60,0,0) - vec(0,CFG_RUN_StrideY,0)),
 
         # HANDS
-        "v_hand_l" = vec(CFG_WALK_StrideX*0.5,CFG_ArmY,-CFG_ArmZ):rotate(-Cos*60 - 45,0,0),
-        "v_hand_r" = vec(CFG_WALK_StrideX*0.5,-CFG_ArmY,-CFG_ArmZ):rotate(Cos*60 - 45,0,0),
+        "v_hand_l" = vec(0,CFG_ArmY,CFG_ArmZ*0.45):rotate(-45,0,0) + vec(0,0,-1):rotate(Cos*80 - 30, 0, 0)*CFG_ArmZ,
+        "v_hand_r" = vec(0,-CFG_ArmY,CFG_ArmZ*0.45):rotate(-45,0,0) + vec(0,0,-1):rotate(-Cos*80 - 30, 0, 0)*CFG_ArmZ,
 
         # ROOT
         "n_movespeed" = CFG_RUN_MoveSpeed,
@@ -519,15 +526,15 @@ function table anim__RUN_L() {
 
         # PELVIS
         "v_pelvis2" = vec(0,-Sin*CFG_RUN_StrideY*0.5,abs(cos(90 + ANIM_Loop))*CFG_RUN_PelvisZ*0.25),
-        "q_pelvis2" = quat(ang(0,-Cos*15 + 40,-20 - abs(Cos)*5)),
+        "q_pelvis2" = quat(ang(0,-Cos*10 + 40,-20 - abs(Cos)*5)),
 
         # FEET
         "v_foot_l" = MDL_PelvisEntity1:toWorld(L:rotate(-Cos*60,90,0) + L:rotate(-(Cos + Sin)*60 + 60,80,0) + Rotate + vec(0,CFG_RUN_StrideY,0)),
         "v_foot_r" = MDL_PelvisEntity1:toWorld(R:rotate(Cos*60,90,0) + R:rotate((Cos + Sin)*60 + 60,80,0) - Rotate - vec(0,CFG_RUN_StrideY,0)),
 
         # HANDS
-        "v_hand_l" = vec(CFG_WALK_StrideX*0.5,CFG_ArmY,-CFG_ArmZ):rotate(-Cos*60,0,0),
-        "v_hand_r" = vec(CFG_WALK_StrideX*0.5,-CFG_ArmY,-CFG_ArmZ):rotate(Cos*60,0,0),
+        "v_hand_l" = vec(0,CFG_ArmY,CFG_ArmZ*0.45):rotate(-45,0,0) + vec(0,0,-1):rotate(Cos*50 - 30, 0, 0)*CFG_ArmZ,
+        "v_hand_r" = vec(0,-CFG_ArmY,CFG_ArmZ*0.45):rotate(-45,0,0) + vec(0,0,-1):rotate(-Cos*50 - 30, 0, 0)*CFG_ArmZ,
 
         # ROOT
         "n_movespeed" = CFG_RUN_MoveSpeed,
@@ -548,15 +555,15 @@ function table anim__RUN_R() {
 
         # PELVIS
         "v_pelvis2" = vec(0,-Sin*CFG_RUN_StrideY*0.5,abs(cos(90 + ANIM_Loop))*CFG_RUN_PelvisZ*0.25),
-        "q_pelvis2" = quat(ang(0,-Cos*15 - 40,20 + abs(Cos)*5)),
+        "q_pelvis2" = quat(ang(0,-Cos*10 - 40,20 + abs(Cos)*5)),
 
         # FEET
         "v_foot_l" = MDL_PelvisEntity1:toWorld(L:rotate(-Cos*60,-90,0) + L:rotate(-(Cos + Sin)*60 + 60,-80,0) + Rotate + vec(0,CFG_RUN_StrideY,0)),
         "v_foot_r" = MDL_PelvisEntity1:toWorld(R:rotate(Cos*60,-90,0) + R:rotate((Cos + Sin)*60 + 60,-80,0) - Rotate - vec(0,CFG_RUN_StrideY,0)),
 
         # HANDS
-        "v_hand_l" = vec(CFG_WALK_StrideX*0.5,CFG_ArmY,-CFG_ArmZ):rotate(-Cos*60,0,0),
-        "v_hand_r" = vec(CFG_WALK_StrideX*0.5,-CFG_ArmY,-CFG_ArmZ):rotate(Cos*60,0,0),
+        "v_hand_l" = vec(0,CFG_ArmY,CFG_ArmZ*0.45):rotate(-45,0,0) + vec(0,0,-1):rotate(Cos*50 - 30, 0, 0)*CFG_ArmZ,
+        "v_hand_r" = vec(0,-CFG_ArmY,CFG_ArmZ*0.45):rotate(-45,0,0) + vec(0,0,-1):rotate(-Cos*50 - 30, 0, 0)*CFG_ArmZ,
 
         # ROOT
         "n_movespeed" = CFG_RUN_MoveSpeed,
@@ -601,7 +608,7 @@ function table state__JUMP(XValue,YValue) {
     }
 }
 
-#[
+
 function table wep__HANDGUN_AIM(XValue) {
     local Dir = PHYS_EyeDir
     local Aim = MDL_TorsoEntity:toLocal(rangerOffset(99999,MDL_TorsoEntity:pos(),Dir):position())
@@ -612,25 +619,26 @@ function table wep__HANDGUN_AIM(XValue) {
     )
 }
 function table wep__GATLING_AIM(XValue) {
-    local GDir = MDL_TorsoEntity:toLocalAxis(PHYS_EyeDir)
-    local GPos = GDir*CFG_ArmY*1.25 + GDir:cross(LIB_WorldU)*CFG_ArmY
-
-    holoPos(21,MDL_TorsoEntity:toWorld(GPos - vec(0,0,CFG_ArmY)))
-    holoAng(21,MDL_TorsoEntity:toWorld(GDir:toAngle()))
+    local GAng = clamp(MDL_TorsoEntity:toLocal(PHYS_EyeDir:toAngle()),-CFG_TORSO_MaxAng,CFG_TORSO_MaxAng)
+    local GPos = GAng:forward()*CFG_ArmY*(0.25 + Input) + GAng:right()*CFG_ArmY*(0.75 - Input*0.25)
+    
+    holoPos(8000,MDL_TorsoEntity:toWorld(GPos))
+    holoAng(8000,MDL_TorsoEntity:toWorld(GAng))
 
     return table(
-        "v_hand_l" = MDL_TorsoEntity:toLocal(holoEntity(21):toWorld(vec(0,10,0))),
-        "v_hand_r" = MDL_TorsoEntity:toLocal(holoEntity(21):toWorld(vec(-60,0,15)))
+        "v_hand_l" = MDL_TorsoEntity:toLocal(holoEntity(8007):toWorld(vec(0,33,0))),
+        "v_hand_r" = MDL_TorsoEntity:toLocal(holoEntity(8006):toWorld(vec(0,-33,0)))
     )
-
 }
-]#
+
 
 #-------------------------------
 #-- CORE
 function dt() {
     Dt = curtime() - Ct
     Ct = curtime()
+    
+    #Dt *= 0.25
 }
 
 function main(Interval) {
@@ -663,7 +671,7 @@ function main(Interval) {
             if (PHYS_Velocity[3]) {
                 PHYS_HitGround = 0
                 ANIM_StateNext = "state__JUMP"
-                MDL_TorsoEntity:soundPlay("jsound1","weapons/physcannon/energy_disintegrate5.wav",64,1)
+                MDL_TorsoEntity:soundPlay("jsound1","weapons/physcannon/energy_disintegrate5.wav",34,1)
             }
             else {
                 ANIM_StateNext = "state__MOVEMENT"
@@ -749,7 +757,10 @@ function main(Interval) {
 
         switch (ANIM_StateNext) {
             case "state__MOVEMENT",
-                Input += clamp(Shift + (S ? (S|A|D) + Shift : (W|A|D)*2)*0.5 - Input,-Dt,Dt)
+                local ForceWalk = ARM_State == "wep__GATLING_AIM" ? 1 : 2
+                if (ForceWalk == 1) { Shift = 0 }
+                
+                Input += clamp(Shift + (S ? (S|A|D) + Shift : (W|A|D)*ForceWalk)*0.5 - Input,-Dt,Dt)
 
                 SA = Input
                 SB = atan(PHYS_MoveDir[2],PHYS_MoveDir[1]) - atan(PHYS_EyeDir[2],PHYS_EyeDir[1])
@@ -812,25 +823,29 @@ function main(Interval) {
         holoPos(2,MDL_PelvisEntity1:toWorld(ANIM_Output["v_pelvis2",vector]))
         holoAng(2,MDL_PelvisEntity1:toWorld(ANIM_Output["q_pelvis2",quaternion]:toAngle()))
         holoAng(3,MDL_PelvisEntity2:toWorld(ANIM_Output["q_torso",quaternion]:toAngle()))
-        holoAng(4,MDL_TorsoEntity:toWorld(ANIM_Output["q_torso",quaternion]:toAngle()))
+        holoAng(4,MDL_TorsoEntity:toWorld(MDL_TorsoEntity:toLocal(PHYS_EyeDir:toAngle())))
+        #holoAng(4,MDL_TorsoEntity:toWorld(ANIM_Output["q_torso",quaternion]:toAngle()))
 
         ik_leg(5,6,7,8,ANIM_Output["v_foot_l",vector])
         ik_leg(9,10,11,12,ANIM_Output["v_foot_r",vector])
 
-#[        if (changed(R) & R) {
+        if (changed(R) & R) {
             ARM_State = (ARM_State == "wep__GATLING_AIM" ? "wep__HANDGUN_AIM" : "wep__GATLING_AIM")
             switch (ARM_State) {
                 case "wep__GATLING_AIM",
                     ARM_Blend = 1
-                    holoAlpha(21,255)
-                    holoAlpha(22,0)
-                    holoAlpha(23,0)
+                    
+                    alphaGatling(255)
+                    alphaHandgun(0)
                 break
                 case "wep__HANDGUN_AIM",
-                     ARM_Blend = 0
-                    holoAlpha(21,0)
-                    holoAlpha(22,255)
-                    holoAlpha(23,255)
+                    ARM_Blend = 0
+                    alphaGatling(0)
+                    alphaHandgun(255)
+                break
+                default,
+                    alphaGatling(0)
+                    alphaHandgun(0)
                 break
             }
         }
@@ -840,6 +855,9 @@ function main(Interval) {
             break
             case "wep__HANDGUN_AIM",
                 ARM_Blend += clamp(Mouse1 - ARM_Blend,-Dt*2,Dt*2)
+            break
+            default,
+                ARM_Blend = max(ARM_Blend - Dt*2, 0)
             break
         }
 
@@ -854,12 +872,33 @@ function main(Interval) {
             }
         }
 
-        ANIM_Output = ANIM_Input]#
+        ANIM_Output = ANIM_Input
 
         ik_arm(13,14,15,16,1,MDL_TorsoEntity:toWorld(ANIM_Output["v_hand_l",vector]))
         ik_arm(17,18,19,20,-1,MDL_TorsoEntity:toWorld(ANIM_Output["v_hand_r",vector]))
 
         Thruster1["A",number] = Thruster2["A",number] = Input > 1
+    }
+    else {
+        
+#[        PHYS_EyeDir = holoEntity(9000):forward()
+        
+        ANIM_Loop += ANIM_Output["n_framerate",number]*360*Dt
+
+        ANIM_Output = anim__RUN_F()
+
+        holoPos(2,MDL_PelvisEntity1:toWorld(ANIM_Output["v_pelvis2",vector]))
+        holoAng(2,MDL_PelvisEntity1:toWorld(ANIM_Output["q_pelvis2",quaternion]:toAngle()))
+        holoAng(3,MDL_PelvisEntity1:toWorld(ANIM_Output["q_torso",quaternion]:toAngle()))
+        holoAng(4,MDL_TorsoEntity:toWorld(MDL_TorsoEntity:toLocal(PHYS_EyeDir:toAngle())))
+        #holoAng(4,MDL_TorsoEntity:toWorld(ANIM_Output["q_torso",quaternion]:toAngle()))
+
+        ik_leg(5,6,7,8,ANIM_Output["v_foot_l",vector])
+        ik_leg(9,10,11,12,ANIM_Output["v_foot_r",vector])        
+        ik_arm(13,14,15,16,1,MDL_TorsoEntity:toWorld(ANIM_Output["v_hand_l",vector]))
+        ik_arm(17,18,19,20,-1,MDL_TorsoEntity:toWorld(ANIM_Output["v_hand_r",vector]))
+]#
+      
     }
 
     Ops = ops()

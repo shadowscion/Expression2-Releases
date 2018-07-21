@@ -1,5 +1,5 @@
 @name exteel3/spawn
-@outputs Ops Cpu Input ARM_Blend
+@outputs Ops Cpu Input ARM_Blend ANIM_StaticLoop Dead
 @trigger none
 @model models/maxofs2d/hover_plate.mdl
 
@@ -7,9 +7,9 @@
 #--
 if (first()) {
     if (!->Camera) { exit() }
-    
+
     Factor = 1
-    
+
     #include "exteel3/model"
     #include "exteel3/anim"
 
@@ -35,10 +35,10 @@ if (clk("spawn")) {
         MDL_TorsoEntity = holoEntity(3)
 
         setSkin("drab")
-        
+
         alphaGatling(0)
         alphaHandgun(0)
-        
+
         # MDL->LEG
         MDL_LegA = abs(holoEntity(2):toLocal(holoEntity(5):pos()):y())
         MDL_LegB = abs(holoEntity(5):toLocal(holoEntity(6):pos()):x())
@@ -101,7 +101,7 @@ if (clk("spawn")) {
 
         # ANIM->HOVER
         CFG_HOVER_FootZ = MDL_LegD
-        CFG_HOVER_PelvisZ_Offset = MDL_LegD*0.5
+        CFG_HOVER_PelvisZ_Offset = MDL_LegD/2
 
 
         #[
@@ -125,8 +125,9 @@ if (clk("spawn")) {
               (DON'T CHANGE)
          -----------------------
         ]#
+
         PHYS_BBoxHeight = MDL_TotalZ
-        PHYS_BBoxRadius = 30
+        PHYS_BBoxRadius = 50
         PHYS_BBoxZ = PHYS_BBoxHeight*0.5
         PHYS_BBoxMins = vec(PHYS_BBoxRadius,PHYS_BBoxRadius,PHYS_BBoxZ)*-1
         PHYS_BBoxMaxs = vec(PHYS_BBoxRadius,PHYS_BBoxRadius,0)
@@ -168,23 +169,23 @@ if (clk("parent_thrusters") | last()) {
                 if (T1["ready",number] & T2["ready",number]) {
                     T1:parentTo(holoEntity(4999))
                     T2:parentTo(holoEntity(4999))
-    
+
                     stoptimer("parent_thrusters")
                 }
-    
+
                 T1:propFreeze(1)
                 T1:setPos(holoEntity(4999):toWorld(vec(0,7,-5)))
                 T1:setAng(holoEntity(4999):toWorld(ang(180,0,0)))
                 T1:setAlpha(1)
-    
+
                 T2:propFreeze(1)
                 T2:setPos(holoEntity(4999):toWorld(vec(0,-7,-5)))
                 T2:setAng(holoEntity(4999):toWorld(ang(180,0,0)))
                 T2:setAlpha(1)
-    
+
                 T1["ready",number] = 1
                 T2["ready",number] = 1
-    
+
                 rangerFilter(T1)
                 rangerFilter(T2)
                 rangerPersist(1)

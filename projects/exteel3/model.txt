@@ -10,7 +10,7 @@
 function number spawn_holograms(Shading,Factor){
     timer("spawn",15)
 
-    while(perf()&HS<HN&holoCanCreate()){
+    while(perf(75) & HS<HN&holoCanCreate()){
         HS++
 
         local Data = HT[HS,array]
@@ -355,9 +355,55 @@ HN++,HT[HN,array] = array(8007,8000,vec(7.3*6-3,0,0),ang(90,40,0),vec(2.75,2.75*
 XT[8006,array] = array(vec(),vec(0,-1,0))
 XT[8007,array] = array(vec(),vec(0,1,0))
 
+
+#-- handguns
 HN++,HT[HN,array] = array(8050,16,vec(1,0,-17),ang(0,0,0),vec(4.15),"models/weapons/w_smg_mac10.mdl","",vec4(155,155,155,255))
 HN++,HT[HN,array] = array(8051,20,vec(1,0,-17),ang(0,0,0),vec(4.15),"models/weapons/w_smg_mac10.mdl","",vec4(155,155,155,255))
 
+HN++,HT[HN,array] = array(8052,8050,vec(55,1,27),ang(90,0,0),vec(1,1,20)/12,"cone","",vec4(255,255,0,255),1)
+HN++,HT[HN,array] = array(8053,8050,vec(55,1,27),ang(-90,0,0),-vec(2,2,21)/12,"cone","",vec4(255,125,0,255),1)
+HN++,HT[HN,array] = array(8054,8051,vec(55,1,27),ang(90,0,0),vec(1,1,20)/12,"cone","",vec4(255,255,0,255),1)
+HN++,HT[HN,array] = array(8055,8051,vec(55,1,27),ang(-90,0,0),-vec(2,2,21)/12,"cone","",vec4(255,125,0,255),1)
+
+
+#-- bow
+HN++,HT[HN,array] = array(8600,1,vec(0,0,5),ang(),vec(0.25),"","",vec4(0))
+HN++,HT[HN,array] = array(8601,8600,vec(16,0,15),ang(),vec(0.25),"","",vec4(0))
+HN++,HT[HN,array] = array(8602,8600,vec(16,0,-15),ang(),vec(0.25),"","",vec4(0))
+
+
+HN++,HT[HN,array] = array(8603,8600,vec(50,-4.5*0.75-7,0),ang(0,180,90):rotateAroundAxis(vec(0,1,0),45),vec(3/4),"models/props_lab/teleportring.mdl","",vec4(255))
+HN++,HT[HN,array] = array(8604,8600,vec(50,-4.5*0.75-7,0),ang(0,180,90):rotateAroundAxis(vec(0,1,0),-45),vec(3/4),"models/props_lab/teleportring.mdl","",vec4(255))
+HN++,HT[HN,array] = array(8605,8600,vec(50,-4.5*0.75+7,0),ang(0,180,90):rotateAroundAxis(vec(0,1,0),45),vec(3/4),"models/props_lab/teleportring.mdl","",vec4(255))
+HN++,HT[HN,array] = array(8606,8600,vec(50,-4.5*0.75+7,0),ang(0,180,90):rotateAroundAxis(vec(0,1,0),-45),vec(3/4),"models/props_lab/teleportring.mdl","",vec4(255))
+HN++,HT[HN,array] = array(8607,8600,vec(50,-7,0),ang(0,180,90),vec(4.5,4.5,0.2),"hq_tube_thin","models/props_combine/combine_train002",vec4(255))
+HN++,HT[HN,array] = array(8608,8600,vec(50,7,0),ang(0,180,90),vec(4.5,4.5,0.2),"hq_tube_thin","models/props_combine/combine_train002",vec4(255))
+HN++,HT[HN,array] = array(8609,8600,vec(10,-7,10),ang(0,90,0):rotateAroundAxis(vec(1,0,0),135),vec(0.03,0.065,0.05),"models/props_combine/combine_train02a.mdl","",vec4(255))
+HN++,HT[HN,array] = array(8610,8600,vec(10,7,10),ang(0,90,0):rotateAroundAxis(vec(1,0,0),-135),vec(0.03,0.065,0.05),"models/props_combine/combine_train02a.mdl","",vec4(255))
+HN++,HT[HN,array] = array(8611,8600,vec(10,7,-10),ang(0,90,0):rotateAroundAxis(vec(1,0,0),135+180),vec(0.03,0.065,0.05),"models/props_combine/combine_train02a.mdl","",vec4(255))
+HN++,HT[HN,array] = array(8612,8600,vec(10,-7,-10),ang(0,90,0):rotateAroundAxis(vec(1,0,0),-135-180),vec(0.03,0.065,0.05),"models/props_combine/combine_train02a.mdl","",vec4(255))
+HN++,HT[HN,array] = array(8613,8600,vec(15,0,0),ang(0,0,90),vec(0.5,0.9,0.75),"models/xqm/box3s.mdl","models/props_lab/rings_sheet",vec4(255))
+XT[8607,array] = array(vec(-15,0,0),vec(1,0,0))
+XT[8608,array] = array(vec(-15,0,0),vec(1,0,0))
+
+
+HN++,HT[HN,array] = array(8614,8601,vec(0,0,15):rotate(-62.5/2,0,0),ang(0,90,0):rotateAroundAxis(vec(0,1,0),62.5),vec(0.05,0.05,0.05),"models/props_combine/combine_train02a.mdl","",vec4(255))
+HN++,HT[HN,array] = array(8615,8601,vec(-13,0,55),ang(0,90,0):rotateAroundAxis(vec(0,1,0),-90),vec(0.025,0.125,0.05),"models/props_combine/combine_train02b.mdl","",vec4(255))
+HN++,HT[HN,array] = array(8616,8601,vec(-11.5,0,89),ang(-90,0,0),vec(1.5),"models/Items/combine_rifle_ammo01.mdl","",vec4(255))
+
+HN++,HT[HN,array] = array(8617,8602,vec(0,0,-15):rotate(62.5/2,0,0),ang(0,-90,180):rotateAroundAxis(vec(0,1,0),-62.5),vec(0.05,0.05,0.05),"models/props_combine/combine_train02a.mdl","",vec4(255))
+HN++,HT[HN,array] = array(8618,8602,vec(-13,0,-35),ang(0,-90,180):rotateAroundAxis(vec(0,1,0),90),vec(0.025,0.05,0.05),"models/props_combine/combine_train02b.mdl","",vec4(255))
+HN++,HT[HN,array] = array(8619,8602,vec(-11.5,0,-46),ang(-90,0,0),vec(1.5),"models/Items/combine_rifle_ammo01.mdl","",vec4(255))
+
+
+for (I = 8620,8623) {
+    HN++,HT[HN,array] = array(I,8600,vec(-10,0,8),ang(90,0,0),vec(0.75,0.75,0.25),"models/holograms/torus3.mdl","models/alyx/emptool_glow",vec4(255,205,0,0),1)
+}
+
+HN++,HT[HN,array] = array(8624,8600,vec(50,0,0),ang(),vec(4),"sphere3","",vec4(255,205,0,0),1)
+HN++,HT[HN,array] = array(8625,8624,vec(0,0,0),ang(),vec(3),"sphere3","models/alyx/emptool_glow",vec4(255,255,0,0),1)
+
+HN++,HT[HN,array] = array(8626,8600,vec(40,0,8),ang(-90,0,0),vec(0.35,0.35,5),"cone","models/alyx/emptool_glow",vec4(255,255,0,0),1)
 
 
 #-------------------------------
@@ -385,10 +431,19 @@ local Skins = table(
         "4" = array(vec4(188,0,45,255),"")
     ),
 
+    "slate" = table(
+        "1" = array(vec4(60,60,60,255),"models/props_debris/plasterwall040c"),
+        "2" = array(vec4(78,92,107,255),"models/props_debris/plasterwall040c"),
+        "3" = array(vec4(184,179,161,255),"models/props_debris/plasterwall040c"),
+        "4" = array(vec4(188,0,45,255),"")
+    ),
+
     "none" = table(
         "1" = Empty,"2" = Empty,"3" = Empty,"4" = Empty,"5" = Empty,"6" = Empty,"7" = Empty,"8" = Empty
     )
 )
+
+
 
 Layout = table(
    "skins" = Skins,
@@ -425,7 +480,14 @@ function setColor(SRGB:array) {
         }
     }
 }
-
+function setMaterial(SMAT:array) {
+    if (SMAT:count() >= 3 & Layout[SMAT[2,string],array]) {
+        local Holograms = Layout[SMAT[2,string],array]
+        for (N = 1,Holograms:count()) {
+            holoMaterial(Holograms[N,number],SMAT[3,string])
+        }
+    }
+}
 function setSkin(Name:string) {
     if (!Layout["skins",table][Name,table]) { return }
 

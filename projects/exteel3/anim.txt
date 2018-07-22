@@ -2,14 +2,15 @@
 
 #-------------------------------
 #-- INPUTS
-@inputs Camera:wirelink [W A S D] [Shift Space] [R] [Mouse1 Mouse2] [Active] [Entity]:entity
+@inputs EGP:wirelink Camera:wirelink [W A S D] [Shift Space] [R] [Mouse1 Mouse2] [Active] [Entity]:entity
 @inputs [Thruster1 Thruster2]:wirelink
 
 
 #-------------------------------
 #-- MISC
 @persist [Dt Ct] [LIB_WorldU LIB_WorldD LIB_WorldV]:vector [LIB_WorldA]:angle Dead
-
+@persist MPullBow WeaponSwitch MFlashHandgun MFireLauncher MFireRecoilLauncher EGPN Driver:entity WeaponIndicator GrenadeModel:string
+@persist Projectile:array
 
 #-------------------------------
 #-- CONFIG
@@ -37,6 +38,94 @@
 #-------------------------------
 #-- ANIM
 @persist [Input] [ANIM_Loop ANIM_HalfLoop ANIM_StaticLoop] [ANIM_Transition] [ANIM_Output]:table [ANIM_StateNext ANIM_StateLast]:string ARM_State:string ARM_Blend
+
+
+#-------------------------------
+#-- HUD
+
+function entity  shootHoloProjectile(Origin:vector,Direction:vector,Impulse,Gravity,Template:table) {
+    local N = Projectile:count() + 11111
+    local P = holoCreate(N,Origin,Template["scale",vector]/12,Direction:toAngle() )
+
+    holoModel(N,Template["model",string])
+    holoMaterial(N,Template["material",string])
+    holoColor(N,Template["color",vector4])
+    holoDisableShading(N,Template["shading",number])
+
+    P["Gravity",vector] = vec(0,0,Gravity)
+    P["Velocity",vector] = Direction*Impulse
+    P["Position",vector] = Origin
+
+    P:setTrails(Template["scale",vector]:length(),1,1,"trails/laser",vec(Template["color",vector4]),255)
+
+    Projectile:unshiftEntity(P)
+
+    return P
+}
+function handleHoloProjectiles() {
+    foreach (K,V:entity = Projectile) {
+        V["Velocity",vector] = V["Velocity",vector] + V["Gravity",vector]*Dt
+
+        local R = rangerOffset(V["Position",vector],V["Position",vector] + V["Velocity",vector]*Dt)
+
+        V["Position",vector] = R:position()
+
+        holoPos(holoIndex(V),V["Position",vector])
+
+        if (R:hit()) {
+            Projectile:removeEntity(K),
+            holoDelete(holoIndex(V))
+            propSpawn("models/props_junk/propane_tank001a.mdl",V["Position",vector] -  V["Velocity",vector]*Dt,1):propBreak()
+        }
+    }
+}
+
+function redrawHUD(Player:entity) {
+    EGP:egpClear()
+
+    local W = 1360
+    local H = 768
+
+    local ScrW = egpScrW(Player) / W
+    local ScrH = egpScrH(Player) / H
+    local Res = vec2(ScrW,ScrH)
+
+    EGPN++,EGP:egpLine(EGPN,vec2(W/2 - 8,H/2)*Res,vec2(W/2 + 8,H/2)*Res),EGP:egpAlpha(EGPN,100)
+    EGPN++,EGP:egpLine(EGPN,vec2(W/2,H/2 - 8)*Res,vec2(W/2,H/2 + 8)*Res),EGP:egpAlpha(EGPN,100)
+
+    EGPN++,EGP:egpLine(EGPN,vec2(W/2-64,H/2 - 64)*Res,vec2(W/2-64,H/2 - 64 + 16)*Res),EGP:egpAlpha(EGPN,150)
+    EGPN++,EGP:egpLine(EGPN,vec2(W/2-64,H/2 - 64)*Res,vec2(W/2-64 + 16,H/2 - 64)*Res),EGP:egpAlpha(EGPN,150)
+
+    EGPN++,EGP:egpLine(EGPN,vec2(W/2+64,H/2 - 64)*Res,vec2(W/2+64,H/2 - 64 + 16)*Res),EGP:egpAlpha(EGPN,150)
+    EGPN++,EGP:egpLine(EGPN,vec2(W/2+64,H/2 - 64)*Res,vec2(W/2+64 - 16,H/2 - 64)*Res),EGP:egpAlpha(EGPN,150)
+
+    EGPN++,EGP:egpLine(EGPN,vec2(W/2+64,H/2 + 64)*Res,vec2(W/2+64,H/2 + 64 - 16)*Res),EGP:egpAlpha(EGPN,150)
+    EGPN++,EGP:egpLine(EGPN,vec2(W/2+64,H/2 + 64)*Res,vec2(W/2+64 - 16,H/2 + 64)*Res),EGP:egpAlpha(EGPN,150)
+
+    EGPN++,EGP:egpLine(EGPN,vec2(W/2-64,H/2 + 64)*Res,vec2(W/2-64,H/2 + 64 - 16)*Res),EGP:egpAlpha(EGPN,150)
+    EGPN++,EGP:egpLine(EGPN,vec2(W/2-64,H/2 + 64)*Res,vec2(W/2-64 + 16,H/2 + 64)*Res),EGP:egpAlpha(EGPN,150)
+
+    EGPN++
+    EGP:egpBox(EGPN,vec2(W/2,H/2)*Res,vec2(W,H)*Res)
+    EGP:egpColor(EGPN,vec4(0,0,255,5))
+
+    EGPN++
+    EGP:egpBox(EGPN,vec2(W/2,H/2)*Res,vec2(W,H)*Res)
+    EGP:egpMaterial(EGPN,"vgui/zoom")
+
+    EGPN++
+    EGP:egpBox(EGPN,vec2(W/2,H/2)*Res,-vec2(W,H)*Res)
+    EGP:egpMaterial(EGPN,"vgui/zoom")
+
+    EGPN++
+    EGP:egpText(EGPN,"WEAPON(R): ",vec2(W/2,H - 32)*Res)
+    EGP:egpFont(EGPN,"Fixedsys")
+    EGP:egpSize(EGPN,13)
+    EGP:egpAlign(EGPN,0)
+    EGP:egpColor(EGPN,vec4(255,255,255,200))
+
+    WeaponIndicator = EGPN
+}
 
 
 #-------------------------------
@@ -93,15 +182,7 @@ function ik_arm(A,B,C,D,Side,Target:vector) {
     holoAng(B,MDL_TorsoEntity:toWorld(BA))
     holoAng(C,BE:toWorld(ang(acos((MDL_ArmD^2 + MDL_ArmC^2 - BD^2)/(2*MDL_ArmC*MDL_ArmD)) + 180,0,0)))
 }
-function alphaGatling(N) {
-    for (I = 8001,8007) {
-        holoAlpha(I,N ? 255 : 0)
-    }
-}
-function alphaHandgun(N) {
-    holoAlpha(8050,N ? 255 : 0)
-    holoAlpha(8051,N ? 255 : 0)
-}
+
 
 #-------------------------------
 #-- ANIMATIONS
@@ -182,8 +263,8 @@ function table blend_MOVEMENT_BY_DIRECTION(Type:string,Direction) {
 # ANIMATIONS
 # JUMP
 function table anim__JUMP_LOOP(XValue,YValue) {
-    local L = rangerOffset(CFG_WALK_PelvisZ,MDL_PelvisEntity1:toWorld(vec(CFG_WALK_StrideX,CFG_IDLE_StrideY*(1 - XValue),0)),LIB_WorldD)
-    local R = rangerOffset(CFG_WALK_PelvisZ,MDL_PelvisEntity1:toWorld(vec(0,-CFG_IDLE_StrideY*(1 - XValue),0)),LIB_WorldD)
+    local L = rangerOffset(CFG_WALK_PelvisZ,MDL_PelvisEntity1:toWorld(vec(CFG_WALK_StrideX,CFG_IDLE_StrideY*(1 - XValue/3),0)),LIB_WorldD)
+    local R = rangerOffset(CFG_WALK_PelvisZ,MDL_PelvisEntity1:toWorld(vec(0,-CFG_IDLE_StrideY*(1 - XValue/3),0)),LIB_WorldD)
 
     return table(
         # TORSO
@@ -610,8 +691,6 @@ function table state__JUMP(XValue,YValue) {
         return anim__JUMP_LOOP(XValue,YValue)
     }
 }
-
-
 function table anim__STATIC_DEATH(XValue,YValue) {
     ANIM_StaticLoop += select(ceil(max(ANIM_StaticLoop,1)),5,1,3,1,1)*Dt
     ANIM_StaticLoop = min(ANIM_StaticLoop,5)
@@ -656,27 +735,188 @@ function table anim__STATIC_DEATH(XValue,YValue) {
         "n_movespeed" = 0
     )
 }
-
 function table wep__HANDGUN_AIM(XValue) {
     local Dir = PHYS_EyeDir
-    local Aim = MDL_TorsoEntity:toLocal(rangerOffset(99999,MDL_TorsoEntity:pos(),Dir):position())
+    local Aim = MDL_TorsoEntity:toLocal(Camera["HitPos",vector])
+
+    if (changed(XValue)) {
+        if (XValue == 1) {
+            holoEntity(8051):soundPlay("handgunf","npc/combine_gunship/gunship_fire_loop1.wav",120,1)
+        }
+        else {
+            for (I = 8052,8055) {
+                holoAlpha(I,0)
+            }
+            soundStop("handgunf")
+        }
+    }
+    if (XValue == 1) {
+        MFlashHandgun = !MFlashHandgun*255
+        for (I = 8052,8055) {
+            holoAlpha(I,MFlashHandgun)
+        }
+    }
 
     return table(
         "v_hand_l" = Aim,
         "v_hand_r" = Aim
     )
 }
+function number tPitch(GunVel,GunGrav,GunPos:vector,Target:vector) {
+    local GunDis = Target:setZ(0):distance(GunPos:setZ(0))
+    local GunHgt = Target[3] - GunPos[3]
+
+    return atan((GunVel^2 + sqrt(GunVel^4 - GunGrav*(GunGrav*GunDis^2 - 2*GunHgt*GunVel^2)))/(GunGrav*GunDis)) - 90
+}
 function table wep__GATLING_AIM(XValue) {
-    local GAng = clamp(MDL_TorsoEntity:toLocal(PHYS_EyeDir:toAngle()),-CFG_TORSO_MaxAng,CFG_TORSO_MaxAng)
-    local GPos = GAng:forward()*CFG_ArmY*(0.25 + Input) + GAng:right()*CFG_ArmY*(0.75 - Input*0.25)
+    #local GAng = clamp(MDL_TorsoEntity:toLocal(PHYS_EyeDir:toAngle()),-CFG_TORSO_MaxAng,CFG_TORSO_MaxAng)
+
+    local TP = tPitch(4000,600,holoEntity(8000):pos(),Camera["HitPos",vector])
+    local GAng = clamp(MDL_TorsoEntity:toLocal((Camera["HitPos",vector] - holoEntity(8000):pos()):toAngle()),-CFG_TORSO_MaxAng,CFG_TORSO_MaxAng):setPitch(TP)
+    local GPos = GAng:forward()*CFG_ArmY*(0.25 + Input - MFireRecoilLauncher) + GAng:right()*CFG_ArmY*(0.75 - Input*0.25)
 
     holoPos(8000,MDL_TorsoEntity:toWorld(GPos))
     holoAng(8000,MDL_TorsoEntity:toWorld(GAng))
+
+    if (Mouse1) {
+        MFireLauncher = min(MFireLauncher + Dt*4,1)
+        if (propCanCreate() & MFireLauncher == 1) {
+            holoEntity(randint(8000,8005)):soundPlay("gfirelauncher","weapons/rpg/rocketfire1.wav",60,1)
+
+            MFireLauncher = 0
+            MFireRecoilLauncher = 1/2
+
+            local PRJ = shootHoloProjectile(
+                holoEntity(8005):toWorld(vec(0,0,2.5*12)),
+                holoEntity(8005):up(),
+                4000,-600,
+                table(
+                    "shading" = 1,
+                    "model" = "sphere",
+                    "material" = "",
+                    "color" = vec4(255,100,0,255),
+                    "scale" = vec(8,8,8)
+                )
+            )
+        }
+        MFireRecoilLauncher = max(MFireRecoilLauncher - Dt*2,0)
+    }
 
     return table(
         "v_hand_l" = MDL_TorsoEntity:toLocal(holoEntity(8007):toWorld(vec(0,33,0))),
         "v_hand_r" = MDL_TorsoEntity:toLocal(holoEntity(8006):toWorld(vec(0,-33,0)))
     )
+}
+
+function number inExpo(T,B,C,D) {
+    if (T == 0) { return B }
+    return C * (2^(10 * (T / D - 1))) + B - C * 0.001
+}
+function number inBack(T,B,C,D) {
+    local S = 1.70158
+    local T = T / D
+    return C * T * T * ((S + 1) * T - S) + B
+}
+function table wep__BOW_AIM(XValue) {
+    if (MPullBow > 0.5 & !Mouse1) {
+
+        local PRJ = shootHoloProjectile(
+            holoEntity(8624):pos(),
+            holoEntity(8624):forward(),
+            10000,-300,
+            table(
+                "shading" = 1,
+                "model" = "sphere",
+                "material" = "models/alyx/emptool_glow",
+                "color" = vec4(255,255,0,255),
+                "scale" = vec(48,48,48)
+            )
+        )
+
+        PRJ:soundPlay("bow_fire",0,"weapons/physcannon/energy_disintegrate4.wav"),soundPitch("bow_fire",65)
+        soundStop("bow_charge")
+    }
+
+    MPullBow += clamp(Mouse1 - MPullBow,-MPullBow,Dt)
+    local TW = inExpo(MPullBow,0,1,1)
+
+    local TP = tPitch(10000,300,holoEntity(8600):pos(),Camera["HitPos",vector])
+    local GAng = clamp(MDL_TorsoEntity:toLocal((Camera["HitPos",vector] - holoEntity(8600):pos()):toAngle()),-CFG_TORSO_MaxAng/2,CFG_TORSO_MaxAng/2):setPitch(TP)
+    local GPos = GAng:forward()*CFG_ArmY*(1 + TW/4) - GAng:right()*CFG_ArmY*(0.25 + TW*0.25) + vec(0,0,CFG_ArmY/3)*TW
+
+    holoPos(8600,MDL_TorsoEntity:toWorld(GPos))
+    holoAng(8600,MDL_TorsoEntity:toWorld(GAng:rotateAroundAxis(GAng:forward(),(1 - TW) * 22.5 + 22.5)))
+
+    holoAng(8601,holoEntity(8600):toWorld(ang(-inBack(MPullBow,0,35,1),0,0)))
+    holoAng(8602,holoEntity(8600):toWorld(ang(inBack(MPullBow,0,35,1),0,0)))
+
+    holoPos(8626,holoEntity(8600):toWorld(vec(40 - 50*TW,0,8)))
+    holoAlpha(8626,TW*255)
+
+    holoAng(8616,holoEntity(8600):toWorld(ang(-90,0,0)))
+    holoAng(8619,holoEntity(8600):toWorld(ang(-90,0,0)))
+
+    for (I = 1,4) {
+        holoPos(I+8619,holoEntity(8600):toWorld(vec(0 - (I * 10)*TW,0,8)))
+        holoAlpha(I+8619,TW*255)
+    }
+
+    holoAlpha(8624,TW*100)
+    holoAlpha(8625,TW*255)
+
+    if (changed(Mouse1) & Mouse1) {
+        soundStop("bow_charge")
+        holoEntity(8600):soundPlay("bow_charge",0,"npc/combine_gunship/dropship_engine_near_loop1.wav")
+        soundVolume("bow_charge",0)
+    }
+    if (MPullBow) {
+        soundVolume("bow_charge",MPullBow)
+        soundPitch("bow_charge",200 - 100*MPullBow)
+    }
+    else {
+        soundStop("bow_charge")
+    }
+
+    return table(
+        "v_hand_l" = MDL_TorsoEntity:toLocal(holoEntity(8600):toWorld(vec(0,0,0))),
+        "v_hand_r" = MDL_TorsoEntity:toLocal(holoEntity(8623):pos())
+    )
+}
+
+function alphaGATLING(N) {
+    for (I = 8001,8007) {
+        holoAlpha(I,N ? 255 : 0)
+    }
+}
+function alphaHANDGUN(N) {
+    for (I = 8050,8051) {
+        holoAlpha(I,N ? 255 : 0)
+    }
+    for (I = 8052,8055) {
+        holoAlpha(I,0)
+    }
+}
+function alphaBOW(N) {
+    for (I = 8603,8625) {
+        holoAlpha(I,N ? 255 : 0)
+    }
+}
+function swapWeapons(None) {
+    local List = array("","HANDGUN","GATLING","BOW")
+
+    WeaponSwitch++
+    if (WeaponSwitch > List:count() | None) {
+        WeaponSwitch = 1
+    }
+
+    local Next = List[WeaponSwitch,string]
+    for (I = 2,List:count()) {
+        ("alpha" + List[I,string])(List[I,string] == Next)
+    }
+
+    if (Next:length()) { ARM_State = "wep__" + Next + "_AIM" } else { ARM_State = Next }
+
+    EGP:egpSetText(WeaponIndicator,"WEAPON(R): " +  Next)
 }
 
 
@@ -692,11 +932,19 @@ function dt() {
 function main(Interval) {
     timer("main",Interval),dt()
 
+    Driver = Entity:driver()
+    if (changed(Driver) & Driver) {
+        redrawHUD(Driver)
+    }
+
     if (Active) {
         #-- player and inputs
         Camera["Activated",number] = 1
 
-        PHYS_EyeDir = Entity:toLocalAxis(Entity:driver():eye())
+        PHYS_EyeDir = Entity:toLocalAxis(Driver:eye())
+
+        #PHYS_EyeDir = (Camera["HitPos",vector] - Camera["CamPos",vector]):normalized()
+
         PHYS_EyeDirNoZ = PHYS_EyeDir:setZ(0)
         if (W|S) {
             PHYS_MoveDir = (W - S)*PHYS_EyeDirNoZ
@@ -841,7 +1089,8 @@ function main(Interval) {
             break
             case "state__MOVEMENT",
                 local ForceWalk = ARM_State == "wep__GATLING_AIM" ? 1 : 2
-                if (ForceWalk == 1) { Shift = 0 }
+                if (MPullBow) { ForceWalk = MPullBow }
+                if (ForceWalk) { Shift = 0 }
 
                 Input += clamp(Shift + (S ? (S|A|D) + Shift : (W|A|D)*ForceWalk)*0.5 - Input,-Dt,Dt)
 
@@ -882,7 +1131,7 @@ function main(Interval) {
                     MDL_PelvisEntity1:soundPlay("death","npc/turret_floor/die.wav",100,1)
                     MDL_PelvisEntity2:soundPlay("death2","hl1/fvox/near_death.wav",100,1)
 
-                    alphaGatling(0)
+                    swapWeapons(1)
                 }
             break
 
@@ -899,7 +1148,7 @@ function main(Interval) {
                     MDL_PelvisEntity1:soundPlay("death","npc/turret_floor/die.wav",100,1)
                     MDL_PelvisEntity2:soundPlay("death2","hl1/fvox/near_death.wav",100,1)
 
-                    alphaGatling(0)
+                    swapWeapons(1)
                 }
             break
 
@@ -940,7 +1189,11 @@ function main(Interval) {
         ik_leg(9,10,11,12,ANIM_Output["v_foot_r",vector])
 
         if (changed(R) & R) {
-            ARM_State = (ARM_State == "wep__GATLING_AIM" ? "wep__HANDGUN_AIM" : "wep__GATLING_AIM")
+            swapWeapons(0)
+        }
+
+#[        if (changed(R) & R) {
+            #ARM_State = (ARM_State == "wep__GATLING_AIM" ? "wep__HANDGUN_AIM" : "wep__GATLING_AIM")
             switch (ARM_State) {
                 case "wep__GATLING_AIM",
                     ARM_Blend = 1
@@ -958,10 +1211,14 @@ function main(Interval) {
                     alphaHandgun(0)
                 break
             }
-        }
-        switch (ARM_State) {
-            case "wep__GATLING_AIM",
+        }]#
 
+        switch (ARM_State) {
+            case "wep__BOW_AIM",
+                ARM_Blend = 1
+            break
+            case "wep__GATLING_AIM",
+                ARM_Blend = 1
             break
             case "wep__HANDGUN_AIM",
                 ARM_Blend += clamp(Mouse1 - ARM_Blend,-Dt*2,Dt*2)
@@ -971,9 +1228,15 @@ function main(Interval) {
             break
         }
 
+#[        foreach (K,V:entity = Grenades) {
+            if (V:vel():length() < 200) {
+                Grenades:removeEntity(K)
+                V:propBreak()
+            }
+        }]#
+        handleHoloProjectiles()
 
-
-        if (ARM_Blend) {
+        if (ARM_Blend & ARM_State) {
             if (ARM_Blend == 1) {
                 ANIM_Input = ANIM_Input:merge(ARM_State(ARM_Blend)[table])
             }

@@ -1,5 +1,5 @@
 @name exteel3/spawn
-@outputs Ops Cpu Input ARM_Blend ANIM_StaticLoop Dead
+@outputs Ops Cpu Projectile:array
 @trigger none
 @model models/maxofs2d/hover_plate.mdl
 
@@ -34,10 +34,12 @@ if (clk("spawn")) {
         MDL_PelvisEntity2 = holoEntity(2)
         MDL_TorsoEntity = holoEntity(3)
 
-        setSkin("drab")
-
-        alphaGatling(0)
-        alphaHandgun(0)
+        alphaBOW(0)
+        alphaHANDGUN(0)
+        alphaGATLING(0)
+        #alphaGatling(0)
+        #alphaHandgun(0)
+        #alphaBow(0)
 
         # MDL->LEG
         MDL_LegA = abs(holoEntity(2):toLocal(holoEntity(5):pos()):y())
@@ -57,7 +59,6 @@ if (clk("spawn")) {
         MDL_PelvisZ = (MDL_LegB + MDL_LegC + MDL_LegD + MDL_LegE)*(3/4)
         MDL_TotalZ = MDL_PelvisZ + abs(holoEntity(2):toLocal(holoEntity(4):pos()):z())
 
-
         #[
          -----------------------
               CAMERA CONFIGS
@@ -65,8 +66,8 @@ if (clk("spawn")) {
         ]#
 
         Camera["Parent",entity] = holoEntity(9000)
-        Camera["Distance",number] = 150
-        Camera["Position",vector] = vec()
+        Camera["Distance",number] = 250*Factor
+        Camera["Position",vector] = vec(0,-75,75)*Factor
         Camera["Activated",number] = 1
 
 
@@ -127,7 +128,7 @@ if (clk("spawn")) {
         ]#
 
         PHYS_BBoxHeight = MDL_TotalZ
-        PHYS_BBoxRadius = 50
+        PHYS_BBoxRadius = 50*Factor
         PHYS_BBoxZ = PHYS_BBoxHeight*0.5
         PHYS_BBoxMins = vec(PHYS_BBoxRadius,PHYS_BBoxRadius,PHYS_BBoxZ)*-1
         PHYS_BBoxMaxs = vec(PHYS_BBoxRadius,PHYS_BBoxRadius,0)
@@ -213,6 +214,10 @@ if (chatClk(owner())) {
         break
         case "setcolor",
             setColor(Command)
+            hideChat(1)
+        break
+        case "setmat",
+            setMaterial(Command)
             hideChat(1)
         break
         default,

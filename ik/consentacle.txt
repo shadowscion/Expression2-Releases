@@ -1,0 +1,35 @@
+@name consentacle
+@inputs GPS:vector
+@persist Count
+
+if (first()) {
+    Count = 20
+    Size = 50
+    
+    for (I = 1, Count) {
+        holoCreate(I)
+        holoParent(I, holoEntity(I-1) ?: entity())
+        holoModel(I, "models/Combine_Helicopter/helicopter_bomb01.mdl")
+        
+        #holoModel(I, "models/noesis/donut.mdl")
+        #holoMaterial(I, "models/debug/debugwhite")
+        #holoColor(I, hsv2rgb(360, 1 - I/Count, 0.5))
+
+        local S = ( 1 - I / Count ) * Size
+
+        holoScaleUnits(I, vec(S))
+        holoPos(I, holoEntity(I):parent():toWorld(vec(S/2,0,0)))    
+    }    
+}
+
+interval(90)
+
+for (I = 1, Count) {
+    local Ang = holoEntity(I):parent():toLocal((GPS - holoEntity(I):pos()):toAngle()) / (Count / I)
+    holoAng(I, holoEntity(I):parent():toWorld(Ang))
+    #[
+    local Dir = GPS - holoEntity(I):pos()
+    local Ang = holoEntity(I):parent():toLocal(Dir:toAngle()) / (Count / I)
+    holoAng(I, holoEntity(I):parent():toWorld(Ang):setRoll( atan(Dir[2], Dir[1]) ))
+    ]#
+}

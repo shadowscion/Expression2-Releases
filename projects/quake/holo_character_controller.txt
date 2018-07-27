@@ -222,9 +222,15 @@ if (clk("main")) {
         if (HEIGHT_CROUCH) {
             LCtrl = PLAYER:keyDuck()
             if (changed(LCtrl)) {
-                recalc_bbox(BBOX_RAD,LCtrl ? HEIGHT_CROUCH : HEIGHT_STAND)
-                if (HIT_BELOW) {
-                    POSITION[3] = Trace_Z:position()[3] + HEIGHT_CURRENT
+                local HitHeight = LCtrl ? HEIGHT_CROUCH : HEIGHT_STAND
+                local HitCheck = rangerOffsetHull(HitHeight,POSITION,DIR_UP,vec(-BBOX_RAD*2,BBOX_RAD*2,0)):distance()
+                #local HitCheck = rangerOffset(HitHeight,POSITION,DIR_UP):distance()
+
+                if (HitCheck == HitHeight) {
+                    recalc_bbox(BBOX_RAD,HitHeight)
+                    if (HIT_BELOW) {
+                        POSITION[3] = Trace_Z:position()[3] + HEIGHT_CURRENT
+                    }
                 }
             }
         }
@@ -258,6 +264,11 @@ if (clk("main")) {
             case "CAMERA_MOVE",
                 holoAng(9000,ang(0,atan(DIR_MOVE[2],DIR_MOVE[1]),0))
             break
+        }
+
+        if (changed(R) & R) {
+            print("yes")
+            MOVETYPE = (MOVETYPE == "CAMERA_LOOK") ? "CAMERA_MOVE" : "CAMERA_LOOK"
         }
     }
 

@@ -4,16 +4,17 @@
 @inputs [Camera]:wirelink [W A S D ] [Active] [R Space Shift] [Entity]:entity
 
 # CORE
-@persist [MODE MOVETYPE]:string [TIME_DELTA TIME_CURRENT] [PLAYER]:entity [DIR_UP]:vector [CONTROLLER]:entity
+@persist [MOVEMODE MOVETYPE]:string [TIME_DELTA TIME_CURRENT] [PLAYER]:entity [DIR_UP]:vector [CONTROLLER]:entity
+@persist [LCtrl]
 
 # CONTROLLER -> PHYSICS
-@persist [POSITION VELOCITY GRAVITY]:vector [DIR_MOVE DIR_LOOK]:vector [BBOX_MIN BBOX_MAX]:vector
+@persist [POSITION VELOCITY GRAVITY]:vector [DIR_MOVE DIR_LOOK]:vector [BBOX_MIN BBOX_MAX]:vector [BBOX_RAD]
 
 # CONTROLLER -> FLAGS
 @persist [HIT_BELOW HIT_ABOVE HIT_BBOX]
 
 # CONTROLLER -> CONSTANTS
-@persist [HEIGHT_STAND HEIGHT_JUMP HEIGHT_CURRENT] [K_GRAVITY]
+@persist [HEIGHT_STAND HEIGHT_CROUCH HEIGHT_JUMP HEIGHT_CURRENT] [K_GRAVITY]
 
 # TRIGGERS
 @trigger none
@@ -21,7 +22,6 @@
 
 
 #[
-
     A HOLO CHARACTER CONTROLLER
     by shadowscion
 
@@ -32,31 +32,51 @@
         - TWO MOVEMENT SCHEMES
             - "CAMERA_LOOK" -> character faces camera at all times
             - "CAMERA_MOVE" -> character is angled local to camera direction when WASD is pressed
+
+    WIRING INSTRUCTIONS:
+        - Spawn a SEAT
+        - Spawn a WIRE POD CONTROLLER
+        - Spawn a WIRE CAMERA CONTROLLER with the following options:
+            - CHECK   "coordinates local to parent"
+            - CHECK   "clientside movement"
+            - UNCHECK "localized movement"
+
+        - Link the pod and cam to the seat
+
+        - With the wiring tool selected, HOLD ALT and LEFT CLICK on the E2
+        - LEFT CLICK on the pod controller
+        - HOLD ALT and LEFT CLICK again
+
+        - Rewire the Camera:wirelink input to the camera controller entity
+
+        - Reload the E2
 ]#
 
 
 if (first()) {
     # SETUP -> CONFIG
-    HEIGHT_STAND = 72
-    HEIGHT_JUMP  = 150
-    RADIUS       = 15
-    K_GRAVITY    = -685
+    HEIGHT_STAND  = 72          # height at top (head for bipeds) when standing
+    HEIGHT_CROUCH = 36          # height at top (head for bipeds) when crouching,set to 0 to disable crouching
+    HEIGHT_JUMP   = 150         # height at top (head for bipeds) at apex of jump,set to 0 to disable jumping
+    RADIUS        = 15          # radius of bbox collider
+    K_GRAVITY     = -685        # accleration of gravity (gmod units per second)
 
-    MOVETYPE = "CAMERA_MOVE"
-    MODE = "GROUND"
+    MOVETYPE = "CAMERA_MOVE"    # camera control scheme: "CAMERA_MOVE" or "CAMERA_LOOK"
 
 
     # SETUP -> BBOX
     function recalc_bbox(Radius,Height) {
         HEIGHT_CURRENT = Height
+        BBOX_RAD = Radius
         BBOX_MIN = vec(-Radius,-Radius,-Height*0.5)
         BBOX_MAX = vec(Radius,Radius,0)
     }
 
     recalc_bbox(RADIUS,HEIGHT_STAND)
 
-    CONTROLLER = holoCreate(9000,entity():pos() + vec(0,0,HEIGHT_CURRENT)),holoModel(9000,"models/sprops/misc/origin.mdl")
+    CONTROLLER = holoCreate(9000,entity():pos() + vec(0,0,HEIGHT_CURRENT),vec(1))
     POSITION   = CONTROLLER:pos()
+    MOVEMODE   = "GROUND"
 
 
     # SETUP -> CAMERA
@@ -83,8 +103,8 @@ if (clk("main")) {
     TIME_CURRENT = curtime()
 
 
-    # GROUND MODE
-    if (MODE == "GROUND") {
+    # GROUND MOVEMODE
+    if (MOVEMODE == "GROUND") {
         #[
             COLLISION -> LINEAR
                 - REFLECT BBOX HITPOS ALONG BBOX HITNORMAL
@@ -198,12 +218,24 @@ if (clk("main")) {
         DIR_MOVE = DIR_MOVE:normalized()
 
 
+        # PLAYER -> CROUCH
+        if (HEIGHT_CROUCH) {
+            LCtrl = PLAYER:keyDuck()
+            if (changed(LCtrl)) {
+                recalc_bbox(BBOX_RAD,LCtrl ? HEIGHT_CROUCH : HEIGHT_STAND)
+                if (HIT_BELOW) {
+                    POSITION[3] = Trace_Z:position()[3] + HEIGHT_CURRENT
+                }
+            }
+        }
+
+
         # CONTROLLER -> VELOCITY AND GRAVITY
         if (HIT_BELOW) {
             SPEED_MOVE = (W|A|S|D)*600*TIME_DELTA
             VELOCITY   = DIR_MOVE*SPEED_MOVE
 
-            if (Space) {
+            if (HEIGHT_JUMP & Space) {
                 GRAVITY = vec(0,0,sqrt(-2*K_GRAVITY*HEIGHT_JUMP))
                 HIT_BBOX = HIT_ABOVE = HIT_BELOW = 0
             }
@@ -227,11 +259,21 @@ if (clk("main")) {
                 holoAng(9000,ang(0,atan(DIR_MOVE[2],DIR_MOVE[1]),0))
             break
         }
-
     }
 
-    # FLIGHT MODE
-    if (MODE == "FLIGHT") {
+    # FLIGHT MOVEMODE
+    if (MOVEMODE == "FLIGHT") {
+#[        PLAYER = Entity:driver()
+        DIR_LOOK = Entity:toLocalAxis(PLAYER:eye())
+        DIR_MOVE = DIR_LOOK
 
+        VELOCITY = DIR_MOVE*600*TIME_DELTA
+        POSITION += VELOCITY
+
+        Roll = clamp( VELOCITY:normalized():dot(CONTROLLER:right()) * 100,-45,45)
+
+        holoPos(9000,POSITION)
+        holoAng(9000,DIR_LOOK:toAngle():setRoll(Roll))  ]#
     }
+
 }

@@ -61,38 +61,32 @@ if (first()) {
         "u" = table(
             "m" = matrix(vec(1, 0, 0), vec(0, -1, 0), vec(0, 0, 1)),
             "x" = array("f", "b"),
-            "y" = array("l", "r"),
-            "map" = table()
+            "y" = array("l", "r")
         ),
         "d" = table(
             "m" = matrix(vec(-1, 0, 0), vec(0, -1, 0), vec(0, 0, -1)),
             "x" = array("b", "f"),
-            "y" = array("l", "r"),
-            "map" = table()
+            "y" = array("l", "r")
         ),
         "f" = table(
             "m" =  matrix(vec(0, 0, 1), vec(0, -1, 0), vec(1, 0, 0)),
             "x" = array("d", "u"),
-            "y" = array("l", "r"),
-            "map" = table()
+            "y" = array("l", "r")
         ),
         "b" = table(
             "m" =  matrix(vec(0, 0, -1), vec(0, -1, 0), vec(-1, 0, 0)),
             "x" = array("u", "d"),
-            "y" = array("l", "r"),
-            "map" = table()
+            "y" = array("l", "r")
         ),
         "l" = table(
             "m" =  matrix(vec(1, 0, 0), vec(0, 0, 1), vec(0, 1, 0)),
             "x" = array("f", "b"),
-            "y" = array("d", "u"),
-            "map" = table()
+            "y" = array("d", "u")
         ),
         "r" = table(
             "m" =  matrix(vec(1, 0, 0), vec(0, 0, -1), vec(0, -1, 0)),
             "x" = array("f", "b"),
-            "y" = array("u", "d"),
-            "map" = table()
+            "y" = array("u", "d")
         )
     )
 
@@ -100,6 +94,7 @@ if (first()) {
         V["a", angle] = -V["m", matrix]:toAngle()
         V["d", vector] = V["m", matrix]:z()
     }
+    
 
     # HOLOGRAMS->SPAWNER
     function entity holoCreate(N, P, Pos:vector, Ang:angle, Scale:vector, Model:string, Material:string, Color:vector4, Wireframe) {
@@ -171,7 +166,6 @@ if (first()) {
         holoCreate(N, 1000, V["m", matrix]:z()*(Cube_Size - Cube_Tile*2 - Padding)*0.5 , Angle:rotateAroundAxis(Angle:up(), 90), vec(Cube_Size*0.25 - Padding):setY(1), "prism", "", Col_Corner, 0)
     }
 
-    print(N)
 
     # HOLOGRAMS->SNAKE
     holoCreate(2000, 1000, vec(), ang(), vec(Cube_Tile - Padding), "", Material, Col_Snake, 1)
@@ -456,6 +450,7 @@ if (clk("game")) {
     }
 }
 
+# KEY BUFFER
 if (keyClk(Player)) {
     local Key = keyClkPressed()
     if (Player:keyPressed(Key)) {

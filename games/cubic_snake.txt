@@ -1,0 +1,470 @@
+#[
+    Snakes on a... cube!
+    by shadowscion
+]#
+@name games/cubic_snake
+
+# INPUT
+@inputs
+
+# HOLO
+@persist [Skins]:table [Col_Cube Col_Corner Col_Snake Col_Tail1 Col_Tail2 Col_Fruit]:vector4 [Material]:string [Padding] [Spawn]
+
+# MATH
+@persist [Cube_Info]:table [Cube_Size Cube_Z Cube_Tile Cube_Grid Cube_Half Cube_Corner]
+
+# GAME
+@persist [Fruit_Pos Snake_Pos Snake_Dir]:vector [Fruit_Face Snake_Face]:string [Tail]:table [Tail_Max Tail_Count]
+@persist [Cube Player]:entity [Key_MoveDir Snake_Frame]:table [Key_Buffer]:array [Interpolate] Ang:angle [Dt Ct]
+
+@trigger none
+@model models/hunter/blocks/cube1x1x1.mdl
+
+
+if (first()) {
+    # CONFIG
+    entity():setAlpha(0)
+
+    Player = owner()
+
+    Cube_Grid  = 16
+    Cube_Size  = Cube_Grid*12
+
+    Padding  = 0.5
+    Material = ""
+
+    Skins = table(
+        "default" = table(
+            "cube"   = vec4(187, 205, 229, 255),
+            "corner" = vec4(38, 38, 38, 255),
+            "snake"  = vec4(55, 155, 55, 255),
+            "tail1"  = vec4(109, 182, 109, 255),
+            "tail2"  = vec4(hsv2rgb(rgb2hsv(vec(Col_Tail1)) * vec(1, 0.50, 0.75)), 255),
+            "fruit"  = vec4(214, 73, 51, 255)
+        )
+    )
+
+    # vec4(231, 226, 71)
+    # vec4(214, 73, 51, 255)
+    # vec4(88, 164, 176, 255)
+
+
+    # SETUP
+    Tail_Max = min(100, Cube_Grid*4 - 1)
+
+    Cube_Corner = Cube_Grid^2 / 2
+    Cube_Half = Cube_Grid/2
+    Cube_Tile = Cube_Size/Cube_Grid
+    Cube_Z    = Cube_Size/2
+
+    Cube_Info = table(
+        "u" = table(
+            "m" = matrix(vec(1, 0, 0), vec(0, -1, 0), vec(0, 0, 1)),
+            "x" = array("f", "b"),
+            "y" = array("l", "r"),
+            "map" = table()
+        ),
+        "d" = table(
+            "m" = matrix(vec(-1, 0, 0), vec(0, -1, 0), vec(0, 0, -1)),
+            "x" = array("b", "f"),
+            "y" = array("l", "r"),
+            "map" = table()
+        ),
+        "f" = table(
+            "m" =  matrix(vec(0, 0, 1), vec(0, -1, 0), vec(1, 0, 0)),
+            "x" = array("d", "u"),
+            "y" = array("l", "r"),
+            "map" = table()
+        ),
+        "b" = table(
+            "m" =  matrix(vec(0, 0, -1), vec(0, -1, 0), vec(-1, 0, 0)),
+            "x" = array("u", "d"),
+            "y" = array("l", "r"),
+            "map" = table()
+        ),
+        "l" = table(
+            "m" =  matrix(vec(1, 0, 0), vec(0, 0, 1), vec(0, 1, 0)),
+            "x" = array("f", "b"),
+            "y" = array("d", "u"),
+            "map" = table()
+        ),
+        "r" = table(
+            "m" =  matrix(vec(1, 0, 0), vec(0, 0, -1), vec(0, -1, 0)),
+            "x" = array("f", "b"),
+            "y" = array("u", "d"),
+            "map" = table()
+        )
+    )
+
+    foreach (K, V:table = Cube_Info) {
+        V["a", angle] = -V["m", matrix]:toAngle()
+        V["d", vector] = V["m", matrix]:z()
+    }
+
+    # HOLOGRAMS->SPAWNER
+    function entity holoCreate(N, P, Pos:vector, Ang:angle, Scale:vector, Model:string, Material:string, Color:vector4, Wireframe) {
+        local Parent = holoEntity(P)
+        if (!Parent) { Parent = entity() }
+
+        holoCreate(N)
+        holoParent(N, Parent)
+        holoPos(N, Parent:toWorld(Pos))
+        holoAng(N, Parent:toWorld(Ang))
+        holoScaleUnits(N, Scale)
+        holoModel(N, Model)
+        holoMaterial(N, Material)
+        holoColor(N, Color)
+        holoDisableShading(N, 1)
+
+        if (Wireframe) { holoCreate(N+15000, N, vec(), ang(), -(Scale + Padding), Model, "", vec4(0, 0, 0, 255), 0) }
+
+        return holoEntity(N)
+    }
+
+    function set_skin(Name:string, Set) {
+        if (Skins[Name, table]) {
+            Col_Cube   = Skins[Name, table]["cube", vector4]
+            Col_Corner = Skins[Name, table]["corner", vector4]
+            Col_Snake  = Skins[Name, table]["snake", vector4]
+            Col_Tail1  = Skins[Name, table]["tail1", vector4]
+            Col_Tail2  = Skins[Name, table]["tail2", vector4]
+            Col_Fruit  = Skins[Name, table]["fruit", vector4]
+
+            if (Set) {
+                holoColor(1000, Col_Cube:setW(100))
+                holoColor(1001, Col_Cube)
+
+                holoColor(2000, Col_Snake)
+                holoColor(3000, Col_Fruit)
+
+                for (I = 1002, 1015) {
+                    holoColor(I, Col_Corner)
+                }
+                for (I = 1, Tail_Max) {
+                    holoColor(I, mix(Col_Tail2, Col_Tail1, Spawn/Tail_Max))
+                }
+            }
+        }
+    }
+
+    set_skin("default", 0)
+
+
+    # HOLOGRAMS->CUBE
+    Cube = holoCreate(1000, 0, vec(), ang(), vec(Cube_Size - Cube_Tile - Padding), "", Material, Col_Cube:setW(100), 1)
+    holoCreate(1001, 1000, vec(), ang(), vec(Cube_Size - Cube_Tile*2 - Padding), "", "", Col_Cube, 0)
+    holoCreate(999, 1000, vec(), ang(), vec(Cube_Size - Cube_Tile*2 - Padding), "", "models/wireframe", vec4(0, 0, 0, 255), 0)
+
+    holoCreate(1002, 1000, vec(Cube_Z)*vec(1, 1, 1), ang(), vec(Cube_Tile - Padding), "", Material, Col_Corner, 1)
+    holoCreate(1003, 1000, vec(Cube_Z)*vec(1, -1, 1), ang(), vec(Cube_Tile - Padding), "", Material, Col_Corner, 1)
+    holoCreate(1004, 1000, vec(Cube_Z)*vec(-1, 1, 1), ang(), vec(Cube_Tile - Padding), "", Material, Col_Corner, 1)
+    holoCreate(1005, 1000, vec(Cube_Z)*vec(-1, -1, 1), ang(), vec(Cube_Tile - Padding), "", Material, Col_Corner, 1)
+    holoCreate(1006, 1000, vec(Cube_Z)*vec(1, 1, -1), ang(), vec(Cube_Tile - Padding), "", Material, Col_Corner, 1)
+    holoCreate(1007, 1000, vec(Cube_Z)*vec(1, -1, -1), ang(), vec(Cube_Tile - Padding), "", Material, Col_Corner, 1)
+    holoCreate(1008, 1000, vec(Cube_Z)*vec(-1, 1, -1), ang(), vec(Cube_Tile - Padding), "", Material, Col_Corner, 1)
+    holoCreate(1009, 1000, vec(Cube_Z)*vec(-1, -1, -1), ang(), vec(Cube_Tile - Padding), "", Material, Col_Corner, 1)
+
+    local N = 1009
+    foreach (K, V:table = Cube_Info) {
+        N++
+        local Angle = -V["m", matrix]:toAngle():rotateAroundAxis(V["m", matrix]:y(), 90)
+        holoCreate(N, 1000, V["m", matrix]:z()*(Cube_Size - Cube_Tile*2 - Padding)*0.5 , Angle:rotateAroundAxis(Angle:up(), 90), vec(Cube_Size*0.25 - Padding):setY(1), "prism", "", Col_Corner, 0)
+    }
+
+    print(N)
+
+    # HOLOGRAMS->SNAKE
+    holoCreate(2000, 1000, vec(), ang(), vec(Cube_Tile - Padding), "", Material, Col_Snake, 1)
+
+
+    # HOLOGRAMS->FRUIT
+    holoCreate(3000, 1000, vec(), ang(), vec(Cube_Tile - Padding), "", Material, Col_Fruit, 1)
+
+
+    # GAME->RESET
+    function reset_fruit() {
+        local Taken = 1
+        while (Taken) {
+            Fruit_Pos = vec(randint(-Cube_Half, Cube_Half), randint(-Cube_Half, Cube_Half), 0)
+            Fruit_Face = select(randint(1, 6), "u", "d", "f", "b", "l", "r")
+
+            local Check = abs(Fruit_Pos[1]) == Cube_Half | abs(Fruit_Pos[2]) == Cube_Half
+            if (!Check) {
+                Check = Fruit_Face == Snake_Face & Fruit_Pos == Snake_Pos
+
+                if (!Check) {
+                    for (I = 1, Tail:count()) {
+                        local S = Tail[I, table]
+                        if (Fruit_Face == S["snakeFace", string] & Fruit_Pos == S["snakePos", vector]) {
+                            Check = 1
+                            break
+                        }
+                    }
+                }
+            }
+            Taken = Check
+        }
+
+        holoPos(3000, toWorld(Fruit_Pos*Cube_Tile, ang(), Cube:toWorld(Cube_Info[Fruit_Face, table]["d", vector]*Cube_Z), Cube:toWorld(Cube_Info[Fruit_Face, table]["a", angle])))
+
+        Tail_Count++
+    }
+
+    function check_fruit() {
+        if (Snake_Pos == Fruit_Pos & Snake_Face == Fruit_Face) {
+            reset_fruit()
+
+            holoEntity(3000):soundPlay("boop", 0, "garrysmod/balloon_pop_cute.wav")
+            soundPitch("boop", 100 + (Tail_Count / Tail_Max)*155)
+        }
+    }
+
+    function reset_game() {
+        Snake_Dir = vec(0, 0, 0)
+        Snake_Pos = vec()
+        Snake_Face = "u"
+
+        holoPos(2000, toWorld(Snake_Pos*Cube_Tile, ang(), Cube:toWorld(Cube_Info[Snake_Face, table]["d", vector]*Cube_Z), Cube:toWorld(Cube_Info[Snake_Face, table]["a", angle])))
+
+        holoEntity(3000):soundPlay("boop", 0, "garrysmod/balloon_pop_cute.wav")
+        soundPitch("boop", 30)
+
+        for (I = 1, Tail_Count) { holoPos(I, Cube:pos()) }
+
+        Tail = table()
+        Tail_Count = 5
+
+        reset_fruit()
+    }
+
+    function number check_tail() {
+        for (I = 2, Tail:count()) {
+            local F = Tail[I+1, table]
+            if (Snake_Face == F["old_f", string]) {
+                if (Snake_Pos == F["real_p", vector]) {
+                    return 1
+                }
+            }
+        }
+        return 0
+    }
+
+
+    # GAME->CONTROLS
+    Key_MoveDir = table(
+        "up" = vec(1, 0, 0),
+        "down" = vec(-1, 0, 0),
+        "left" = vec(0, 1, 0),
+        "right" = vec(0, -1, 0)
+    )
+
+    function vector keyDir(ChangeTo:vector) {
+        return (Snake_Dir == -ChangeTo ? Snake_Dir : ChangeTo) ?: Snake_Dir
+    }
+
+
+    # MISC
+    reset_game()
+
+    Ct = curtime()
+
+    runOnKeys(Player, 1)
+    timer("spawn", 500)
+    timer("game", 120)
+}
+
+if (clk("spawn")) {
+    timer("spawn", 100)
+
+    while (perf() & holoRemainingSpawns() >= 2 & Spawn < Tail_Max) {
+        Spawn++
+        holoCreate(Spawn, 1000, vec(-Cube_Tile*Spawn, 0, Cube_Z)*0, ang(), vec(Cube_Tile - Padding), "", Material, mix(Col_Tail2, Col_Tail1, Spawn/Tail_Max), 1)
+        # - (Spawn / Tail_Max)*Cube_Tile*Padding*0.25
+    }
+
+    if (Spawn >= Tail_Max) {
+        stoptimer("spawn")
+    }
+}
+
+if (clk("game")) {
+    # GAME->INTERPOLATION
+    timer("game", 120)
+
+    Dt = curtime() - Ct
+    Ct = curtime()
+
+    if (!Snake_Dir) { exit() }
+
+    Interpolate += (Cube_Size / Cube_Tile)*Dt*0.25
+
+    while (Interpolate >= 1) {
+        # CONTROL->KEY BUFFER
+        Snake_Dir = keyDir(Key_MoveDir[Key_Buffer:removeString(1), vector])
+
+
+        # FRAME->LAST
+        Snake_Frame = table(
+            "real_p" = Snake_Pos,
+            "old_p" = Snake_Pos*Cube_Tile,
+            "old_f" = Snake_Face,
+            "old_u" = Cube_Info[Snake_Face, table]["d", vector]*Cube_Z,
+            "old_a" = Cube_Info[Snake_Face, table]["a", angle]
+        )
+
+
+        # POS->ADD DIR
+        Snake_Pos = clamp(Snake_Pos + Snake_Dir, vec(-Cube_Half), vec(Cube_Half))
+
+
+        # POS->CORNER=DEATH
+        if (Snake_Pos:length2() == Cube_Corner) {
+            reset_game()
+            exit()
+        }
+        if (check_tail()) {
+            reset_game()
+            exit()
+        }
+
+
+        # POS->FRUIT CHECK
+        check_fruit()
+
+
+        # POS->WRAP X
+        if (Snake_Pos[1] >= Cube_Half | Snake_Pos[1] <= -Cube_Half) {
+            local Swap = sign(Snake_Pos[1])
+            local Next = Cube_Info[Snake_Face, table]["x", array][Swap > 0 ? 1 : 2, string]
+
+            switch (Snake_Face) {
+                case "l",
+                    Snake_Dir = vec(0, -1, 0)
+                    Snake_Pos = vec(Snake_Pos[2], Snake_Pos[1], 0) * Swap
+                break
+                case "r",
+                    Snake_Dir = vec(0, 1, 0)
+                    Snake_Pos = vec(Snake_Pos[2], Snake_Pos[1], 0) * -Swap
+                break
+                default,
+                    Snake_Pos[1] = -Snake_Pos[1]
+                break
+            }
+
+            Snake_Face = Next
+
+            if (check_tail()) {
+                reset_game()
+                exit()
+            }
+
+            check_fruit()
+        }
+
+
+        # POS->WRAP Y
+        elseif (Snake_Pos[2] >= Cube_Half | Snake_Pos[2] <= -Cube_Half) {
+            local Swap = sign(Snake_Pos[2])
+            local Next = Cube_Info[Snake_Face, table]["y", array][Swap > 0 ? 1 : 2, string]
+
+            switch (Snake_Face) {
+                case "u",
+                    Snake_Pos[2] = -Snake_Pos[2]
+                break
+                case "d",
+                    Snake_Dir = -Snake_Dir
+                    Snake_Pos[1] = -Snake_Pos[1]
+                break
+                case "f",
+                    Snake_Dir  = vec(-1, 0, 0)
+                    Snake_Pos = vec(Snake_Pos[2], Snake_Pos[1], 0) * Swap
+                break
+                case "b",
+                    Snake_Dir  = vec(1, 0, 0)
+                    Snake_Pos = vec(Snake_Pos[2], Snake_Pos[1], 0) * -Swap
+                break
+                case "l",
+                    if (Swap == 1) {
+                        Snake_Dir = -Snake_Dir
+                        Snake_Pos[1] = -Snake_Pos[1]
+                    }
+                    else {
+                        Snake_Pos[2] = -Snake_Pos[2]
+                    }
+                break
+                case "r",
+                    if (Swap == 1) {
+                        Snake_Pos[2] = -Snake_Pos[2]
+                    }
+                    else {
+                        Snake_Dir = -Snake_Dir
+                        Snake_Pos[1] = -Snake_Pos[1]
+                    }
+                break
+            }
+
+            Snake_Face = Next
+
+            if (check_tail()) {
+                reset_game()
+                exit()
+            }
+
+            check_fruit()
+        }
+
+
+        # FRAME->NEW
+        Snake_Frame = Snake_Frame:add(table(
+            "new_p" = Snake_Pos*Cube_Tile,
+            "new_f" = Snake_Face,
+            "new_u" = Cube_Info[Snake_Face, table]["d", vector]*Cube_Z,
+            "new_a" = Cube_Info[Snake_Face, table]["a", angle]
+        ))
+
+
+        # TAIL
+        Tail:unshiftTable(Snake_Frame)
+        while (Tail:count() + 1 > Tail_Count) {
+            Tail:pop()
+        }
+
+
+        # REMAINDER
+        Interpolate--
+    }
+
+
+    # GAME->HOLOGRAMS
+    local D = (Player:shootPos() - Cube:pos()):normalized():setZ(0)
+    local M = Cube_Info[Snake_Face, table]["m", matrix]
+    holoAng(1000, slerp(quat(Cube), quat(M:toAngle()) * qRotation(M:z(), 45 + 180 + atan(D[2], D[1])), 0.4):toAngle())
+
+    holoPos(2000, mix(
+        toWorld(Snake_Frame["new_p", vector], Ang, Cube:toWorld(Snake_Frame["new_u", vector]), Cube:toWorld(Snake_Frame["new_a", angle])),
+        toWorld(Snake_Frame["old_p", vector], Ang, Cube:toWorld(Snake_Frame["old_u", vector]), Cube:toWorld(Snake_Frame["old_a", angle])),
+        Interpolate
+    ))
+
+    for (I = 1, Tail:count()) {
+        local F = Tail[I+1, table]
+        holoPos(I, mix(
+            toWorld(F["new_p", vector], Ang, Cube:toWorld(F["new_u", vector]), Cube:toWorld(F["new_a", angle])),
+            toWorld(F["old_p", vector], Ang, Cube:toWorld(F["old_u", vector]), Cube:toWorld(F["old_a", angle])),
+            Interpolate
+        ))
+    }
+}
+
+if (keyClk(Player)) {
+    local Key = keyClkPressed()
+    if (Player:keyPressed(Key)) {
+        if (Key_MoveDir[Key, vector]) {
+            if (!Snake_Dir) { Snake_Dir = Key_MoveDir[Key, vector]}
+            elseif (Key != Key_Buffer[Key_Buffer:count(), string]) {
+                Key_Buffer:pushString(Key)
+            }
+        }
+    }
+}
+

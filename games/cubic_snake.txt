@@ -28,7 +28,7 @@ if (first()) {
     Player = owner()
 
     Cube_Grid  = 16
-    Cube_Size  = Cube_Grid*12
+    Cube_Size  = 100
 
     Padding  = 0.5
     Material = ""

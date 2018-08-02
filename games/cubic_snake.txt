@@ -1,6 +1,8 @@
 @name games/cubic_snake
 @inputs
 
+@outputs POWERUP_ACTIVE:table GAME_SPEED_MUL
+
 # HOLOGRAM
 @persist [HOLO_N] [CFG_SIZE CFG_TILE] [CFG_SKIN]:string [HOLO_DATA SKINS]:table [HOLO_R]:array Vec:vector Ang:angle
 
@@ -14,17 +16,22 @@
 @persist [TAIL]:table [TAIL_COUNT TAIL_MAX]
 
 # POWERUP
-@persist [POWERUP_POOL]:array [POWERUP_MAP]:table [POWERUP_MAX POWERUP_INDEX]
+@persist [POWERUP_POOL]:array [POWERUP_MAP POWERUP_ACTIVE POWERUP_WEIGHTS]:table [POWERUP_MAX POWERUP_INDEX POWERUP_TIME]
+@persist [POWERUP_GHOST]
 
 # FRUIT
 @persist [FRUIT_POOL]:array [FRUIT_MAP]:table [FRUIT_MAX FRUIT_INDEX FRUIT_BONUS]
 
+# OBSTACLE
+@persist [OBSTACLE_POOL]:array [OBSTACLE_MAX OBSTACLE_INDEX]
+
 # GAME
-@persist [GAME_MAP GAME_CTRL]:table [GAME_KEYBUFFER]:array [GAME_PLAYER]:entity [GAME_INTERPOLATE] [Dt Ct]
+@persist [GAME_MAP GAME_CTRL]:table [GAME_KEYBUFFER]:array [GAME_PLAYER]:entity [GAME_INTERPOLATE GAME_SPEED_MUL] [Dt Ct]
 
 # MISC
 @model models/hunter/blocks/cube1x1x1.mdl
 @trigger none
+
 
 if (first()) {
     #--------------------------------------------------------------
@@ -35,38 +42,47 @@ if (first()) {
     entity():setAlpha(0)
 
     TAIL_MAX = 100
-    CFG_SIZE = 48
+    CFG_SIZE = 96
     CFG_TILE = 16
     CFG_SKIN = "default"
 
     SKINS = table(
         "default" = table(
-            "cube"   = vec4(187,205,229,255),
-            "corner" = vec4(48,48,48,255),
-            "snake"  = vec4(55,155,55,255),
-            "tail1"  = vec4(109,182,109,255),
-            "tail2"  = vec4(hsv2rgb(rgb2hsv(109,182,109) * vec(1,0.50,0.75)),255),
-            "fruit"  = vec4(214,73,51,255),
-            "power"  = vec4(88,94,176,255),
+            "cube"   = vec4(187, 205, 229, 255),
+            "corner" = vec4(48, 48, 48, 255),
+            "obstacle" = vec4(48, 48, 48, 255),
+            "snake"  = vec4(55, 155, 55, 255),
+            "tail1"  = vec4(109, 182, 109, 255),
+            "tail2"  = vec4(hsv2rgb(rgb2hsv(109, 182, 109) * vec(1, 0.50, 0.75)), 255),
+            "fruit"  = vec4(214, 73, 51, 255),
+            "power"  = vec4(88, 94, 176, 255),
             "material" = "phoenix_storms/mat/mat_phx_metallic2"
         ),
          "skin1" = table(
-            "cube"   = vec4(248,244,244,255),
-            "corner" = vec4(51,51,51,255),
-            "snake"  = vec4(122,199,79,255),
-            "tail1"  = vec4(111,181,72,255),
-            "tail2"  = vec4(67,109,44,255),
-            "fruit"  = vec4(244,96,54,255),
-            "power"  = vec4(0,154,152,255),
+            "cube"   = vec4(248, 244, 244, 255),
+            "corner" = vec4(51, 51, 51, 255),
+            "obstacle" = vec4(48, 48, 48, 255),
+            "snake"  = vec4(122, 199, 79, 255),
+            "tail1"  = vec4(111, 181, 72, 255),
+            "tail2"  = vec4(67, 109, 44, 255),
+            "fruit"  = vec4(244, 96, 54, 255),
+            "power"  = vec4(0, 154, 152, 255),
             "material" = "phoenix_storms/mat/mat_phx_metallic2"
         )
+    )
+
+    POWERUP_WEIGHTS = table(
+        "powerup_fast_activate"     = 40,
+        "powerup_ghost_activate"    = 20,
+        "powerup_slow_activate"     = 20,
+        "powerup_obstacle_activate" = 10,
+        "powerup_mindfuck_activate" = 10
     )
 
     #phoenix_storms/Fender_white
     #phoenix_storms/concrete3
     #phoenix_storms/egg
     #phoenix_storms/mat/mat_phx_metallic2
-
 
     #--------------------------------------------------------------
     #-- do not edit below this line -------------------------------
@@ -79,25 +95,25 @@ if (first()) {
 
     HOLO_N++
     holoCreate(HOLO_N)
-    holoParent(HOLO_N,entity())
+    holoParent(HOLO_N, entity())
 
     CUBE_INDEX = HOLO_N
     CUBE_ENT  = holoEntity(CUBE_INDEX)
 
-    for (I = 1,16) {
+    for (I = 1, 16) {
         HOLO_N++
         holoCreate(HOLO_N)
-        holoParent(HOLO_N,CUBE_INDEX)
+        holoParent(HOLO_N, CUBE_INDEX)
     }
 
     FRUIT_MAX = 30
     FRUIT_POOL = array()
     FRUIT_INDEX = HOLO_N + 1
 
-    for (I = 1,FRUIT_MAX) {
+    for (I = 1, FRUIT_MAX) {
         HOLO_N++
         holoCreate(HOLO_N)
-        holoParent(HOLO_N,CUBE_INDEX)
+        holoParent(HOLO_N, CUBE_INDEX)
         FRUIT_POOL:pushNumber(HOLO_N)
     }
 
@@ -105,43 +121,54 @@ if (first()) {
     POWERUP_POOL = array()
     POWERUP_INDEX = HOLO_N + 1
 
-    for (I = 1,POWERUP_MAX) {
+    for (I = 1, POWERUP_MAX) {
         HOLO_N++
         holoCreate(HOLO_N)
-        holoParent(HOLO_N,CUBE_INDEX)
+        holoParent(HOLO_N, CUBE_INDEX)
         POWERUP_POOL:pushNumber(HOLO_N)
     }
 
 
     HOLO_N++
     holoCreate(HOLO_N)
-    holoParent(HOLO_N,CUBE_INDEX)
+    holoParent(HOLO_N, CUBE_INDEX)
     SNAKE_INDEX = HOLO_N
-
-#[    HOLO_N++
-    holoCreate(HOLO_N)
-    holoParent(HOLO_N,SNAKE_INDEX)
 
     HOLO_N++
     holoCreate(HOLO_N)
-    holoParent(HOLO_N,SNAKE_INDEX)]#
+    holoParent(HOLO_N, SNAKE_INDEX)
 
-    TAIL_MAX = min(TAIL_MAX,250 - (HOLO_N - 1000))
+    HOLO_N++
+    holoCreate(HOLO_N)
+    holoParent(HOLO_N, SNAKE_INDEX)
+
+    OBSTACLE_MAX = holoRemainingSpawns() - 1
+    OBSTACLE_POOL = array()
+    OBSTACLE_INDEX = HOLO_N + 1
+
+    for (I = 1, OBSTACLE_MAX) {
+        HOLO_N++
+        holoCreate(HOLO_N)
+        holoParent(HOLO_N, CUBE_INDEX)
+        OBSTACLE_POOL:pushNumber(HOLO_N)
+    }
+
+    TAIL_MAX = min(TAIL_MAX, 250 - (HOLO_N - 1000))
     HOLO_N = 0
 
-
-    function holoVisual(N,Pos:vector,Ang:angle,Scale:vector,Model:string,Material:string,Color:vector4) {
-        holoPos(N,holoEntity(N):parent():toWorld(Pos))
-        holoAng(N,holoEntity(N):parent():toWorld(Ang))
-        holoModel(N,Model)
-        holoMaterial(N,Material)
-        holoScaleUnits(N,Scale)
-        holoColor(N,Color)
+    function holoVisual(N, Pos:vector, Ang:angle, Scale:vector, Model:string, Material:string, Color:vector4) {
+        holoPos(N, holoEntity(N):parent():toWorld(Pos))
+        holoAng(N, holoEntity(N):parent():toWorld(Ang))
+        holoModel(N, Model)
+        holoMaterial(N, Material)
+        holoScaleUnits(N, Scale)
+        holoColor(N, Color)
+        holoDisableShading(N, 1)
 
         HOLO_R:pushNumber(N)
     }
-    function rebuild_cube(Size,Grid,Padding,SkinID:string) {
-        timer("rebuild",100)
+    function rebuild_cube(Size, Grid, Padding, SkinID:string) {
+        timer("rebuild", 100)
 
         HOLO_DATA = table()
         HOLO_R = array()
@@ -156,93 +183,116 @@ if (first()) {
         local N = CUBE_INDEX
 
         # SKIN
-        local Skin = SKINS[SkinID,table]
-        local Material = Skin["material",string]
+        local Skin = SKINS[SkinID, table]
+        local Material = Skin["material", string]
 
         # CUBE
-            HOLO_DATA:pushArray(array(N,Vec,Ang,vec(CUBE_SIZE - CUBE_TILE - Padding),"","models/shiny",Skin["cube",vector4]:setW(100)))
-        N++,HOLO_DATA:pushArray(array(N,Vec,Ang,vec(CUBE_SIZE - CUBE_TILE*2 - Padding),"",Material,Skin["cube",vector4]))
-        N++,HOLO_DATA:pushArray(array(N,Vec,Ang,vec(CUBE_SIZE - CUBE_TILE*2 - Padding),"","models/wireframe",vec4(0,0,0,255)))
+            HOLO_DATA:pushArray(array(N, Vec, Ang, vec(CUBE_SIZE - CUBE_TILE - Padding), "", "models/shiny", Skin["cube", vector4]:setW(100)))
+        N++, HOLO_DATA:pushArray(array(N, Vec, Ang, vec(CUBE_SIZE - CUBE_TILE*2 - Padding), "", Material, Skin["cube", vector4]))
+        N++, HOLO_DATA:pushArray(array(N, Vec, Ang, vec(CUBE_SIZE - CUBE_TILE*2 - Padding), "", "models/wireframe", vec4(0, 0, 0, 255)))
 
         # CORNERS
-        N++,HOLO_DATA:pushArray(array(N,vec(CUBE_Z,CUBE_Z,CUBE_Z),Ang,vec(CUBE_TILE - Padding),"",Material,Skin["corner",vector4]))
-        N++,HOLO_DATA:pushArray(array(N,vec(-CUBE_Z,CUBE_Z,CUBE_Z),Ang,vec(CUBE_TILE - Padding),"",Material,Skin["corner",vector4]))
-        N++,HOLO_DATA:pushArray(array(N,vec(-CUBE_Z,-CUBE_Z,CUBE_Z),Ang,vec(CUBE_TILE - Padding),"",Material,Skin["corner",vector4]))
-        N++,HOLO_DATA:pushArray(array(N,vec(CUBE_Z,-CUBE_Z,CUBE_Z),Ang,vec(CUBE_TILE - Padding),"",Material,Skin["corner",vector4]))
-        N++,HOLO_DATA:pushArray(array(N,vec(CUBE_Z,CUBE_Z,-CUBE_Z),Ang,vec(CUBE_TILE - Padding),"",Material,Skin["corner",vector4]))
-        N++,HOLO_DATA:pushArray(array(N,vec(-CUBE_Z,CUBE_Z,-CUBE_Z),Ang,vec(CUBE_TILE - Padding),"",Material,Skin["corner",vector4]))
-        N++,HOLO_DATA:pushArray(array(N,vec(-CUBE_Z,-CUBE_Z,-CUBE_Z),Ang,vec(CUBE_TILE - Padding),"",Material,Skin["corner",vector4]))
-        N++,HOLO_DATA:pushArray(array(N,vec(CUBE_Z,-CUBE_Z,-CUBE_Z),Ang,vec(CUBE_TILE - Padding),"",Material,Skin["corner",vector4]))
+        N++, HOLO_DATA:pushArray(array(N, vec(CUBE_Z, CUBE_Z, CUBE_Z), Ang, vec(CUBE_TILE - Padding), "", Material, Skin["corner", vector4]))
+        N++, HOLO_DATA:pushArray(array(N, vec(-CUBE_Z, CUBE_Z, CUBE_Z), Ang, vec(CUBE_TILE - Padding), "", Material, Skin["corner", vector4]))
+        N++, HOLO_DATA:pushArray(array(N, vec(-CUBE_Z, -CUBE_Z, CUBE_Z), Ang, vec(CUBE_TILE - Padding), "", Material, Skin["corner", vector4]))
+        N++, HOLO_DATA:pushArray(array(N, vec(CUBE_Z, -CUBE_Z, CUBE_Z), Ang, vec(CUBE_TILE - Padding), "", Material, Skin["corner", vector4]))
+        N++, HOLO_DATA:pushArray(array(N, vec(CUBE_Z, CUBE_Z, -CUBE_Z), Ang, vec(CUBE_TILE - Padding), "", Material, Skin["corner", vector4]))
+        N++, HOLO_DATA:pushArray(array(N, vec(-CUBE_Z, CUBE_Z, -CUBE_Z), Ang, vec(CUBE_TILE - Padding), "", Material, Skin["corner", vector4]))
+        N++, HOLO_DATA:pushArray(array(N, vec(-CUBE_Z, -CUBE_Z, -CUBE_Z), Ang, vec(CUBE_TILE - Padding), "", Material, Skin["corner", vector4]))
+        N++, HOLO_DATA:pushArray(array(N, vec(CUBE_Z, -CUBE_Z, -CUBE_Z), Ang, vec(CUBE_TILE - Padding), "", Material, Skin["corner", vector4]))
 
         # ARROWS
         local Offset = (CUBE_SIZE - CUBE_TILE*2 - Padding)*0.5
         local Scale  = vec(CUBE_SIZE*0.25 - Padding):setY(1)
 
-        N++,HOLO_DATA:pushArray(array(N,vec(0,0,Offset),ang(0,90,90),Scale,"prism",Material,Skin["corner",vector4]))
-        N++,HOLO_DATA:pushArray(array(N,vec(0,0,-Offset),ang(0,90,-90),Scale,"prism",Material,Skin["corner",vector4]))
-        N++,HOLO_DATA:pushArray(array(N,vec(Offset,0,0),ang(0,90,-180),Scale,"prism",Material,Skin["corner",vector4]))
-        N++,HOLO_DATA:pushArray(array(N,vec(-Offset,0,0),ang(0,90,0),Scale,"prism",Material,Skin["corner",vector4]))
-        N++,HOLO_DATA:pushArray(array(N,vec(0,Offset,0),ang(90,0,0),Scale,"prism",Material,Skin["corner",vector4]))
-        N++,HOLO_DATA:pushArray(array(N,vec(0,-Offset,0),ang(-90,180,0),Scale,"prism",Material,Skin["corner",vector4]))
+        N++, HOLO_DATA:pushArray(array(N, vec(0, 0, Offset), ang(0, 90, 90), Scale, "prism", Material, Skin["corner", vector4]))
+        N++, HOLO_DATA:pushArray(array(N, vec(0, 0, -Offset), ang(0, 90, -90), Scale, "prism", Material, Skin["corner", vector4]))
+        N++, HOLO_DATA:pushArray(array(N, vec(Offset, 0, 0), ang(0, 90, -180), Scale, "prism", Material, Skin["corner", vector4]))
+        N++, HOLO_DATA:pushArray(array(N, vec(-Offset, 0, 0), ang(0, 90, 0), Scale, "prism", Material, Skin["corner", vector4]))
+        N++, HOLO_DATA:pushArray(array(N, vec(0, Offset, 0), ang(90, 0, 0), Scale, "prism", Material, Skin["corner", vector4]))
+        N++, HOLO_DATA:pushArray(array(N, vec(0, -Offset, 0), ang(-90, 180, 0), Scale, "prism", Material, Skin["corner", vector4]))
 
         # FRUIT
         local Scale = vec(CUBE_TILE - Padding)
-        for (I = 1,FRUIT_MAX) {
-            N++,HOLO_DATA:pushArray(array(N,Vec,Ang,Scale,"icosphere2",Material,Skin["fruit",vector4]))
+        for (I = 1, FRUIT_MAX) {
+            N++, HOLO_DATA:pushArray(array(N, Vec, Ang, Scale, "icosphere2", Material, Skin["fruit", vector4]))
         }
 
         # POWERUP
         local Scale = vec(CUBE_TILE - Padding)
-        for (I = 1,POWERUP_MAX) {
-            N++,HOLO_DATA:pushArray(array(N,Vec,Ang,Scale,"rcube",Material,Skin["power",vector4]))
+        for (I = 1, POWERUP_MAX) {
+            N++, HOLO_DATA:pushArray(array(N, Vec, Ang, Scale, "rcube", Material, Skin["power", vector4]))
         }
 
         # SNAKE
         local Scale = vec(CUBE_TILE - Padding)
-        N++,HOLO_DATA:pushArray(array(N,Vec:setZ(CUBE_Z),Ang,Scale,"",Material,Skin["snake",vector4]))
-        #N++,HOLO_DATA:pushArray(array(N,vec(Scale[1],0,-Scale[3]*0.25),Ang,Scale*vec(1,1,0.5),"",Material,Skin["snake",vector4]))
-        #N++,HOLO_DATA:pushArray(array(N,vec(Scale[1]*0.25,0,Scale[3]*0.25),Ang,Scale*vec(0.2,1.1,0.2),"",Material,vec4(15,15,15,255)))
+        N++, HOLO_DATA:pushArray(array(N, Vec:setZ(CUBE_Z), Ang, Scale, "", Material, Skin["snake", vector4]))
+        N++, HOLO_DATA:pushArray(array(N, vec(Scale:x(), 0, -Scale:z()*0.25), Ang, Scale*vec(1, 1, 0.5), "", Material, Skin["snake", vector4]))
+        N++, HOLO_DATA:pushArray(array(N, vec(Scale:x()*0.25, 0, Scale:z()*0.25), Ang, Scale*vec(0.2, 1.1, 0.2), "", "", vec4(15, 15, 15, 255)))
+
+        # OBSTACLE
+        local Scale = vec(CUBE_TILE - Padding)
+        for (I = 1, OBSTACLE_MAX) {
+            N++, HOLO_DATA:pushArray(array(N, Vec, Ang, Scale, "", "phoenix_storms/stripes", vec4(255, 255, 255, 255)))
+        }
 
         # TAIL
-        local Scale = vec(CUBE_TILE - Padding)
-        for (I = 1,100) {
-            HOLO_DATA:pushArray(array(I,Vec,Ang,Scale,"",Material,mix(Skin["tail1",vector4],Skin["tail2",vector4],I/100):setW(255)))
+        local Scale = vec(CUBE_TILE - Padding - Padding)
+        for (I = 1, 100) {
+            HOLO_DATA:pushArray(array(I, Vec, Ang, Scale, "", Material, mix(Skin["tail1", vector4], Skin["tail2", vector4], I/100):setW(255)))
         }
     }
     function reset_fruit_holos() {
         local P = CUBE_ENT:pos()
-        for (I = FRUIT_INDEX,FRUIT_INDEX+FRUIT_MAX-1) {
-            holoPos(I,P)
+        for (I = FRUIT_INDEX, FRUIT_INDEX+FRUIT_MAX-1) {
+            holoPos(I, P)
         }
     }
     function reset_powerup_holos() {
         local P = CUBE_ENT:pos()
-        for (I = POWERUP_INDEX,POWERUP_INDEX+POWERUP_MAX-1) {
-            holoPos(I,P)
+        for (I = POWERUP_INDEX, POWERUP_INDEX+POWERUP_MAX-1) {
+            holoPos(I, P)
+        }
+    }
+    function reset_obstacle_holos() {
+        local P = CUBE_ENT:pos()
+        for (I = OBSTACLE_INDEX, OBSTACLE_INDEX+OBSTACLE_MAX-1) {
+            holoPos(I, P)
         }
     }
     function reset_tail_holos() {
         local P = CUBE_ENT:pos()
-        for (I = 1,TAIL_MAX) {
-            holoPos(I,P)
+        for (I = 1, TAIL_MAX) {
+            holoPos(I, P)
         }
     }
     function reset_object_holos() {
         local P = CUBE_ENT:pos()
 
-        holoPos(SNAKE_INDEX,P)
-        for (I = FRUIT_INDEX,FRUIT_INDEX+FRUIT_MAX-1) {
-            holoPos(I,P)
+        holoPos(SNAKE_INDEX, P)
+        for (I = FRUIT_INDEX, FRUIT_INDEX+FRUIT_MAX-1) {
+            holoPos(I, P)
         }
-        for (I = POWERUP_INDEX,POWERUP_INDEX+POWERUP_MAX-1) {
-            holoPos(I,P)
+        for (I = POWERUP_INDEX, POWERUP_INDEX+POWERUP_MAX-1) {
+            holoPos(I, P)
         }
-        for (I = 1,TAIL_MAX) {
-            holoPos(I,P)
+        for (I = OBSTACLE_INDEX, OBSTACLE_INDEX+OBSTACLE_MAX-1) {
+            holoPos(I, P)
+        }
+        for (I = 1, TAIL_MAX) {
+            holoPos(I, P)
         }
     }
-    function object_set_pos(N,Face:string,Pos:vector) {
-        holoPos(N,toWorld(Pos*CUBE_TILE,Ang,CUBE_ENT:toWorld(CUBE_MATRIX[Face,table]["d",vector]*CUBE_Z),CUBE_ENT:toWorld(CUBE_MATRIX[Face,table]["a",angle])))
+    function object_set_pos(N, Face:string, Pos:vector) {
+        holoPos(N, toWorld(Pos*CUBE_TILE, Ang, CUBE_ENT:toWorld(CUBE_MATRIX[Face, table]["d", vector]*CUBE_Z), CUBE_ENT:toWorld(CUBE_MATRIX[Face, table]["a", angle])))
+    }
+    function object_set_ang(N, Face:string, Angl:angle) {
+        holoAng(N, toWorldAng(Vec, Angl, Vec, CUBE_ENT:toWorld(CUBE_MATRIX[Face, table]["a", angle])))
+    }
+    function object_set_pos_ang(N, Face:string, Pos:vector, Angl:angle) {
+        local PA =  toWorldPosAng(Pos*CUBE_TILE, Angl, CUBE_ENT:toWorld(CUBE_MATRIX[Face, table]["d", vector]*CUBE_Z), CUBE_ENT:toWorld(CUBE_MATRIX[Face, table]["a", angle]))
+        holoPos(N, PA[1, vector])
+        holoAng(N, PA[2, angle])
     }
 
 
@@ -251,92 +301,213 @@ if (first()) {
     #--------------------------------------------------------------
     CUBE_MATRIX = table(
         "u" = table(
-            "m" = matrix(vec(1,0,0),vec(0,-1,0),vec(0,0,1)),
-            "x" = array("f","b"),
-            "y" = array("l","r")
+            "m" = matrix(vec(1, 0, 0), vec(0, -1, 0), vec(0, 0, 1)),
+            "x" = array("f", "b"),
+            "y" = array("l", "r")
         ),
         "d" = table(
-            "m" = matrix(vec(-1,0,0),vec(0,-1,0),vec(0,0,-1)),
-            "x" = array("b","f"),
-            "y" = array("l","r")
+            "m" = matrix(vec(-1, 0, 0), vec(0, -1, 0), vec(0, 0, -1)),
+            "x" = array("b", "f"),
+            "y" = array("l", "r")
         ),
         "f" = table(
-            "m" =  matrix(vec(0,0,1),vec(0,-1,0),vec(1,0,0)),
-            "x" = array("d","u"),
-            "y" = array("l","r")
+            "m" =  matrix(vec(0, 0, 1), vec(0, -1, 0), vec(1, 0, 0)),
+            "x" = array("d", "u"),
+            "y" = array("l", "r")
         ),
         "b" = table(
-            "m" =  matrix(vec(0,0,-1),vec(0,-1,0),vec(-1,0,0)),
-            "x" = array("u","d"),
-            "y" = array("l","r")
+            "m" =  matrix(vec(0, 0, -1), vec(0, -1, 0), vec(-1, 0, 0)),
+            "x" = array("u", "d"),
+            "y" = array("l", "r")
         ),
         "l" = table(
-            "m" =  matrix(vec(1,0,0),vec(0,0,1),vec(0,1,0)),
-            "x" = array("f","b"),
-            "y" = array("d","u")
+            "m" =  matrix(vec(1, 0, 0), vec(0, 0, 1), vec(0, 1, 0)),
+            "x" = array("f", "b"),
+            "y" = array("d", "u")
         ),
         "r" = table(
-            "m" =  matrix(vec(1,0,0),vec(0,0,-1),vec(0,-1,0)),
-            "x" = array("f","b"),
-            "y" = array("u","d")
+            "m" =  matrix(vec(1, 0, 0), vec(0, 0, -1), vec(0, -1, 0)),
+            "x" = array("f", "b"),
+            "y" = array("u", "d")
         )
     )
 
-    foreach (K,V:table = CUBE_MATRIX) {
-        V["a",angle] = -V["m",matrix]:toAngle()
-        V["d",vector] = V["m",matrix]:z()
+    foreach (K, V:table = CUBE_MATRIX) {
+        V["a", angle] = -V["m", matrix]:toAngle()
+        V["d", vector] = V["m", matrix]:z()
     }
 
 
     #--------------------------------------------------------------
     #-- game map triggers -----------------------------------------
     #--------------------------------------------------------------
-    function array map_get_empty() {
+    function array map_get_empty(F:string) {
         local NotEmpty = 1
         while (NotEmpty) {
-            local Face = select(randint(1,6),"u","d","f","b","l","r")
-            local Pos = vec(randint(-CUBE_HALF + 1,CUBE_HALF - 1),randint(-CUBE_HALF + 1,CUBE_HALF - 1),0)
-            local Key = Face + Pos[1] + Pos[2]
+            local Face = F ?: select(randint(1, 6), "u", "d", "f", "b", "l", "r")
+            local Pos = vec(randint(-CUBE_HALF + 1, CUBE_HALF - 1), randint(-CUBE_HALF + 1, CUBE_HALF - 1), 0)
+            local Key = format("%s%d%d", Face, Pos:x(), Pos:y())
 
-            if (GAME_MAP[Key,string]) {
+            if (GAME_MAP[Key, string]) {
             }
             else {
                 NotEmpty = 0
-                return array(Key,Face,Pos)
+                return array(Key, Face, Pos)
             }
         }
         return array()
     }
-    function map_set_trigger(Face:string,Pos:vector,Event:string) {
-        local Key = Face + Pos[1] + Pos[2]
-        GAME_MAP[Key,string] = GAME_MAP[Key,string] ?: Event
+    function map_set_trigger(Face:string, Pos:vector, Event:string) {
+        local Key = format("%s%d%d", Face, Pos:x(), Pos:y())
+        GAME_MAP[Key, string] = GAME_MAP[Key, string] ?: Event
     }
-    function map_remove_trigger(Face:string,Pos:vector) {
-        GAME_MAP:removeString(Face + Pos[1] + Pos[2])
+    function map_remove_trigger(Face:string, Pos:vector) {
+        GAME_MAP:removeString(format("%s%d%d", Face, Pos:x(), Pos:y()))
     }
-    function map_remove_trigger(Face:string,Pos:vector,Event:string) {
-        local Key = Face + Pos[1] + Pos[2]
-        if (GAME_MAP[Key,string] == Event) {
+    function map_remove_trigger(Face:string, Pos:vector, Event:string) {
+        local Key = format("%s%d%d", Face, Pos:x(), Pos:y())
+        if (GAME_MAP[Key, string] == Event) {
             GAME_MAP:removeString(Key)
         }
     }
-    function map_trigger(Face:string,Pos:vector) {
-        local Key = Face + Pos[1] + Pos[2]
-        if (GAME_MAP[Key,string]) {
-            printColor(vec(255,255,255),"Event-> ",vec(252,152,0),GAME_MAP[Key,string],vec(255,255,255)," at ",vec(252,152,0),Key)
-            GAME_MAP[Key,string](Key,Face,Pos)
+    function map_trigger(Face:string, Pos:vector) {
+        local Key = format("%s%d%d", Face, Pos:x(), Pos:y())
+        if (GAME_MAP[Key, string]) {
+            print(format("Event-> %25s at %s %+3dx %+3dy", GAME_MAP[Key, string], Face, Pos[1], Pos[2]))
+            GAME_MAP[Key, string](Key, Face, Pos)
         }
     }
     function map_reset() {
         GAME_MAP = table()
 
-        for (I = 1,6) {
-            local Face = select(I,"u","d","f","b","l","r")
-            map_set_trigger(Face,vec(CUBE_HALF,CUBE_HALF,0),"event_collide_corner")
-            map_set_trigger(Face,vec(CUBE_HALF,-CUBE_HALF,0),"event_collide_corner")
-            map_set_trigger(Face,vec(-CUBE_HALF,CUBE_HALF,0),"event_collide_corner")
-            map_set_trigger(Face,vec(-CUBE_HALF,-CUBE_HALF,0),"event_collide_corner")
+        for (I = 1, 6) {
+            local Face = select(I, "u", "d", "f", "b", "l", "r")
+            map_set_trigger(Face, vec(CUBE_HALF, CUBE_HALF, 0), "event_collide_corner")
+            map_set_trigger(Face, vec(CUBE_HALF, -CUBE_HALF, 0), "event_collide_corner")
+            map_set_trigger(Face, vec(-CUBE_HALF, CUBE_HALF, 0), "event_collide_corner")
+            map_set_trigger(Face, vec(-CUBE_HALF, -CUBE_HALF, 0), "event_collide_corner")
         }
+    }
+
+
+    #--------------------------------------------------------------
+    #-- powerups --------------------------------------------------
+    #--------------------------------------------------------------
+
+    # powerup -> speed increase
+    function number powerup_fast(Data:table) {
+        if (Ct - Data["time", number] > Data["duration", number]) {
+            GAME_SPEED_MUL = max(GAME_SPEED_MUL - 1, 0.5)
+            return 1
+        }
+        return 0
+    }
+    function table powerup_fast_activate() {
+        GAME_SPEED_MUL += 1
+        return table(
+            "func" = "powerup_fast",
+            "sound" = "vo/npc/barney/ba_hurryup.wav",
+            "pitch" = 144,
+            "time" = Ct,
+            "duration" = 20
+        )
+    }
+
+    # powerup -> speed decrease
+    function number powerup_slow(Data:table) {
+        if (Ct - Data["time", number] > Data["duration", number]) {
+            GAME_SPEED_MUL += 0.5
+            return 1
+        }
+        return 0
+    }
+    function table powerup_slow_activate() {
+        GAME_SPEED_MUL = max(GAME_SPEED_MUL - 0.5, 0.5)
+        return table(
+            "func" = "powerup_slow",
+            "sound" = "vo/npc/barney/ba_damnit.wav",
+            "pitch" = 144,
+            "time" = Ct,
+            "duration" = 10
+        )
+    }
+
+    # powerup -> mindfuck
+    function number powerup_mindfuck(Data:table) {
+        if (Ct - Data["time", number] > Data["duration", number]) {
+            GAME_CTRL["current", table] = GAME_CTRL["normal", table]
+
+            holoEntity(Data["index", number]):soundPlay("brutal", 0, "vo/npc/alyx/brutal02.wav"), soundPitch("brutal", 135)
+
+            return 1
+        }
+        return 0
+    }
+    function table powerup_mindfuck_activate() {
+        GAME_CTRL["current", table] = GAME_CTRL["mindfuck", table]
+        return table(
+            "func" = "powerup_mindfuck",
+            "sound" = "vo/npc/male01/thehacks01.wav",
+            "pitch" = 144,
+            "time" = Ct,
+            "duration" = 5
+        )
+    }
+
+    # powerup -> ghost
+    function number powerup_ghost(Data:table) {
+        if (Ct - Data["time", number] > Data["duration", number]) {
+            POWERUP_GHOST = 0
+
+            holoAlpha(SNAKE_INDEX, 255)
+            holoAlpha(SNAKE_INDEX+1, 255)
+            holoAlpha(SNAKE_INDEX+2, 255)
+
+            for (I = 1, TAIL_MAX) { holoAlpha(I, 255) }
+
+            return 1
+        }
+        return 0
+    }
+    function table powerup_ghost_activate() {
+        POWERUP_GHOST = 1
+
+        holoAlpha(SNAKE_INDEX, 100)
+        holoAlpha(SNAKE_INDEX+1, 100)
+        holoAlpha(SNAKE_INDEX+2, 100)
+
+        for (I = 1, TAIL_MAX) { holoAlpha(I, 100) }
+
+        return table(
+            "func" = "powerup_ghost",
+            "sound" = "vo/npc/male01/fantastic01.wav",
+            "pitch" = 144,
+            "time" = Ct,
+            "duration" = 15
+        )
+    }
+
+    function number powerup_obstacle(Data:table) {
+        if (Ct - Data["time", number] > Data["duration", number]) {
+            if (OBSTACLE_POOL:count()) {
+                local N = OBSTACLE_POOL:popNumber()
+                local M = map_get_empty(SNAKE_FACE)
+
+                object_set_pos_ang(N, M[2, string], M[3, vector], CUBE_MATRIX[M[2, string], table]["d", vector]:toAngle())
+                map_set_trigger(M[2, string], M[3, vector], "event_collide_obstacle")
+            }
+            return 1
+        }
+        return 0
+    }
+    function table powerup_obstacle_activate() {
+        return table(
+            "func" = "powerup_obstacle",
+            "sound" = "vo/npc/barney/ba_lookout.wav",
+            "pitch" = 144,
+            "time" = Ct,
+            "duration" = 0
+        )
     }
 
 
@@ -347,29 +518,45 @@ if (first()) {
         if (!FRUIT_POOL:count()) { return }
 
         local N = FRUIT_POOL:popNumber()
-        local M = map_get_empty()
+        local M = map_get_empty("")
 
-        FRUIT_MAP[M[1,string],table] = table(
+        FRUIT_MAP[M[1, string], table] = table(
             "index" = N,
             "value" = 100,
             "decay" = Ct
         )
 
-        map_set_trigger(M[2,string],M[3,vector],"event_collide_fruit")
-        object_set_pos(N,M[2,string],M[3,vector])
+        map_set_trigger(M[2, string], M[3, vector], "event_collide_fruit")
+        object_set_pos(N, M[2, string], M[3, vector])
+    }
+    function string game_random_powerup() {
+        local RNG = random(1, POWERUP_WEIGHTS:values():sum())
+        local SUM = 0
+
+        foreach (K, W:number = POWERUP_WEIGHTS) {
+            SUM += W
+            if (SUM >= RNG) {
+                return K
+            }
+        }
+
+        return ""
     }
     function game_add_powerup() {
         if (!POWERUP_POOL:count()) { return }
+        local P = game_random_powerup()
 
-        local N = POWERUP_POOL:popNumber()
-        local M = map_get_empty()
+        if (P) {
+            local N = POWERUP_POOL:popNumber()
+            local M = map_get_empty("")
+            POWERUP_MAP[M[1, string], table] = table(
+                "index" = N,
+                "onHit" = P
+            )
 
-        POWERUP_MAP[M[1,string],table] = table(
-            "index" = N
-        )
-
-        map_set_trigger(M[2,string],M[3,vector],"event_collide_powerup")
-        object_set_pos(N,M[2,string],M[3,vector])
+            map_set_trigger(M[2, string], M[3, vector], "event_collide_powerup")
+            object_set_pos(N, M[2, string], M[3, vector])
+        }
     }
 
 
@@ -381,8 +568,10 @@ if (first()) {
 
         reset_object_holos()
 
+        GAME_SPEED_MUL = 1
+
         SNAKE_POS = vec()
-        SNAKE_DIR = vec(1,0,0)
+        SNAKE_DIR = vec(1, 0, 0)
         SNAKE_FACE = "u"
 
         TAIL = table()
@@ -390,47 +579,71 @@ if (first()) {
 
         FRUIT_MAP = table()
         FRUIT_POOL = array()
-        for (I = FRUIT_INDEX,FRUIT_INDEX+FRUIT_MAX-1) {
+        for (I = FRUIT_INDEX, FRUIT_INDEX+FRUIT_MAX-1) {
             FRUIT_POOL:pushNumber(I)
         }
 
         POWERUP_MAP = table()
         POWERUP_POOL = array()
-        for (I = POWERUP_INDEX,POWERUP_INDEX+POWERUP_MAX-1) {
+        for (I = POWERUP_INDEX, POWERUP_INDEX+POWERUP_MAX-1) {
             POWERUP_POOL:pushNumber(I)
+        }
+
+        OBSTACLE_POOL = array()
+        for (I = OBSTACLE_INDEX, OBSTACLE_INDEX+OBSTACLE_MAX-1) {
+            OBSTACLE_POOL:pushNumber(I)
         }
 
         map_reset()
     }
-    function event_death(Key:string,Face:string,Pos:vector) {
+    function event_death(Key:string, Face:string, Pos:vector) {
+        CUBE_ENT:soundPlay("death1", 0, "vo/npc/barney/ba_no02.wav"), soundPitch("death1", 144)
         event_reset()
         exit()
     }
-    function event_collide_self(Key:string,Face:string,Pos:vector) {
-        event_death(Key,Face,Pos)
+    function event_collide_self(Key:string, Face:string, Pos:vector) {
+        if (!POWERUP_GHOST) {
+            event_death(Key, Face, Pos)
+        }
     }
-    function event_collide_corner(Key:string,Face:string,Pos:vector) {
-        event_death(Key,Face,Pos)
+    function event_collide_corner(Key:string, Face:string, Pos:vector) {
+        if (!POWERUP_GHOST) {
+            event_death(Key, Face, Pos)
+        }
     }
-    function event_collide_fruit(Key:string,Face:string,Pos:vector) {
+    function event_collide_obstacle(Key:string, Face:string, Pos:vector) {
+        if (!POWERUP_GHOST) {
+            event_death(Key, Face, Pos)
+        }
+    }
+    function event_collide_fruit(Key:string, Face:string, Pos:vector) {
         local Object = FRUIT_MAP:removeTable(Key)
 
-        holoPos(Object["index",number],CUBE_ENT:pos())
+        holoPos(Object["index", number], CUBE_ENT:pos())
 
-        for (I = 1,FRUIT_BONUS) {
+        for (I = 1, FRUIT_BONUS) {
             game_add_fruit()
         }
 
+        if (TAIL_COUNT < TAIL_MAX) { TAIL_COUNT++ }
+
         GAME_MAP:removeString(Key)
-        FRUIT_POOL:pushNumber(Object["index",number])
+        FRUIT_POOL:pushNumber(Object["index", number])
     }
-    function event_collide_powerup(Key:string,Face:string,Pos:vector) {
+    function event_collide_powerup(Key:string, Face:string, Pos:vector) {
         local Object = POWERUP_MAP:removeTable(Key)
 
-        holoPos(Object["index",number],CUBE_ENT:pos())
+        local PowerUp = Object["onHit", string]()[table]
+        PowerUp["index", number] = Object["index", number]
+
+        POWERUP_ACTIVE:pushTable(PowerUp)
+        POWERUP_TIME = Ct
+
+        holoEntity(Object["index", number]):soundPlay(Key + "powerup", 0, PowerUp["sound", string]), soundPitch(Key + "powerup", PowerUp["pitch", number])
+        holoPos(Object["index", number], CUBE_ENT:pos())
 
         GAME_MAP:removeString(Key)
-        POWERUP_POOL:pushNumber(Object["index",number])
+        POWERUP_POOL:pushNumber(Object["index", number])
     }
 
 
@@ -439,26 +652,26 @@ if (first()) {
     #--------------------------------------------------------------
     GAME_CTRL = table(
         "normal" = table(
-            "up" = vec(1,0,0),
-            "down" = vec(-1,0,0),
-            "left" = vec(0,1,0),
-            "right" = vec(0,-1,0)
+            "up" = vec(1, 0, 0),
+            "down" = vec(-1, 0, 0),
+            "left" = vec(0, 1, 0),
+            "right" = vec(0, -1, 0)
         ),
         "mindfuck" = table(
-            "up" = vec(-1,0,0),
-            "down" = vec(1,0,0),
-            "left" = vec(0,-1,0),
-            "right" = vec(0,1,0)
+            "up" = vec(-1, 0, 0),
+            "down" = vec(1, 0, 0),
+            "left" = vec(0, -1, 0),
+            "right" = vec(0, 1, 0)
         )
     )
 
-    GAME_CTRL["current",table] = GAME_CTRL["normal",table]
+    GAME_CTRL["current", table] = GAME_CTRL["normal", table]
 
 
     #--------------------------------------------------------------
     #-- misc stuff ------------------------------------------------
     #--------------------------------------------------------------
-    timer("spawn",15)
+    timer("spawn", 15)
 }
 
 
@@ -466,26 +679,26 @@ if (first()) {
 #-- spawner and rebuidler -------------------------------------
 #--------------------------------------------------------------
 if (clk("spawn")) {
-    timer("spawn",15)
+    timer("spawn", 15)
     while (perf() & holoCanCreate() & HOLO_N < TAIL_MAX) {
         HOLO_N++
         holoCreate(HOLO_N)
-        holoParent(HOLO_N,CUBE_INDEX)
-        if (HOLO_N >= 100) {
-            rebuild_cube(CFG_SIZE,CFG_TILE,0.1,CFG_SKIN)
+        holoParent(HOLO_N, CUBE_INDEX)
+        if (HOLO_N >= TAIL_MAX) {
+            rebuild_cube(CFG_SIZE, CFG_TILE, 0.1, CFG_SKIN)
             stoptimer("spawn")
         }
     }
 }
 if (clk("rebuild")) {
-    timer("rebuild",15)
+    timer("rebuild", 15)
     while (perf() & HOLO_DATA:count()) {
         local D = HOLO_DATA:popArray()
-        holoVisual(D[1,number],D[2,vector],D[3,angle],D[4,vector],D[5,string],D[6,string],D[7,vector4])
+        holoVisual(D[1, number], D[2, vector], D[3, angle], D[4, vector], D[5, string], D[6, string], D[7, vector4])
         if (!HOLO_DATA:count()) {
             event_reset()
             stoptimer("rebuild")
-            timer("game",100)
+            timer("game", 100)
         }
     }
 }
@@ -496,31 +709,31 @@ if (clk("rebuild")) {
 #--------------------------------------------------------------
 if (keyClk(GAME_PLAYER)) {
     local Key = keyClkPressed()
-    if (GAME_CTRL["current",table][Key,vector]){
+    if (GAME_CTRL["current", table][Key, vector]){
         if (GAME_PLAYER:keyPressed(Key)) {
-            if (GAME_KEYBUFFER:count() < 3 & Key != GAME_KEYBUFFER[GAME_KEYBUFFER:count(),string]) {
+            if (GAME_KEYBUFFER:count() < 3 & Key != GAME_KEYBUFFER[GAME_KEYBUFFER:count(), string]) {
                 GAME_KEYBUFFER:pushString(Key)
             }
         }
     }
 }
 if (clk("game")) {
-    timer("game",105)
+    timer("game", 105)
 
     Dt = curtime() - Ct
     Ct = curtime()
 
     if (changed(GAME_PLAYER)) {
-        runOnKeys(GAME_PLAYER,1)
+        runOnKeys(GAME_PLAYER, 1)
         GAME_KEYBUFFER = array()
     }
 
-    GAME_INTERPOLATE += Dt*cbrt(CUBE_SIZE)
+    GAME_INTERPOLATE += Dt*sqrt(CUBE_GRID)*GAME_SPEED_MUL
 
     while (GAME_INTERPOLATE >= 1) {
         # key buffer
-        if (abs(SNAKE_POS[1]) != CUBE_HALF & abs(SNAKE_POS[2]) != CUBE_HALF) {
-            local Next = GAME_CTRL["current",table][GAME_KEYBUFFER:removeString(1),vector]
+        if (abs(SNAKE_POS:x()) != CUBE_HALF & abs(SNAKE_POS:y()) != CUBE_HALF) {
+            local Next = GAME_CTRL["current", table][GAME_KEYBUFFER:removeString(1), vector]
             SNAKE_DIR = ((SNAKE_DIR == -Next) ? SNAKE_DIR : Next) ?: SNAKE_DIR
         }
 
@@ -529,133 +742,141 @@ if (clk("game")) {
             "old_r" = SNAKE_POS,
             "old_p" = SNAKE_POS*CUBE_TILE,
             "old_f" = SNAKE_FACE,
-            "old_u" = CUBE_MATRIX[SNAKE_FACE,table]["d",vector]*CUBE_Z,
-            "old_a" = CUBE_MATRIX[SNAKE_FACE,table]["a",angle]
+            "old_u" = CUBE_MATRIX[SNAKE_FACE, table]["d", vector]*CUBE_Z,
+            "old_a" = CUBE_MATRIX[SNAKE_FACE, table]["a", angle]
         )
 
         # add dir to position
-        SNAKE_POS = clamp(SNAKE_POS + SNAKE_DIR,vec(-CUBE_HALF),vec(CUBE_HALF))
+        SNAKE_POS = clamp(SNAKE_POS + SNAKE_DIR, vec(-CUBE_HALF), vec(CUBE_HALF))
 
         # evaluate new position
-        map_trigger(SNAKE_FACE,SNAKE_POS)
+        map_trigger(SNAKE_FACE, SNAKE_POS)
 
         # wrap x
-        if (SNAKE_POS[1] >= CUBE_HALF | SNAKE_POS[1] <= -CUBE_HALF) {
-            local Swap = sign(SNAKE_POS[1])
-            local Next = CUBE_MATRIX[SNAKE_FACE,table]["x",array][Swap > 0 ? 1 : 2,string]
+        if (SNAKE_POS:x() >= CUBE_HALF | SNAKE_POS:x() <= -CUBE_HALF) {
+            local Swap = sign(SNAKE_POS:x())
+            local Next = CUBE_MATRIX[SNAKE_FACE, table]["x", array][Swap > 0 ? 1 : 2, string]
 
             switch (SNAKE_FACE) {
                 case "l",
-                    SNAKE_DIR = vec(0,-1,0)
-                    SNAKE_POS = vec(SNAKE_POS[2],SNAKE_POS[1],0) * Swap
+                    SNAKE_DIR = vec(0, -1, 0)
+                    SNAKE_POS = vec(SNAKE_POS:y(), SNAKE_POS:x(), 0) * Swap
                 break
                 case "r",
-                    SNAKE_DIR = vec(0,1,0)
-                    SNAKE_POS = vec(SNAKE_POS[2],SNAKE_POS[1],0) * -Swap
+                    SNAKE_DIR = vec(0, 1, 0)
+                    SNAKE_POS = vec(SNAKE_POS:y(), SNAKE_POS:x(), 0) * -Swap
                 break
                 default,
-                    SNAKE_POS[1] = -SNAKE_POS[1]
+                    SNAKE_POS[1] = -SNAKE_POS:x()
                 break
             }
 
             SNAKE_FACE = Next
 
-            map_trigger(SNAKE_FACE,SNAKE_POS)
+            map_trigger(SNAKE_FACE, SNAKE_POS)
         }
 
         # wrap y
-        elseif (SNAKE_POS[2] >= CUBE_HALF | SNAKE_POS[2] <= -CUBE_HALF) {
-            local Swap = sign(SNAKE_POS[2])
-            local Next = CUBE_MATRIX[SNAKE_FACE,table]["y",array][Swap > 0 ? 1 : 2,string]
+        elseif (SNAKE_POS:y() >= CUBE_HALF | SNAKE_POS:y() <= -CUBE_HALF) {
+            local Swap = sign(SNAKE_POS:y())
+            local Next = CUBE_MATRIX[SNAKE_FACE, table]["y", array][Swap > 0 ? 1 : 2, string]
 
             switch (SNAKE_FACE) {
                 case "u",
-                    SNAKE_POS[2] = -SNAKE_POS[2]
+                    SNAKE_POS[2] = -SNAKE_POS:y()
                 break
                 case "d",
                     SNAKE_DIR = -SNAKE_DIR
-                    SNAKE_POS[1] = -SNAKE_POS[1]
+                    SNAKE_POS[1] = -SNAKE_POS:x()
                 break
                 case "f",
-                    SNAKE_DIR  = vec(-1,0,0)
-                    SNAKE_POS = vec(SNAKE_POS[2],SNAKE_POS[1],0) * Swap
+                    SNAKE_DIR  = vec(-1, 0, 0)
+                    SNAKE_POS = vec(SNAKE_POS:y(), SNAKE_POS:x(), 0) * Swap
                 break
                 case "b",
-                    SNAKE_DIR  = vec(1,0,0)
-                    SNAKE_POS = vec(SNAKE_POS[2],SNAKE_POS[1],0) * -Swap
+                    SNAKE_DIR  = vec(1, 0, 0)
+                    SNAKE_POS = vec(SNAKE_POS:y(), SNAKE_POS:x(), 0) * -Swap
                 break
                 case "l",
                     if (Swap == 1) {
                         SNAKE_DIR = -SNAKE_DIR
-                        SNAKE_POS[1] = -SNAKE_POS[1]
+                        SNAKE_POS[1] = -SNAKE_POS:x()
                     }
                     else {
-                        SNAKE_POS[2] = -SNAKE_POS[2]
+                        SNAKE_POS[2] = -SNAKE_POS:y()
                     }
                 break
                 case "r",
                     if (Swap == 1) {
-                        SNAKE_POS[2] = -SNAKE_POS[2]
+                        SNAKE_POS[2] = -SNAKE_POS:y()
                     }
                     else {
                         SNAKE_DIR = -SNAKE_DIR
-                        SNAKE_POS[1] = -SNAKE_POS[1]
+                        SNAKE_POS[1] = -SNAKE_POS:x()
                     }
                 break
             }
 
             SNAKE_FACE = Next
 
-            map_trigger(SNAKE_FACE,SNAKE_POS)
+            map_trigger(SNAKE_FACE, SNAKE_POS)
         }
 
-        map_set_trigger(SNAKE_FACE,SNAKE_POS,"event_collide_self")
+        map_set_trigger(SNAKE_FACE, SNAKE_POS, "event_collide_self")
 
         # set new snake info
         SNAKE_FRAME = SNAKE_FRAME:add(table(
             "new_r" = SNAKE_POS,
             "new_p" = SNAKE_POS*CUBE_TILE,
             "new_f" = SNAKE_FACE,
-            "new_u" = CUBE_MATRIX[SNAKE_FACE,table]["d",vector]*CUBE_Z,
-            "new_a" = CUBE_MATRIX[SNAKE_FACE,table]["a",angle]
+            "new_u" = CUBE_MATRIX[SNAKE_FACE, table]["d", vector]*CUBE_Z,
+            "new_a" = CUBE_MATRIX[SNAKE_FACE, table]["a", angle]
         ))
 
         # shift frame into tail
         TAIL:unshiftTable(SNAKE_FRAME)
         while (TAIL:count() > TAIL_COUNT + 1) {
             local T = TAIL:popTable()
-            map_remove_trigger(T["new_f",string],T["new_r",vector],"event_collide_self")
+            map_remove_trigger(T["new_f", string], T["new_r", vector], "event_collide_self")
         }
 
         # add fruit when there are none
-        while (FRUIT_POOL:count() == FRUIT_MAX) {
+        while (FRUIT_POOL:count() > FRUIT_MAX - 2) {
             game_add_fruit()
         }
 
         # add pwerup when there are none
-        while (POWERUP_POOL:count() == POWERUP_MAX) {
+        while (Ct - POWERUP_TIME > 15 & POWERUP_POOL:count() == POWERUP_MAX) {
             game_add_powerup()
+        }
+        foreach (K:number, PowerUp:table = POWERUP_ACTIVE) {
+            if (PowerUp["func", string](PowerUp)[number]) {
+                POWERUP_ACTIVE:removeTable(K)
+            }
         }
 
         # remainder
         GAME_INTERPOLATE--
     }
 
+    local Dir = (GAME_PLAYER:shootPos() - CUBE_ENT:pos()):setZ(0)
+    local Mat = CUBE_MATRIX[SNAKE_FACE, table]["m", matrix]
+    holoAng(CUBE_INDEX, slerp(quat(CUBE_ENT), quat(Mat:toAngle()) * qRotation(Mat:z(), 45 + 180 + atan(Dir:y(), Dir:x())), 0.5):toAngle())
 
-    #local D = (Player:shootPos() - Cube:pos()):normalized():setZ(0)
-    #local M = Cube_Info[Snake_Face,table]["m",matrix]
-    #holoAng(1000,slerp(quat(Cube),quat(M:toAngle()) * qRotation(M:z(),45 + 180 + atan(D[2],D[1])),0.4):toAngle())
-
-    holoPos(SNAKE_INDEX,mix(
-        toWorld(SNAKE_FRAME["new_p",vector],Ang,CUBE_ENT:toWorld(SNAKE_FRAME["new_u",vector]),CUBE_ENT:toWorld(SNAKE_FRAME["new_a",angle])),
-        toWorld(SNAKE_FRAME["old_p",vector],Ang,CUBE_ENT:toWorld(SNAKE_FRAME["old_u",vector]),CUBE_ENT:toWorld(SNAKE_FRAME["old_a",angle])),
+    holoPos(SNAKE_INDEX, mix(
+        toWorld(SNAKE_FRAME["new_p", vector], Ang, CUBE_ENT:toWorld(SNAKE_FRAME["new_u", vector]), CUBE_ENT:toWorld(SNAKE_FRAME["new_a", angle])),
+        toWorld(SNAKE_FRAME["old_p", vector], Ang, CUBE_ENT:toWorld(SNAKE_FRAME["old_u", vector]), CUBE_ENT:toWorld(SNAKE_FRAME["old_a", angle])),
         GAME_INTERPOLATE))
 
-    for (I = 1,TAIL:count()) {
-        local F = TAIL[I+1,table]
-        holoPos(I,mix(
-            toWorld(F["new_p",vector],Ang,CUBE_ENT:toWorld(F["new_u",vector]),CUBE_ENT:toWorld(F["new_a",angle])),
-            toWorld(F["old_p",vector],Ang,CUBE_ENT:toWorld(F["old_u",vector]),CUBE_ENT:toWorld(F["old_a",angle])),
+    if (changed(SNAKE_FACE) | changed(SNAKE_DIR)) {
+        holoAng(SNAKE_INDEX, toWorldAng(Vec, SNAKE_DIR:toAngle(), Vec, CUBE_ENT:toWorld(CUBE_MATRIX[SNAKE_FACE, table]["a", angle])))
+    }
+
+    for (I = 1, TAIL:count()) {
+        local F = TAIL[I+1, table]
+        holoPos(I, mix(
+            toWorld(F["new_p", vector], Ang, CUBE_ENT:toWorld(F["new_u", vector]), CUBE_ENT:toWorld(F["new_a", angle])),
+            toWorld(F["old_p", vector], Ang, CUBE_ENT:toWorld(F["old_u", vector]), CUBE_ENT:toWorld(F["old_a", angle])),
             GAME_INTERPOLATE))
     }
 }

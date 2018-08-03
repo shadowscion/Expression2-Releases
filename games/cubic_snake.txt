@@ -1,7 +1,7 @@
 @name games/cubic_snake
 @inputs
 
-@outputs POWERUP_ACTIVE:table GAME_SPEED_MUL
+@outputs GAME_POINT_MUL GAME_SCORE
 
 # HOLOGRAM
 @persist [HOLO_N] [CFG_SIZE CFG_TILE] [CFG_SKIN]:string [HOLO_DATA SKINS]:table [HOLO_R]:array Vec:vector Ang:angle
@@ -17,7 +17,7 @@
 
 # POWERUP
 @persist [POWERUP_POOL]:array [POWERUP_MAP POWERUP_ACTIVE POWERUP_WEIGHTS]:table [POWERUP_MAX POWERUP_INDEX POWERUP_TIME]
-@persist [POWERUP_GHOST]
+@persist [POWERUP_GHOST POWERUP_MARIO] [MARIO_INDEX]
 
 # FRUIT
 @persist [FRUIT_POOL]:array [FRUIT_MAP]:table [FRUIT_MAX FRUIT_INDEX FRUIT_BONUS]
@@ -26,7 +26,7 @@
 @persist [OBSTACLE_POOL]:array [OBSTACLE_MAX OBSTACLE_INDEX]
 
 # GAME
-@persist [GAME_MAP GAME_CTRL]:table [GAME_KEYBUFFER]:array [GAME_PLAYER]:entity [GAME_INTERPOLATE GAME_SPEED_MUL] [Dt Ct]
+@persist [GAME_MAP GAME_CTRL]:table [GAME_KEYBUFFER]:array [GAME_PLAYER]:entity [GAME_INTERPOLATE GAME_SPEED_MUL GAME_POINT_MUL GAME_SCORE] [Dt Ct]
 
 # MISC
 @model models/hunter/blocks/cube1x1x1.mdl
@@ -42,7 +42,7 @@ if (first()) {
     entity():setAlpha(0)
 
     TAIL_MAX = 100
-    CFG_SIZE = 96
+    CFG_SIZE = 47
     CFG_TILE = 16
     CFG_SKIN = "default"
 
@@ -54,9 +54,10 @@ if (first()) {
             "snake"  = vec4(55, 155, 55, 255),
             "tail1"  = vec4(109, 182, 109, 255),
             "tail2"  = vec4(hsv2rgb(rgb2hsv(109, 182, 109) * vec(1, 0.50, 0.75)), 255),
-            "fruit"  = vec4(214, 73, 51, 255),
+            "fruit1" = vec4(214, 73, 51, 255),
+            "fruit2" = vec4(127, 111, 63, 255),
             "power"  = vec4(88, 94, 176, 255),
-            "material" = "phoenix_storms/mat/mat_phx_metallic2"
+            "material" = "phoenix_storms/concrete3"
         ),
          "skin1" = table(
             "cube"   = vec4(248, 244, 244, 255),
@@ -65,18 +66,21 @@ if (first()) {
             "snake"  = vec4(122, 199, 79, 255),
             "tail1"  = vec4(111, 181, 72, 255),
             "tail2"  = vec4(67, 109, 44, 255),
-            "fruit"  = vec4(244, 96, 54, 255),
+            "fruit1" = vec4(244, 96, 54, 255),
+            "fruit2" = vec4(127, 111, 63, 255),
             "power"  = vec4(0, 154, 152, 255),
-            "material" = "phoenix_storms/mat/mat_phx_metallic2"
+            "material" = "phoenix_storms/concrete3"
         )
     )
 
     POWERUP_WEIGHTS = table(
-        "powerup_fast_activate"     = 40,
+        "powerup_mario_activate"    = 25,
+        "powerup_obstacle_activate" = 25,
+        "powerup_fast_activate"     = 25,
         "powerup_ghost_activate"    = 20,
         "powerup_slow_activate"     = 20,
-        "powerup_obstacle_activate" = 10,
-        "powerup_mindfuck_activate" = 10
+        "powerup_harvest_activate"  = 15,
+        "powerup_mindfuck_activate" = 5
     )
 
     #phoenix_storms/Fender_white
@@ -128,7 +132,7 @@ if (first()) {
         POWERUP_POOL:pushNumber(HOLO_N)
     }
 
-
+    # snake
     HOLO_N++
     holoCreate(HOLO_N)
     holoParent(HOLO_N, CUBE_INDEX)
@@ -141,6 +145,16 @@ if (first()) {
     HOLO_N++
     holoCreate(HOLO_N)
     holoParent(HOLO_N, SNAKE_INDEX)
+    
+    # mario tube
+    HOLO_N++
+    holoCreate(HOLO_N)
+    holoParent(HOLO_N, CUBE_INDEX)
+    MARIO_INDEX = HOLO_N
+
+    HOLO_N++
+    holoCreate(HOLO_N)
+    holoParent(HOLO_N, CUBE_INDEX)        
 
     OBSTACLE_MAX = holoRemainingSpawns() - 1
     OBSTACLE_POOL = array()
@@ -163,7 +177,7 @@ if (first()) {
         holoMaterial(N, Material)
         holoScaleUnits(N, Scale)
         holoColor(N, Color)
-        holoDisableShading(N, 1)
+        #holoDisableShading(N, 1)
 
         HOLO_R:pushNumber(N)
     }
@@ -215,7 +229,7 @@ if (first()) {
         # FRUIT
         local Scale = vec(CUBE_TILE - Padding)
         for (I = 1, FRUIT_MAX) {
-            N++, HOLO_DATA:pushArray(array(N, Vec, Ang, Scale, "icosphere2", Material, Skin["fruit", vector4]))
+            N++, HOLO_DATA:pushArray(array(N, Vec, Ang, Scale, "icosphere2", Material, Skin["fruit1", vector4]))
         }
 
         # POWERUP
@@ -229,6 +243,10 @@ if (first()) {
         N++, HOLO_DATA:pushArray(array(N, Vec:setZ(CUBE_Z), Ang, Scale, "", Material, Skin["snake", vector4]))
         N++, HOLO_DATA:pushArray(array(N, vec(Scale:x(), 0, -Scale:z()*0.25), Ang, Scale*vec(1, 1, 0.5), "", Material, Skin["snake", vector4]))
         N++, HOLO_DATA:pushArray(array(N, vec(Scale:x()*0.25, 0, Scale:z()*0.25), Ang, Scale*vec(0.2, 1.1, 0.2), "", "", vec4(15, 15, 15, 255)))
+        
+        # WORMHOLE
+        N++, HOLO_DATA:pushArray(array(N, Vec, Ang, vec(CUBE_TILE) , "hq_stube", Material, vec4(55, 255, 55, 255)))
+        N++, HOLO_DATA:pushArray(array(N, Vec, Ang, vec(CUBE_TILE) , "hq_stube", Material, vec4(55, 255, 55, 255)))
 
         # OBSTACLE
         local Scale = vec(CUBE_TILE - Padding)
@@ -290,9 +308,16 @@ if (first()) {
         holoAng(N, toWorldAng(Vec, Angl, Vec, CUBE_ENT:toWorld(CUBE_MATRIX[Face, table]["a", angle])))
     }
     function object_set_pos_ang(N, Face:string, Pos:vector, Angl:angle) {
-        local PA =  toWorldPosAng(Pos*CUBE_TILE, Angl, CUBE_ENT:toWorld(CUBE_MATRIX[Face, table]["d", vector]*CUBE_Z), CUBE_ENT:toWorld(CUBE_MATRIX[Face, table]["a", angle]))
-        holoPos(N, PA[1, vector])
-        holoAng(N, PA[2, angle])
+        if (Pos:z()) {
+            local PA =  toWorldPosAng(Pos:setZ(0)*CUBE_TILE, Angl, CUBE_ENT:toWorld(CUBE_MATRIX[Face, table]["d", vector]*Pos:z()), CUBE_ENT:toWorld(CUBE_MATRIX[Face, table]["a", angle]))
+            holoPos(N, PA[1, vector])
+            holoAng(N, PA[2, angle])             
+        }
+        else {
+            local PA =  toWorldPosAng(Pos*CUBE_TILE, Angl, CUBE_ENT:toWorld(CUBE_MATRIX[Face, table]["d", vector]*CUBE_Z), CUBE_ENT:toWorld(CUBE_MATRIX[Face, table]["a", angle]))
+            holoPos(N, PA[1, vector])
+            holoAng(N, PA[2, angle])            
+        }
     }
 
 
@@ -303,32 +328,38 @@ if (first()) {
         "u" = table(
             "m" = matrix(vec(1, 0, 0), vec(0, -1, 0), vec(0, 0, 1)),
             "x" = array("f", "b"),
-            "y" = array("l", "r")
+            "y" = array("l", "r"),
+            "o" = "d"
         ),
         "d" = table(
             "m" = matrix(vec(-1, 0, 0), vec(0, -1, 0), vec(0, 0, -1)),
             "x" = array("b", "f"),
-            "y" = array("l", "r")
+            "y" = array("l", "r"),
+            "o" = "u"
         ),
         "f" = table(
             "m" =  matrix(vec(0, 0, 1), vec(0, -1, 0), vec(1, 0, 0)),
             "x" = array("d", "u"),
-            "y" = array("l", "r")
+            "y" = array("l", "r"),
+            "o" = "b"
         ),
         "b" = table(
             "m" =  matrix(vec(0, 0, -1), vec(0, -1, 0), vec(-1, 0, 0)),
             "x" = array("u", "d"),
-            "y" = array("l", "r")
+            "y" = array("l", "r"),
+            "o" = "f"
         ),
         "l" = table(
             "m" =  matrix(vec(1, 0, 0), vec(0, 0, 1), vec(0, 1, 0)),
             "x" = array("f", "b"),
-            "y" = array("d", "u")
+            "y" = array("d", "u"),
+            "o" = "r"
         ),
         "r" = table(
             "m" =  matrix(vec(1, 0, 0), vec(0, 0, -1), vec(0, -1, 0)),
             "x" = array("f", "b"),
-            "y" = array("u", "d")
+            "y" = array("u", "d"),
+            "o" = "l"
         )
     )
 
@@ -391,19 +422,159 @@ if (first()) {
 
 
     #--------------------------------------------------------------
+    #-- game objects ----------------------------------------------
+    #--------------------------------------------------------------
+    function void game_add_fruit() {
+        if (!FRUIT_POOL:count()) { return }
+
+        local N = FRUIT_POOL:popNumber()
+        local M = map_get_empty("")
+
+        FRUIT_MAP[M[1, string], table] = table(
+            "index" = N,
+            "value" = 100,
+            "decay" = Ct
+        )
+        
+        holoEntity(N):soundPlay("fruit_add" + N, 1, "garrysmod/balloon_pop_cute.wav"), soundPitch("fruit_add" + N, 100 + (FRUIT_MAX - FRUIT_POOL:count()))
+
+        map_set_trigger(M[2, string], M[3, vector], "event_collide_fruit")
+        object_set_pos(N, M[2, string], M[3, vector])
+    }
+    function string game_random_powerup() {
+        local RNG = random(1, POWERUP_WEIGHTS:values():sum())
+        local SUM = 0
+
+        foreach (K, W:number = POWERUP_WEIGHTS) {
+            SUM += W
+            if (SUM >= RNG) {
+                return K
+            }
+        }
+
+        return ""
+    }
+    function game_add_powerup() {
+        if (!POWERUP_POOL:count()) { return }
+        local P = game_random_powerup()
+
+        if (P) {
+            local N = POWERUP_POOL:popNumber()
+            local M = map_get_empty("")
+            POWERUP_MAP[M[1, string], table] = table(
+                "index" = N,
+                "onHit" = P
+            )
+
+            map_set_trigger(M[2, string], M[3, vector], "event_collide_powerup")
+            object_set_pos(N, M[2, string], M[3, vector])
+        }
+    }
+    
+    
+    #--------------------------------------------------------------
     #-- powerups --------------------------------------------------
     #--------------------------------------------------------------
+    
+    # powerup -> mario
+    function event_collide_mario(Key:string, Face:string, Pos:vector) {
+        local Data = POWERUP_MAP[Key,table]
+        SNAKE_FACE = Data["face",string]
+        SNAKE_POS  = Data["pos",vector]
+    }
+    function number powerup_mario(Data:table) {
+        if (Ct - Data["time", number] > Data["duration", number]) {
+            holoPos(MARIO_INDEX,CUBE_ENT:pos())
+            holoPos(MARIO_INDEX+1,CUBE_ENT:pos())
+
+            GAME_MAP:removeTable(Data["key1",string])
+            GAME_MAP:removeTable(Data["key2",string])             
+            POWERUP_MAP:removeTable(Data["key1",string])
+            POWERUP_MAP:removeTable(Data["key2",string])           
+            
+            POWERUP_MARIO = 0
+
+            return 1
+        }
+        return 0
+    }
+    function table powerup_mario_activate() {
+        if (!POWERUP_MARIO) {
+            POWERUP_MARIO = 1
+
+            local M1 = map_get_empty(SNAKE_FACE)
+            object_set_pos_ang(MARIO_INDEX, M1[2, string], M1[3, vector]:setZ(CUBE_Z - CUBE_TILE*0.5), Ang)
+            
+            local M2 = map_get_empty(CUBE_MATRIX[M1[2,string],table]["o",string])
+            object_set_pos_ang(MARIO_INDEX+1, M2[2, string], M2[3, vector]:setZ(CUBE_Z - CUBE_TILE*0.5), Ang)
+            
+            map_set_trigger(M1[2, string], M1[3, vector], "event_collide_mario")
+            map_set_trigger(M2[2, string], M2[3, vector], "event_collide_mario")
+            
+            POWERUP_MAP[M1[1,string],table] = table(
+                "face" = M2[2,string],
+                "pos"  = M2[3,vector]
+            )
+            POWERUP_MAP[M2[1,string],table] = table(
+                "face" = M1[2,string],
+                "pos"  = M1[3,vector]
+            )
+            
+            return table(
+                "key1" = M1[1,string],
+                "key2" = M2[1,string],
+                "func" = "powerup_mario",
+                "sound" = "ui/buttonclickrelease.wav",
+                "pitch" = 62,
+                "time" = Ct,
+                "duration" = 1000
+            )
+        }
+        else {
+            return table(
+                "func" = "powerup_mario",
+                "duration" = 0
+            )    
+        }
+    }
+        
+    # powerup -> harvest
+    function number powerup_harvest(Data:table) {
+        Data["counter",number] = Data["counter",number] + Dt
+        if (Data["counter",number] > 0.5) {
+            Data["counter",number] = 0
+            game_add_fruit()
+        }
+        if (Ct - Data["time", number] > Data["duration", number]) {
+            soundPurge()
+            FRUIT_BONUS = 0
+            return 1
+        }
+        return 0
+    }
+    function table powerup_harvest_activate() {
+        FRUIT_BONUS = 2
+        return table(
+            "func" = "powerup_harvest",
+            "sound" = "vo/npc/barney/ba_laugh03.wav",
+            "pitch" = 144,
+            "time" = Ct,
+            "duration" = 10
+        )
+    }
 
     # powerup -> speed increase
     function number powerup_fast(Data:table) {
         if (Ct - Data["time", number] > Data["duration", number]) {
             GAME_SPEED_MUL = max(GAME_SPEED_MUL - 1, 0.5)
+            GAME_POINT_MUL = max(GAME_POINT_MUL - 2, 1)
             return 1
         }
         return 0
     }
     function table powerup_fast_activate() {
         GAME_SPEED_MUL += 1
+        GAME_POINT_MUL += 2
         return table(
             "func" = "powerup_fast",
             "sound" = "vo/npc/barney/ba_hurryup.wav",
@@ -436,6 +607,7 @@ if (first()) {
     function number powerup_mindfuck(Data:table) {
         if (Ct - Data["time", number] > Data["duration", number]) {
             GAME_CTRL["current", table] = GAME_CTRL["normal", table]
+            GAME_POINT_MUL = max(GAME_POINT_MUL - 8, 1)
 
             holoEntity(Data["index", number]):soundPlay("brutal", 0, "vo/npc/alyx/brutal02.wav"), soundPitch("brutal", 135)
 
@@ -445,12 +617,13 @@ if (first()) {
     }
     function table powerup_mindfuck_activate() {
         GAME_CTRL["current", table] = GAME_CTRL["mindfuck", table]
+        GAME_POINT_MUL += 8
         return table(
             "func" = "powerup_mindfuck",
             "sound" = "vo/npc/male01/thehacks01.wav",
             "pitch" = 144,
             "time" = Ct,
-            "duration" = 5
+            "duration" = 10
         )
     }
 
@@ -489,18 +662,18 @@ if (first()) {
 
     function number powerup_obstacle(Data:table) {
         if (Ct - Data["time", number] > Data["duration", number]) {
-            if (OBSTACLE_POOL:count()) {
-                local N = OBSTACLE_POOL:popNumber()
-                local M = map_get_empty(SNAKE_FACE)
-
-                object_set_pos_ang(N, M[2, string], M[3, vector], CUBE_MATRIX[M[2, string], table]["d", vector]:toAngle())
-                map_set_trigger(M[2, string], M[3, vector], "event_collide_obstacle")
-            }
             return 1
         }
         return 0
     }
     function table powerup_obstacle_activate() {
+        if (OBSTACLE_POOL:count()) {
+            local N = OBSTACLE_POOL:popNumber()
+            local M = map_get_empty(SNAKE_FACE)
+
+            object_set_pos_ang(N, M[2, string], M[3, vector], Ang)
+            map_set_trigger(M[2, string], M[3, vector], "event_collide_obstacle")
+        }
         return table(
             "func" = "powerup_obstacle",
             "sound" = "vo/npc/barney/ba_lookout.wav",
@@ -508,55 +681,6 @@ if (first()) {
             "time" = Ct,
             "duration" = 0
         )
-    }
-
-
-    #--------------------------------------------------------------
-    #-- game objects ----------------------------------------------
-    #--------------------------------------------------------------
-    function void game_add_fruit() {
-        if (!FRUIT_POOL:count()) { return }
-
-        local N = FRUIT_POOL:popNumber()
-        local M = map_get_empty("")
-
-        FRUIT_MAP[M[1, string], table] = table(
-            "index" = N,
-            "value" = 100,
-            "decay" = Ct
-        )
-
-        map_set_trigger(M[2, string], M[3, vector], "event_collide_fruit")
-        object_set_pos(N, M[2, string], M[3, vector])
-    }
-    function string game_random_powerup() {
-        local RNG = random(1, POWERUP_WEIGHTS:values():sum())
-        local SUM = 0
-
-        foreach (K, W:number = POWERUP_WEIGHTS) {
-            SUM += W
-            if (SUM >= RNG) {
-                return K
-            }
-        }
-
-        return ""
-    }
-    function game_add_powerup() {
-        if (!POWERUP_POOL:count()) { return }
-        local P = game_random_powerup()
-
-        if (P) {
-            local N = POWERUP_POOL:popNumber()
-            local M = map_get_empty("")
-            POWERUP_MAP[M[1, string], table] = table(
-                "index" = N,
-                "onHit" = P
-            )
-
-            map_set_trigger(M[2, string], M[3, vector], "event_collide_powerup")
-            object_set_pos(N, M[2, string], M[3, vector])
-        }
     }
 
 
@@ -569,6 +693,10 @@ if (first()) {
         reset_object_holos()
 
         GAME_SPEED_MUL = 1
+        GAME_POINT_MUL = 1
+        GAME_SCORE = 0
+        
+        FRUIT_BONUS = 0
 
         SNAKE_POS = vec()
         SNAKE_DIR = vec(1, 0, 0)
@@ -626,6 +754,17 @@ if (first()) {
         }
 
         if (TAIL_COUNT < TAIL_MAX) { TAIL_COUNT++ }
+        
+        local Decay = Ct - Object["decay",number]
+        GAME_SCORE += floor((Object["value",number] - Decay)*GAME_POINT_MUL)
+        GAME_SCORE -= floor((Object["poison",number] * Decay * 0.10)*GAME_POINT_MUL)
+        
+        if (Object["poison",number]) {
+            holoEntity(SNAKE_INDEX):soundPlay("gulp", 0, "vo/npc/male01/moan01.wav"), soundPitch("gulp", 144)
+        }
+        else {
+            holoEntity(SNAKE_INDEX):soundPlay("gulp", 0, "npc/barnacle/barnacle_gulp1.wav")
+        }
 
         GAME_MAP:removeString(Key)
         FRUIT_POOL:pushNumber(Object["index", number])
@@ -844,9 +983,22 @@ if (clk("game")) {
         while (FRUIT_POOL:count() > FRUIT_MAX - 2) {
             game_add_fruit()
         }
+        
+        local C1 = SKINS[CFG_SKIN,table]["fruit1",vector4]
+        local C2 = SKINS[CFG_SKIN,table]["fruit2",vector4]
 
-        # add pwerup when there are none
-        while (Ct - POWERUP_TIME > 15 & POWERUP_POOL:count() == POWERUP_MAX) {
+        foreach (K, Fruit:table = FRUIT_MAP) {
+            if (!Fruit["poison",number]) {
+                local Decay = min((Ct - Fruit["decay",number]) / 30, 1)
+                holoColor(Fruit["index",number],mix(C2,C1,Decay))
+                if (Decay == 1) {
+                    Fruit["poison",number] = 1
+                }                
+            }
+        }
+
+        # add powerup when there are none
+        while (Ct - POWERUP_TIME > 10 & POWERUP_POOL:count()) { # == POWERUP_MAX) {
             game_add_powerup()
         }
         foreach (K:number, PowerUp:table = POWERUP_ACTIVE) {
@@ -861,7 +1013,7 @@ if (clk("game")) {
 
     local Dir = (GAME_PLAYER:shootPos() - CUBE_ENT:pos()):setZ(0)
     local Mat = CUBE_MATRIX[SNAKE_FACE, table]["m", matrix]
-    holoAng(CUBE_INDEX, slerp(quat(CUBE_ENT), quat(Mat:toAngle()) * qRotation(Mat:z(), 45 + 180 + atan(Dir:y(), Dir:x())), 0.5):toAngle())
+    holoAng(CUBE_INDEX, slerp(quat(CUBE_ENT), quat(Mat:toAngle()) * qRotation(Mat:z(), angnorm(15 + 180 + atan(Dir:y(), Dir:x()))), 0.4):toAngle())
 
     holoPos(SNAKE_INDEX, mix(
         toWorld(SNAKE_FRAME["new_p", vector], Ang, CUBE_ENT:toWorld(SNAKE_FRAME["new_u", vector]), CUBE_ENT:toWorld(SNAKE_FRAME["new_a", angle])),

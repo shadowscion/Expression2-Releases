@@ -1,0 +1,442 @@
+@name need_more_bipeds/library/stance_none
+
+#include "need_more_bipeds/library/directives"
+
+function copy_stance(OLD:string,NEW:string) {
+    #ifdef getCode()
+    fileWrite(format("%s.txt",NEW),getCode():replace(OLD,NEW))
+    #endif
+}
+#copy_stance("_NONE_","_SWORD_2H_")
+
+
+#-- STANCE->NONE
+function table anim__STANCE_NONE_CROUCH_IDLE() {
+    local Sin = sin(90 + ANIM_LOOP)
+    local Cos = cos(90 + ANIM_LOOP)
+
+    local L = ik_LOCAL_QUAT_OUTPUT(MDL_PELVIS1,MDL_LEG_L,MDL_PELVIS1:toWorld(vec(0,MDL_FOOT_WIDTH*2,-ANIM_PELVIS_H)),MDL_LEGLENGTH_A,MDL_LEGLENGTH_B,1)
+    local R = ik_LOCAL_QUAT_OUTPUT(MDL_PELVIS1,MDL_LEG_R,MDL_PELVIS1:toWorld(vec(0,-MDL_FOOT_WIDTH*2,-ANIM_PELVIS_H)),MDL_LEGLENGTH_A,MDL_LEGLENGTH_B,1)
+
+    return table(
+        "frame_rate" = 1,
+        "move_speed" = 0,
+        "v_pelvis"   = vec(0,0,0),
+        "q_pelvis"   = quat(ang(0,0,0)),
+        "q_torso"    = ANIM_TORSO_AIM_ANG,
+        "q_head"     = ANIM_HEAD_AIM_ANG,
+        "q_l_leg_a"  = L[1,quaternion],
+        "q_l_leg_b"  = L[2,quaternion],
+        "q_l_leg_c"  = L[3,quaternion],
+        "q_r_leg_a"  = R[1,quaternion],
+        "q_r_leg_b"  = R[2,quaternion],
+        "q_r_leg_c"  = R[3,quaternion],
+        "q_l_arm_a"  = quat(ang(90,0,0)),
+        "q_l_arm_b"  = quat(ang(90,0,0)),
+        "q_l_arm_c"  = quat(ang(90,0,0)),
+        "q_r_arm_a"  = quat(ang(90,0,0)),
+        "q_r_arm_b"  = quat(ang(90,0,0)),
+        "q_r_arm_c"  = quat(ang(90,0,0))
+    )
+}
+
+function table anim__STANCE_NONE_CROUCH_F() {
+    local Sin = sin(90 + ANIM_LOOP)
+    local Cos = cos(90 + ANIM_LOOP)
+
+    local L = ik_LOCAL_QUAT_OUTPUT(MDL_PELVIS1,MDL_LEG_L,MDL_PELVIS1:toWorld(vec(Cos*MDL_LEGLENGTH_A/2,MDL_FOOT_WIDTH*2,-ANIM_PELVIS_H + max(-Sin*MDL_LEGLENGTH_B/2,0))),MDL_LEGLENGTH_A,MDL_LEGLENGTH_B,1)
+    local R = ik_LOCAL_QUAT_OUTPUT(MDL_PELVIS1,MDL_LEG_R,MDL_PELVIS1:toWorld(vec(-Cos*MDL_LEGLENGTH_A/2,-MDL_FOOT_WIDTH*2,-ANIM_PELVIS_H + max(Sin*MDL_LEGLENGTH_B/2,0))),MDL_LEGLENGTH_A,MDL_LEGLENGTH_B,1)
+
+    return table(
+        "frame_rate" = 1.25/2,
+        "move_speed" = 2 * _PI * MDL_LEGLENGTH_A/2,
+        "v_pelvis"   = vec(0,0,abs(Sin * MDL_PELVIS_HEIGHT/10)),
+        "q_pelvis"   = quat(ang(abs(Cos * 7) + 15,Cos*7,0)),
+        "q_torso"    = ANIM_TORSO_AIM_ANG * qRotation(vec(0,abs(Cos * 45) + 45,0)),
+        "q_head"     = ANIM_HEAD_AIM_ANG,
+        "q_l_leg_a"  = L[1,quaternion],
+        "q_l_leg_b"  = L[2,quaternion],
+        "q_l_leg_c"  = L[3,quaternion],
+        "q_r_leg_a"  = R[1,quaternion],
+        "q_r_leg_b"  = R[2,quaternion],
+        "q_r_leg_c"  = R[3,quaternion],
+        "q_l_arm_a"  = quat(ang(90 + Cos*15,0,0)),
+        "q_l_arm_b"  = quat(ang(70 + Cos*15 - 10,0,0)),
+        "q_l_arm_c"  = quat(ang(70 + Cos*15 - 10,0,0)),
+        "q_r_arm_a"  = quat(ang(90 - Cos*15,0,0)),
+        "q_r_arm_b"  = quat(ang(70 - Cos*15 - 10,0,0)),
+        "q_r_arm_c"  = quat(ang(70 - Cos*15 - 10,0,0))
+    )
+}
+
+function table anim__STANCE_NONE_CROUCH_B() {
+    local Sin = sin(270 + ANIM_LOOP)
+    local Cos = cos(270 + ANIM_LOOP)
+
+    local L = ik_LOCAL_QUAT_OUTPUT(MDL_PELVIS1,MDL_LEG_L,MDL_PELVIS1:toWorld(vec(Cos*MDL_LEGLENGTH_A/2,MDL_FOOT_WIDTH*2,-ANIM_PELVIS_H + max(Sin*MDL_LEGLENGTH_B/2,0))),MDL_LEGLENGTH_A,MDL_LEGLENGTH_B,1)
+    local R = ik_LOCAL_QUAT_OUTPUT(MDL_PELVIS1,MDL_LEG_R,MDL_PELVIS1:toWorld(vec(-Cos*MDL_LEGLENGTH_A/2,-MDL_FOOT_WIDTH*2,-ANIM_PELVIS_H + max(-Sin*MDL_LEGLENGTH_B/2,0))),MDL_LEGLENGTH_A,MDL_LEGLENGTH_B,1)
+
+    return table(
+        "frame_rate" = 1.25/2,
+        "move_speed" = 2 * _PI * MDL_LEGLENGTH_A/2,
+        "v_pelvis"   = vec(0,0,abs(Sin * MDL_PELVIS_HEIGHT/10)),
+        "q_pelvis"   = quat(ang(-abs(Cos * 7) - 15,Cos*7,0)),
+        "q_torso"    = ANIM_TORSO_AIM_ANG,
+        "q_head"     = ANIM_HEAD_AIM_ANG,
+        "q_l_leg_a"  = L[1,quaternion],
+        "q_l_leg_b"  = L[2,quaternion],
+        "q_l_leg_c"  = L[3,quaternion],
+        "q_r_leg_a"  = R[1,quaternion],
+        "q_r_leg_b"  = R[2,quaternion],
+        "q_r_leg_c"  = R[3,quaternion],
+        "q_l_arm_a"  = quat(ang(90 + Cos*15,0,0)),
+        "q_l_arm_b"  = quat(ang(70 + Cos*15 - 10,0,0)),
+        "q_l_arm_c"  = quat(ang(70 + Cos*15 - 10,0,0)),
+        "q_r_arm_a"  = quat(ang(90 - Cos*15,0,0)),
+        "q_r_arm_b"  = quat(ang(70 - Cos*15 - 10,0,0)),
+        "q_r_arm_c"  = quat(ang(70 - Cos*15 - 10,0,0))
+    )
+}
+
+function table anim__STANCE_NONE_CROUCH_L() {
+    local Sin = sin(90 + ANIM_LOOP)
+    local Cos = cos(90 + ANIM_LOOP)
+
+    local L = ik_LOCAL_QUAT_OUTPUT(MDL_PELVIS1,MDL_LEG_L,MDL_PELVIS1:toWorld(vec(MDL_FOOT_WIDTH,MDL_FOOT_WIDTH*2 + Cos*MDL_LEGLENGTH_A/2,-ANIM_PELVIS_H + max(-Sin*MDL_LEGLENGTH_B/2,0))),MDL_LEGLENGTH_A,MDL_LEGLENGTH_B,1)
+    local R = ik_LOCAL_QUAT_OUTPUT(MDL_PELVIS1,MDL_LEG_R,MDL_PELVIS1:toWorld(vec(-MDL_FOOT_WIDTH,-MDL_FOOT_WIDTH*2 - Cos*MDL_LEGLENGTH_A/2,-ANIM_PELVIS_H + max(Sin*MDL_LEGLENGTH_B/2,0))),MDL_LEGLENGTH_A,MDL_LEGLENGTH_B,1)
+
+    return table(
+        "frame_rate" = 1.25/2,
+        "move_speed" = 2 * _PI * MDL_LEGLENGTH_A/2,
+        "v_pelvis"   = vec(0,0,abs(Sin * MDL_PELVIS_HEIGHT/10)),
+        "q_pelvis"   = quat(ang(0,-15 + Cos*7,-15 - abs(Cos*7))),
+        "q_torso"    = ANIM_TORSO_AIM_ANG,
+        "q_head"     = ANIM_HEAD_AIM_ANG,
+        "q_l_leg_a"  = L[1,quaternion],
+        "q_l_leg_b"  = L[2,quaternion],
+        "q_l_leg_c"  = L[3,quaternion],
+        "q_r_leg_a"  = R[1,quaternion],
+        "q_r_leg_b"  = R[2,quaternion],
+        "q_r_leg_c"  = R[3,quaternion],
+        "q_l_arm_a"  = quat(ang(100,0,0)) * qRotation(vec(0,0,Cos*5 + 10)),
+        "q_l_arm_b"  = quat(ang(55,0,0)) * qRotation(vec(0,0,Cos*5 + 10)),
+        "q_l_arm_c"  = quat(ang(55,0,0)) * qRotation(vec(0,0,Cos*5 + 10)),
+        "q_r_arm_a"  = quat(ang(115,0,0)) * qRotation(vec(0,0,-Cos*5 - 10)),
+        "q_r_arm_b"  = quat(ang(55,0,0)) * qRotation(vec(0,0,-Cos*5 - 10)),
+        "q_r_arm_c"  = quat(ang(55,0,0)) * qRotation(vec(0,0,-Cos*5 - 10))
+    )
+}
+
+function table anim__STANCE_NONE_CROUCH_R() {
+    local Sin = sin(270 + ANIM_LOOP)
+    local Cos = cos(270 + ANIM_LOOP)
+
+    local L = ik_LOCAL_QUAT_OUTPUT(MDL_PELVIS1,MDL_LEG_L,MDL_PELVIS1:toWorld(vec(-MDL_FOOT_WIDTH,MDL_FOOT_WIDTH*2 + Cos*MDL_LEGLENGTH_A/2,-ANIM_PELVIS_H + max(Sin*MDL_LEGLENGTH_B/2,0))),MDL_LEGLENGTH_A,MDL_LEGLENGTH_B,1)
+    local R = ik_LOCAL_QUAT_OUTPUT(MDL_PELVIS1,MDL_LEG_R,MDL_PELVIS1:toWorld(vec(MDL_FOOT_WIDTH,-MDL_FOOT_WIDTH*2 - Cos*MDL_LEGLENGTH_A/2,-ANIM_PELVIS_H + max(-Sin*MDL_LEGLENGTH_B/2,0))),MDL_LEGLENGTH_A,MDL_LEGLENGTH_B,1)
+
+    return table(
+        "frame_rate" = 1.25/2,
+        "move_speed" = 2 * _PI * MDL_LEGLENGTH_A/2,
+        "v_pelvis"   = vec(0,0,abs(Sin * MDL_PELVIS_HEIGHT/10)),
+        "q_pelvis"   = quat(ang(0,15 + Cos*7,15 + abs(Cos*7))),
+        "q_torso"    = ANIM_TORSO_AIM_ANG,
+        "q_head"     = ANIM_HEAD_AIM_ANG,
+        "q_l_leg_a"  = L[1,quaternion],
+        "q_l_leg_b"  = L[2,quaternion],
+        "q_l_leg_c"  = L[3,quaternion],
+        "q_r_leg_a"  = R[1,quaternion],
+        "q_r_leg_b"  = R[2,quaternion],
+        "q_r_leg_c"  = R[3,quaternion],
+        "q_l_arm_a"  = quat(ang(115,0,0)) * qRotation(vec(0,0,Cos*5 + 10)),
+        "q_l_arm_b"  = quat(ang(55,0,0)) * qRotation(vec(0,0,Cos*5 + 10)),
+        "q_l_arm_c"  = quat(ang(55,0,0)) * qRotation(vec(0,0,Cos*5 + 10)),
+        "q_r_arm_a"  = quat(ang(100,0,0)) * qRotation(vec(0,0,-Cos*5 - 10)),
+        "q_r_arm_b"  = quat(ang(55,0,0)) * qRotation(vec(0,0,-Cos*5 - 10)),
+        "q_r_arm_c"  = quat(ang(55,0,0)) * qRotation(vec(0,0,-Cos*5 - 10))
+    )
+}
+
+function table anim__STANCE_NONE_WALK_IDLE() {
+    local Sin = sin(90 + ANIM_LOOP)
+    local Cos = cos(90 + ANIM_LOOP)
+
+    local L = ik_LOCAL_QUAT_OUTPUT(MDL_PELVIS1,MDL_LEG_L,MDL_PELVIS1:toWorld(vec(0,MDL_FOOT_WIDTH,-ANIM_PELVIS_H)),MDL_LEGLENGTH_A,MDL_LEGLENGTH_B,1)
+    local R = ik_LOCAL_QUAT_OUTPUT(MDL_PELVIS1,MDL_LEG_R,MDL_PELVIS1:toWorld(vec(0,-MDL_FOOT_WIDTH,-ANIM_PELVIS_H)),MDL_LEGLENGTH_A,MDL_LEGLENGTH_B,1)
+
+    return table(
+        "frame_rate" = 1,
+        "move_speed" = 0,
+        "v_pelvis"   = vec(0,0,0),
+        "q_pelvis"   = quat(ang(0,0,0)),
+        "q_torso"    = ANIM_TORSO_AIM_ANG,
+        "q_head"     = ANIM_HEAD_AIM_ANG,
+        "q_l_leg_a"  = L[1,quaternion],
+        "q_l_leg_b"  = L[2,quaternion],
+        "q_l_leg_c"  = L[3,quaternion],
+        "q_r_leg_a"  = R[1,quaternion],
+        "q_r_leg_b"  = R[2,quaternion],
+        "q_r_leg_c"  = R[3,quaternion],
+        "q_l_arm_a"  = quat(ang(90,0,0)),
+        "q_l_arm_b"  = quat(ang(90,0,0)),
+        "q_l_arm_c"  = quat(ang(90,0,0)),
+        "q_r_arm_a"  = quat(ang(90,0,0)),
+        "q_r_arm_b"  = quat(ang(90,0,0)),
+        "q_r_arm_c"  = quat(ang(90,0,0))
+    )
+}
+
+function table anim__STANCE_NONE_WALK_F() {
+    local Sin = sin(90 + ANIM_LOOP)
+    local Cos = cos(90 + ANIM_LOOP)
+
+    local L = ik_LOCAL_QUAT_OUTPUT(MDL_PELVIS1,MDL_LEG_L,MDL_PELVIS1:toWorld(vec(Cos*MDL_LEGLENGTH_A,MDL_FOOT_WIDTH,-ANIM_PELVIS_H + max(-Sin*MDL_LEGLENGTH_B,0))),MDL_LEGLENGTH_A,MDL_LEGLENGTH_B,1)
+    local R = ik_LOCAL_QUAT_OUTPUT(MDL_PELVIS1,MDL_LEG_R,MDL_PELVIS1:toWorld(vec(-Cos*MDL_LEGLENGTH_A,-MDL_FOOT_WIDTH,-ANIM_PELVIS_H + max(Sin*MDL_LEGLENGTH_B,0))),MDL_LEGLENGTH_A,MDL_LEGLENGTH_B,1)
+
+    return table(
+        "frame_rate" = 1.25,
+        "move_speed" = 2 * _PI * MDL_LEGLENGTH_A,
+        "v_pelvis"   = vec(0,0,abs(Sin * MDL_PELVIS_HEIGHT/10)),
+        "q_pelvis"   = quat(ang(abs(Cos * 7) + 7,Cos*7,0)),
+        "q_torso"    = ANIM_TORSO_AIM_ANG,
+        "q_head"     = ANIM_HEAD_AIM_ANG,
+        "q_l_leg_a"  = L[1,quaternion],
+        "q_l_leg_b"  = L[2,quaternion],
+        "q_l_leg_c"  = L[3,quaternion],
+        "q_r_leg_a"  = R[1,quaternion],
+        "q_r_leg_b"  = R[2,quaternion],
+        "q_r_leg_c"  = R[3,quaternion],
+        "q_l_arm_a"  = quat(ang(90 + Cos*25,0,0)),
+        "q_l_arm_b"  = quat(ang(90 + Cos*25 - 10,0,0)),
+        "q_l_arm_c"  = quat(ang(90 + Cos*25 - 10,0,0)),
+        "q_r_arm_a"  = quat(ang(90 - Cos*25,0,0)),
+        "q_r_arm_b"  = quat(ang(90 - Cos*25 - 10,0,0)),
+        "q_r_arm_c"  = quat(ang(90 - Cos*25 - 10,0,0))
+    )
+}
+
+function table anim__STANCE_NONE_WALK_B() {
+    local Sin = sin(270 + ANIM_LOOP)
+    local Cos = cos(270 + ANIM_LOOP)
+
+    local L = ik_LOCAL_QUAT_OUTPUT(MDL_PELVIS1,MDL_LEG_L,MDL_PELVIS1:toWorld(vec(Cos*MDL_LEGLENGTH_A,MDL_FOOT_WIDTH,-ANIM_PELVIS_H + max(Sin*MDL_LEGLENGTH_B,0))),MDL_LEGLENGTH_A,MDL_LEGLENGTH_B,1)
+    local R = ik_LOCAL_QUAT_OUTPUT(MDL_PELVIS1,MDL_LEG_R,MDL_PELVIS1:toWorld(vec(-Cos*MDL_LEGLENGTH_A,-MDL_FOOT_WIDTH,-ANIM_PELVIS_H + max(-Sin*MDL_LEGLENGTH_B,0))),MDL_LEGLENGTH_A,MDL_LEGLENGTH_B,1)
+
+    return table(
+        "frame_rate" = 1.25,
+        "move_speed" = 2 * _PI * MDL_LEGLENGTH_A,
+        "v_pelvis"   = vec(0,0,abs(Sin * MDL_PELVIS_HEIGHT/10)),
+        "q_pelvis"   = quat(ang(-abs(Cos * 7) - 7,Cos*7,0)),
+        "q_torso"    = ANIM_TORSO_AIM_ANG,
+        "q_head"     = ANIM_HEAD_AIM_ANG,
+        "q_l_leg_a"  = L[1,quaternion],
+        "q_l_leg_b"  = L[2,quaternion],
+        "q_l_leg_c"  = L[3,quaternion],
+        "q_r_leg_a"  = R[1,quaternion],
+        "q_r_leg_b"  = R[2,quaternion],
+        "q_r_leg_c"  = R[3,quaternion],
+        "q_l_arm_a"  = quat(ang(90 + Cos*25,0,0)),
+        "q_l_arm_b"  = quat(ang(90 + Cos*25 - 10,0,0)),
+        "q_l_arm_c"  = quat(ang(90 + Cos*25 - 10,0,0)),
+        "q_r_arm_a"  = quat(ang(90 - Cos*25,0,0)),
+        "q_r_arm_b"  = quat(ang(90 - Cos*25 - 10,0,0)),
+        "q_r_arm_c"  = quat(ang(90 - Cos*25 - 10,0,0))
+    )
+}
+
+function table anim__STANCE_NONE_WALK_L() {
+    local Sin = sin(90 + ANIM_LOOP)
+    local Cos = cos(90 + ANIM_LOOP)
+
+    local L = ik_LOCAL_QUAT_OUTPUT(MDL_PELVIS1,MDL_LEG_L,MDL_PELVIS1:toWorld(vec(MDL_FOOT_WIDTH,MDL_FOOT_WIDTH + Cos*MDL_LEGLENGTH_A,-ANIM_PELVIS_H + max(-Sin*MDL_LEGLENGTH_B,0))),MDL_LEGLENGTH_A,MDL_LEGLENGTH_B,1)
+    local R = ik_LOCAL_QUAT_OUTPUT(MDL_PELVIS1,MDL_LEG_R,MDL_PELVIS1:toWorld(vec(-MDL_FOOT_WIDTH,-MDL_FOOT_WIDTH - Cos*MDL_LEGLENGTH_A,-ANIM_PELVIS_H + max(Sin*MDL_LEGLENGTH_B,0))),MDL_LEGLENGTH_A,MDL_LEGLENGTH_B,1)
+
+    return table(
+        "frame_rate" = 1.25,
+        "move_speed" = 2 * _PI * MDL_LEGLENGTH_A,
+        "v_pelvis"   = vec(0,0,abs(Sin * MDL_PELVIS_HEIGHT/10)),
+        "q_pelvis"   = quat(ang(0,-15 + Cos*7,-7 - abs(Cos*7))),
+        "q_torso"    = ANIM_TORSO_AIM_ANG,
+        "q_head"     = ANIM_HEAD_AIM_ANG,
+        "q_l_leg_a"  = L[1,quaternion],
+        "q_l_leg_b"  = L[2,quaternion],
+        "q_l_leg_c"  = L[3,quaternion],
+        "q_r_leg_a"  = R[1,quaternion],
+        "q_r_leg_b"  = R[2,quaternion],
+        "q_r_leg_c"  = R[3,quaternion],
+        "q_l_arm_a"  = quat(ang(100,0,0)) * qRotation(vec(0,0,Cos*5 + 10)),
+        "q_l_arm_b"  = quat(ang(55,0,0)) * qRotation(vec(0,0,Cos*5 + 10)),
+        "q_l_arm_c"  = quat(ang(55,0,0)) * qRotation(vec(0,0,Cos*5 + 10)),
+        "q_r_arm_a"  = quat(ang(115,0,0)) * qRotation(vec(0,0,-Cos*5 - 10)),
+        "q_r_arm_b"  = quat(ang(55,0,0)) * qRotation(vec(0,0,-Cos*5 - 10)),
+        "q_r_arm_c"  = quat(ang(55,0,0)) * qRotation(vec(0,0,-Cos*5 - 10))
+    )
+}
+
+function table anim__STANCE_NONE_WALK_R() {
+    local Sin = sin(270 + ANIM_LOOP)
+    local Cos = cos(270 + ANIM_LOOP)
+
+    local L = ik_LOCAL_QUAT_OUTPUT(MDL_PELVIS1,MDL_LEG_L,MDL_PELVIS1:toWorld(vec(-MDL_FOOT_WIDTH,MDL_FOOT_WIDTH + Cos*MDL_LEGLENGTH_A,-ANIM_PELVIS_H + max(Sin*MDL_LEGLENGTH_B,0))),MDL_LEGLENGTH_A,MDL_LEGLENGTH_B,1)
+    local R = ik_LOCAL_QUAT_OUTPUT(MDL_PELVIS1,MDL_LEG_R,MDL_PELVIS1:toWorld(vec(MDL_FOOT_WIDTH,-MDL_FOOT_WIDTH - Cos*MDL_LEGLENGTH_A,-ANIM_PELVIS_H + max(-Sin*MDL_LEGLENGTH_B,0))),MDL_LEGLENGTH_A,MDL_LEGLENGTH_B,1)
+
+    return table(
+        "frame_rate" = 1.25,
+        "move_speed" = 2 * _PI * MDL_LEGLENGTH_A,
+        "v_pelvis"   = vec(0,0,abs(Sin * MDL_PELVIS_HEIGHT/10)),
+        "q_pelvis"   = quat(ang(0,15 + Cos*7,7 + abs(Cos*7))),
+        "q_torso"    = ANIM_TORSO_AIM_ANG,
+        "q_head"     = ANIM_HEAD_AIM_ANG,
+        "q_l_leg_a"  = L[1,quaternion],
+        "q_l_leg_b"  = L[2,quaternion],
+        "q_l_leg_c"  = L[3,quaternion],
+        "q_r_leg_a"  = R[1,quaternion],
+        "q_r_leg_b"  = R[2,quaternion],
+        "q_r_leg_c"  = R[3,quaternion],
+        "q_l_arm_a"  = quat(ang(115,0,0)) * qRotation(vec(0,0,Cos*5 + 10)),
+        "q_l_arm_b"  = quat(ang(55,0,0)) * qRotation(vec(0,0,Cos*5 + 10)),
+        "q_l_arm_c"  = quat(ang(55,0,0)) * qRotation(vec(0,0,Cos*5 + 10)),
+        "q_r_arm_a"  = quat(ang(100,0,0)) * qRotation(vec(0,0,-Cos*5 - 10)),
+        "q_r_arm_b"  = quat(ang(55,0,0)) * qRotation(vec(0,0,-Cos*5 - 10)),
+        "q_r_arm_c"  = quat(ang(55,0,0)) * qRotation(vec(0,0,-Cos*5 - 10))
+    )
+}
+
+function table anim__STANCE_NONE_RUN_F() {
+    local Sin = sin(90 + ANIM_LOOP)
+    local Cos = cos(90 + ANIM_LOOP)
+
+    local Y = vec(0,MDL_FOOT_WIDTH,0)
+    local D = DIR_DOWN*ANIM_PELVIS_H*0.5
+
+    local L = ik_LOCAL_QUAT_OUTPUT(MDL_PELVIS1,MDL_LEG_L,MDL_PELVIS1:toWorld(D:rotate(-Cos*60,0,0) + D:rotate(-(Cos + Sin)*60 + 60,0,0) + Y),
+        MDL_LEGLENGTH_A,MDL_LEGLENGTH_B,1)
+
+    local R = ik_LOCAL_QUAT_OUTPUT(MDL_PELVIS1,MDL_LEG_R,MDL_PELVIS1:toWorld(D:rotate(Cos*60,0,0) + D:rotate((Cos + Sin)*60 + 60,0,0) - Y),
+        MDL_LEGLENGTH_A,MDL_LEGLENGTH_B,1)
+
+    return table(
+        "frame_rate" = _PHI,
+        "move_speed" = 2 * _PI * MDL_PELVIS_HEIGHT,
+        "v_pelvis"   = vec(0,Sin*MDL_FOOT_WIDTH*0.25,abs(Cos)*MDL_PELVIS_HEIGHT*0.25):rotate(30,0,0),
+        "q_pelvis"   = quat(ang(20 + abs(Cos)*20,Cos*15,0)),
+        "q_torso"    = ANIM_TORSO_AIM_ANG * qRotation(vec(0,20,Cos*30)),
+        "q_head"     = ANIM_HEAD_AIM_ANG,
+        "q_l_leg_a"  = L[1,quaternion],
+        "q_l_leg_b"  = L[2,quaternion],
+        "q_l_leg_c"  = L[3,quaternion],
+        "q_r_leg_a"  = R[1,quaternion],
+        "q_r_leg_b"  = R[2,quaternion],
+        "q_r_leg_c"  = R[3,quaternion],
+        "q_l_arm_a"  = quat(ang(90 + Cos*45,0,0)),
+        "q_l_arm_b"  = quat(ang(90 + Cos*65 - 65,0,0)),
+        "q_l_arm_c"  = quat(ang(90 + Cos*65 - 65,0,0)),
+        "q_r_arm_a"  = quat(ang(90 - Cos*45,0,0)),
+        "q_r_arm_b"  = quat(ang(90 - Cos*65 - 65,0,0)),
+        "q_r_arm_c"  = quat(ang(90 - Cos*65 - 65,0,0))
+    )
+}
+
+function table anim__STANCE_NONE_RUN_B() {
+    local Sin = sin(270 + ANIM_LOOP)
+    local Cos = cos(270 + ANIM_LOOP)
+
+    local Y = vec(0,MDL_FOOT_WIDTH,0)
+    local D = DIR_DOWN*ANIM_PELVIS_H*0.5
+
+    local L = ik_LOCAL_QUAT_OUTPUT(MDL_PELVIS1,MDL_LEG_L,MDL_PELVIS1:toWorld(D:rotate(-Cos*60,0,0) + D:rotate(-(Cos/2 + Sin)*60 - 60,0,0) + Y),
+        MDL_LEGLENGTH_A,MDL_LEGLENGTH_B,1)
+
+    local R = ik_LOCAL_QUAT_OUTPUT(MDL_PELVIS1,MDL_LEG_R,MDL_PELVIS1:toWorld(D:rotate(Cos*60,0,0) + D:rotate((Cos/2 + Sin)*60 - 60,0,0) - Y),
+        MDL_LEGLENGTH_A,MDL_LEGLENGTH_B,1)
+
+    return table(
+        "frame_rate" = _PHI,
+        "move_speed" = 2 * _PI * MDL_PELVIS_HEIGHT,
+        "v_pelvis"   = vec(0,Sin*MDL_FOOT_WIDTH*0.25,abs(Cos)*MDL_PELVIS_HEIGHT*0.25):rotate(-30,0,0),
+        "q_pelvis"   = quat(ang(-20 + abs(Cos)*20,Cos*15,0)),
+        "q_torso"    = ANIM_TORSO_AIM_ANG * qRotation(vec(0,20,Cos*30)),
+        "q_head"     = ANIM_HEAD_AIM_ANG,
+        "q_l_leg_a"  = L[1,quaternion],
+        "q_l_leg_b"  = L[2,quaternion],
+        "q_l_leg_c"  = L[3,quaternion],
+        "q_r_leg_a"  = R[1,quaternion],
+        "q_r_leg_b"  = R[2,quaternion],
+        "q_r_leg_c"  = R[3,quaternion],
+        "q_l_arm_a"  = quat(ang(90 + Cos*45,0,0)),
+        "q_l_arm_b"  = quat(ang(90 + Cos*65 - 65,0,0)),
+        "q_l_arm_c"  = quat(ang(90 + Cos*65 - 65,0,0)),
+        "q_r_arm_a"  = quat(ang(90 - Cos*45,0,0)),
+        "q_r_arm_b"  = quat(ang(90 - Cos*65 - 65,0,0)),
+        "q_r_arm_c"  = quat(ang(90 - Cos*65 - 65,0,0))
+    )
+}
+
+function table anim__STANCE_NONE_RUN_L() {
+    local Sin = sin(90 + ANIM_LOOP)
+    local Cos = cos(90 + ANIM_LOOP)
+
+    local Y = vec(0,MDL_FOOT_WIDTH,0)
+    local D = DIR_DOWN*ANIM_PELVIS_H*0.5
+
+    local L = ik_LOCAL_QUAT_OUTPUT(MDL_PELVIS1,MDL_LEG_L,MDL_PELVIS1:toWorld(D:rotate(-Cos*60,90,0) + D:rotate(-(Cos + Sin)*60 + 60,90,0) + Y),
+        MDL_LEGLENGTH_A,MDL_LEGLENGTH_B,1)
+
+    local R = ik_LOCAL_QUAT_OUTPUT(MDL_PELVIS1,MDL_LEG_R,MDL_PELVIS1:toWorld(D:rotate(Cos*60,90,0) + D:rotate((Cos + Sin)*60 + 60,90,0) - Y),
+        MDL_LEGLENGTH_A,MDL_LEGLENGTH_B,1)
+
+    return table(
+        "frame_rate" = _PHI,
+        "move_speed" = 2 * _PI * MDL_PELVIS_HEIGHT,
+        "v_pelvis"   = vec(0,Sin*MDL_FOOT_WIDTH*0.5,abs(Cos)*MDL_PELVIS_HEIGHT*0.25),
+        "q_pelvis"   = quat(ang(0,Cos*10,-20 + abs(Cos)*10)),
+        "q_torso"    = ANIM_TORSO_AIM_ANG * qRotation(vec(-20,0,-Cos*10)),
+        "q_head"     = ANIM_HEAD_AIM_ANG,
+        "q_l_leg_a"  = L[1,quaternion],
+        "q_l_leg_b"  = L[2,quaternion],
+        "q_l_leg_c"  = L[3,quaternion],
+        "q_r_leg_a"  = R[1,quaternion],
+        "q_r_leg_b"  = R[2,quaternion],
+        "q_r_leg_c"  = R[3,quaternion],
+        "q_l_arm_a"  = quat(ang(100,0,0)) * qRotation(vec(0,0,Cos*5 + 10)),
+        "q_l_arm_b"  = quat(ang(55,0,0)) * qRotation(vec(0,0,Cos*5 + 10)),
+        "q_l_arm_c"  = quat(ang(55,0,0)) * qRotation(vec(0,0,Cos*5 + 10)),
+        "q_r_arm_a"  = quat(ang(115,0,0)) * qRotation(vec(0,0,-Cos*5 - 20)),
+        "q_r_arm_b"  = quat(ang(55,0,0)) * qRotation(vec(0,0,-Cos*5 - 20)),
+        "q_r_arm_c"  = quat(ang(55,0,0)) * qRotation(vec(0,0,-Cos*5 - 20))
+    )
+}
+
+function table anim__STANCE_NONE_RUN_R() {
+    local Sin = sin(90 + ANIM_LOOP)
+    local Cos = cos(90 + ANIM_LOOP)
+
+    local Y = vec(0,MDL_FOOT_WIDTH,0)
+    local D = DIR_DOWN*ANIM_PELVIS_H*0.5
+
+    local L = ik_LOCAL_QUAT_OUTPUT(MDL_PELVIS1,MDL_LEG_L,MDL_PELVIS1:toWorld(D:rotate(-Cos*60,-90,0) + D:rotate(-(Cos + Sin)*60 + 60,-90,0) + Y),
+        MDL_LEGLENGTH_A,MDL_LEGLENGTH_B,1)
+
+    local R = ik_LOCAL_QUAT_OUTPUT(MDL_PELVIS1,MDL_LEG_R,MDL_PELVIS1:toWorld(D:rotate(Cos*60,-90,0) + D:rotate((Cos + Sin)*60 + 60,-90,0) - Y),
+        MDL_LEGLENGTH_A,MDL_LEGLENGTH_B,1)
+
+    return table(
+        "frame_rate" = _PHI,
+        "move_speed" = 2 * _PI * MDL_PELVIS_HEIGHT,
+        "v_pelvis"   = vec(0,Sin*MDL_FOOT_WIDTH*0.5,abs(Cos)*MDL_PELVIS_HEIGHT*0.25),
+        "q_pelvis"   = quat(ang(0,Cos*10,20 - abs(Cos)*10)),
+        "q_torso"    = ANIM_TORSO_AIM_ANG * qRotation(vec(20,0,-Cos*10)),
+        "q_head"     = ANIM_HEAD_AIM_ANG,
+        "q_l_leg_a"  = L[1,quaternion],
+        "q_l_leg_b"  = L[2,quaternion],
+        "q_l_leg_c"  = L[3,quaternion],
+        "q_r_leg_a"  = R[1,quaternion],
+        "q_r_leg_b"  = R[2,quaternion],
+        "q_r_leg_c"  = R[3,quaternion],
+        "q_l_arm_a"  = quat(ang(115,0,0)) * qRotation(vec(0,0,Cos*5 + 20)),
+        "q_l_arm_b"  = quat(ang(55,0,0)) * qRotation(vec(0,0,Cos*5 + 20)),
+        "q_l_arm_c"  = quat(ang(55,0,0)) * qRotation(vec(0,0,Cos*5 + 20)),
+        "q_r_arm_a"  = quat(ang(100,0,0)) * qRotation(vec(0,0,-Cos*5 - 10)),
+        "q_r_arm_b"  = quat(ang(55,0,0)) * qRotation(vec(0,0,-Cos*5 - 10)),
+        "q_r_arm_c"  = quat(ang(55,0,0)) * qRotation(vec(0,0,-Cos*5 - 10))
+    )
+}

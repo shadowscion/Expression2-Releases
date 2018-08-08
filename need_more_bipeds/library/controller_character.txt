@@ -1,0 +1,200 @@
+@name need_more_bipeds/library/controller_character
+
+#include "need_more_bipeds/library/directives"
+
+function recalc_bbox(Radius,Height) {
+    HEIGHT_CURRENT = Height
+    BBOX_RAD = Radius
+    BBOX_MIN = vec(-Radius,-Radius,-Height*0.5)
+    BBOX_MAX = vec(Radius,Radius,0)
+}
+
+function reset_character_controller() {
+    HEIGHT_STAND  = MDL_ROOT_HEIGHT
+    HEIGHT_CROUCH = MDL_ROOT_HEIGHT - MDL_PELVIS_HEIGHT/2
+    HEIGHT_JUMP   = MDL_ROOT_HEIGHT
+    RADIUS        = MDL_FOOT_WIDTH
+    K_GRAVITY     = -685
+
+    MOVETYPE = "CAMERA_LOOK"
+
+    recalc_bbox(RADIUS,HEIGHT_STAND)
+
+    local CONTROLLER = holoEntity(9000)
+    POSITION   = CONTROLLER:pos()
+
+    # SETUP -> CAMERA
+    Camera["Activated",number] = 1
+    Camera["Position",vector] = vec(0,0,MDL_ROOT_HEIGHT/2)
+    Camera["Distance",number] = MDL_ROOT_HEIGHT*2
+    Camera["Parent",entity] = CONTROLLER
+
+     timer("main",100)
+}
+
+function update_character_controller() {
+    if (Active) {
+        #[
+            COLLISION -> LINEAR
+                - REFLECT BBOX HITPOS ALONG BBOX HITNORMAL
+                - CORRECT VELOCITY FOR THIS REFLECTION
+
+            FLAGS -> HIT_BBOX:1
+        ]#
+        local Trace_BBox = rangerOffsetHull(POSITION,POSITION + VELOCITY,BBOX_MIN,BBOX_MAX)
+        if (Trace_BBox:hit()) {
+            local CheckPos = POSITION + VELOCITY
+            local CheckHit = Trace_BBox:position()
+            local CheckDir = Trace_BBox:hitNormal():setZ(0)*1.05
+
+            Trace_BBox = rangerOffsetHull(CheckHit,CheckPos - CheckDir*(CheckPos - CheckHit):dot(CheckDir),BBOX_MIN,BBOX_MAX)
+
+            VELOCITY = (Trace_BBox:position() - POSITION):setZ(0)
+            HIT_BBOX = 1
+        }
+        else {
+            HIT_BBOX = 0
+        }
+
+
+        #[
+            COLLISION -> LINEAR
+                - ADD VELOCITY TO POSITION
+        ]#
+        POSITION += VELOCITY
+
+
+        #[
+            COLLISION -> VERTICAL
+                - TRACE IN DIRECTION OF VERTICAL MOVEMENT
+        ]#
+        local Dir_Z = sign(GRAVITY:z()) ?: -1
+        local Trace_Z = rangerOffset(9999999,POSITION,vec(0,0,Dir_Z))
+
+
+        #[
+            COLLISION -> VERTICAL -> SLOPE
+                - DETECT DOWNWARD SLOPES USING DOT PRODUCT
+                - CORRECT HEIGHT TO STICK TO THEM INSTEAD OF FLYING OFF
+
+            FLAGS -> HIT_BELOW:2
+        ]#
+        if (HIT_BELOW == 1) {
+            local Dot_Z = VELOCITY:normalized():dot(Trace_Z:hitNormal())
+            if (Dot_Z) {
+                if (Trace_Z:distance() < HEIGHT_CURRENT*1.5) {
+                    POSITION[3] = Trace_Z:position():z() + HEIGHT_CURRENT
+                    HIT_BELOW = 2
+                }
+            }
+        }
+
+
+        #[
+            COLLISION -> VERTICAL -> BELOW
+                - ADD GRAVITY AND CORRECT HEIGHT
+
+            FLAGS -> HIT_BELOW:1
+        ]#
+        if (Dir_Z == -1) {
+            POSITION = POSITION + GRAVITY*TIME_DELTA + vec(0,0,0.5*K_GRAVITY*TIME_DELTA*TIME_DELTA)
+
+            local Hit_Z = Trace_Z:position():z() + HEIGHT_CURRENT
+            if (POSITION[3] <= Hit_Z) {
+                POSITION[3] = Hit_Z
+                GRAVITY[3] = 0
+                HIT_BELOW = 1
+            }
+            else {
+                HIT_BELOW = 0
+            }
+        }
+
+
+        #[
+            COLLISION -> VERTICAL -> ABOVE
+                - ADD GRAVITY AND CORRECT HEIGHT
+
+            FLAGS -> HIT_ABOVE:1
+        ]#
+        if (Dir_Z == 1) {
+            POSITION = POSITION + GRAVITY*TIME_DELTA + vec(0,0,0.5*K_GRAVITY*TIME_DELTA*TIME_DELTA)
+
+            local Hit_Z = Trace_Z:position():z()
+            if (POSITION[3] >= Hit_Z) {
+                POSITION[3] = Hit_Z
+                GRAVITY[3] = 0
+                HIT_ABOVE = 1
+            }
+            else {
+                HIT_ABOVE = 0
+            }
+        }
+
+
+        # PLAYER -> EYE
+        PLAYER = Entity:driver()
+        DIR_LOOK = Entity:toLocalAxis(PLAYER:eye())
+
+
+        # PLAYER -> MOVEMENT DIRECTION
+        if (W|A|S|D) {
+            DIR_MOVE = (W - S)*DIR_LOOK:setZ(0) #?: DIR_LOOK:setZ(0)*0.05 #DIR_MOVE #:setZ(0) #*0.05
+            if (A|D) {
+                DIR_MOVE += (D - A)*DIR_LOOK:setZ(0):cross(DIR_UP)
+            }
+        }
+        DIR_MOVE = DIR_MOVE:normalized()
+
+
+        # PLAYER -> CROUCH
+        if (HEIGHT_CROUCH) {
+            LCtrl = PLAYER:keyDuck()
+            if (changed(LCtrl)) {
+                local HitHeight = LCtrl ? HEIGHT_CROUCH : HEIGHT_STAND
+                local HitCheck = rangerOffsetHull(HitHeight,POSITION,DIR_UP,vec(-BBOX_RAD*2,BBOX_RAD*2,0)):distance()
+
+                if (HitCheck == HitHeight) {
+                    recalc_bbox(BBOX_RAD,HitHeight)
+                    if (HIT_BELOW) {
+                        POSITION[3] = Trace_Z:position():z() + HEIGHT_CURRENT
+                    }
+                    CROUCHING = HitHeight == HEIGHT_CROUCH
+                }
+            }
+        }
+
+
+        # CONTROLLER -> VELOCITY AND GRAVITY
+        if (HIT_BELOW) {
+            SPEED_MOVE = ANIM_OUTPUT["move_speed",number]*ANIM_OUTPUT["frame_rate",number]*TIME_DELTA
+            VELOCITY   = DIR_MOVE*SPEED_MOVE
+
+            if (HEIGHT_JUMP & Space) {
+                GRAVITY = vec(0,0,sqrt(-2*K_GRAVITY*HEIGHT_JUMP))
+                HIT_BBOX = HIT_ABOVE = HIT_BELOW = 0
+            }
+        }
+        else {
+            GRAVITY += vec(0,0,K_GRAVITY*TIME_DELTA)
+        }
+
+        holoPos(9000,POSITION)
+
+        switch (MOVETYPE) {
+            case "CAMERA_LOOK",
+                if (VELOCITY) {
+                    holoAng(9000,ang(0,atan(DIR_LOOK[2],DIR_LOOK[1]),0))
+                }
+            break
+
+            case "CAMERA_MOVE",
+                holoAng(9000,ang(0,atan(DIR_MOVE[2],DIR_MOVE[1]),0))
+            break
+        }
+
+        if (changed(R) & R) {
+            MOVETYPE = (MOVETYPE == "CAMERA_LOOK") ? "CAMERA_MOVE" : "CAMERA_LOOK"
+        }
+    }
+}

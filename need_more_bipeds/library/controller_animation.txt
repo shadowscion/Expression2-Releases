@@ -1,0 +1,186 @@
+@name need_more_bipeds/library/controller_animation
+
+#include "need_more_bipeds/library/stance_none"
+#include "need_more_bipeds/library/stance_sword_2h"
+
+# BLENDERS
+function table blend_TABLE(Blend0:table,Blend1:table,T) {
+    if     (T == 0) { return Blend0 }
+    elseif (T == 1) { return Blend1 }
+    else {
+        local Blend2 = table()
+        foreach (K,V:quaternion = Blend0) {
+            Blend2[K,quaternion] = slerp(V,Blend1[K,quaternion],T)
+        }
+        foreach (K,V:vector = Blend0) {
+            Blend2[K,vector] = mix(Blend1[K,vector],V,T)
+        }
+        foreach (K,V:number = Blend0) {
+            Blend2[K,number] = (1 - T)*V + Blend1[K,number]*T
+        }
+
+        return Blend2
+    }
+}
+function table blend_BY_NAME(Blend0:string,Blend1:string,T) {
+    if     (T == 0) { return Blend0()[table] }
+    elseif (T == 1) { return Blend1()[table] }
+    else {
+        return blend_TABLE(Blend0()[table],Blend1()[table],T)
+    }
+}
+function table blend_TYPE_BY_DIRECTION(Type:string,Direction) {
+    local Direction = angnorm(Direction)
+    if (Direction == 0) {
+        return (Type + "F")()[table]
+    }
+    elseif (Direction == 90) {
+        return (Type + "L")()[table]
+    }
+    elseif (Direction == -90) {
+        return (Type + "R")()[table]
+    }
+    elseif (Direction == 180 | Direction == -180) {
+        return (Type + "B")()[table]
+    }
+    elseif (inrange(Direction,0,90)) {
+        return blend_BY_NAME(Type + "F",Type + "L",abs(Direction/90))
+    }
+    elseif (inrange(Direction,-90,0)) {
+        return blend_BY_NAME(Type + "F",Type + "R",abs(Direction/90))
+    }
+    elseif (inrange(Direction,90,180)) {
+        return blend_BY_NAME(Type + "L",Type + "B",abs(Direction/90) - 1)
+    }
+    elseif (inrange(Direction,-180,-90)) {
+        return blend_BY_NAME(Type + "R",Type + "B",abs(Direction/90) - 1)
+    }
+    else {
+        return table()
+    }
+}
+
+
+# BLENDS
+function table blend_STANCE(Stance:string,XValue,YValue) {
+    # IDLES
+    if (XValue == 0) {
+        return format("anim__STANCE_%s_%s_IDLE",Stance,CROUCHING ? "CROUCH" : "WALK")()[table]
+    }
+    # WALKS
+    elseif (XValue <= 0.5) {
+        if (XValue == 0.5) {
+            return blend_TYPE_BY_DIRECTION(format("anim__STANCE_%s_%s_",Stance,CROUCHING ? "CROUCH" : "WALK"),YValue)
+        }
+        else {
+            return blend_TABLE(format("anim__STANCE_%s_%s_IDLE",Stance,CROUCHING ? "CROUCH" : "WALK")()[table],blend_TYPE_BY_DIRECTION(format("anim__STANCE_%s_%s_",Stance,CROUCHING ? "CROUCH" : "WALK"),YValue),XValue*2)
+        }
+    }
+    # RUNS
+    elseif (XValue <= 1) {
+        if (XValue == 1) {
+            return blend_TYPE_BY_DIRECTION(format("anim__STANCE_%s_RUN_",Stance),YValue)
+        }
+        else {
+            return blend_TABLE(blend_TYPE_BY_DIRECTION(format("anim__STANCE_%s_WALK_",Stance),YValue),blend_TYPE_BY_DIRECTION(format("anim__STANCE_%s_RUN_",Stance),YValue),XValue*2 - 1)
+        }
+    }
+}
+function table blend_TWO_STANCES(A:string,B:string,XValue,YValue,ZValue) {
+    if (ZValue == 0) {
+        return blend_STANCE(A,XValue,YValue)
+    }
+    elseif (ZValue == 1) {
+        return blend_STANCE(B,XValue,YValue)
+    }
+    else {
+        return blend_TABLE(blend_STANCE(A,XValue,YValue),blend_STANCE(B,XValue,YValue),ZValue)
+    }
+}
+
+
+# OUTPUT
+function update_animation_controller() {
+    # ANIMATION
+    local Direction = 0
+    switch (MOVETYPE) {
+        case "CAMERA_LOOK",
+            if (VELOCITY) {
+                Direction = atan(DIR_MOVE:y(),DIR_MOVE:x()) - atan(DIR_LOOK:y(),DIR_LOOK:x())
+            }
+        break
+    }
+
+    if (!Active) {
+        DIR_LOOK = holoEntity(1):forward()
+    }
+
+    INPUT += clamp((W|A|S|D)*0.5 + Shift*0.5 - INPUT,-TIME_DELTA,TIME_DELTA)
+
+    ANIM_PELVIS_R = rangerOffset(MDL_PELVIS_HEIGHT,MDL_PELVIS1:pos(),DIR_DOWN)
+    ANIM_PELVIS_H = ANIM_PELVIS_R:distance()
+
+    ANIM_LOOP  += 360*ANIM_OUTPUT["frame_rate",number]*TIME_DELTA
+    ANIM_OUTPUT = blend_STANCE("SWORD_2H",INPUT,Direction)
+
+
+    # PELVIS
+    holoPos(2,MDL_PELVIS1:toWorld(ANIM_OUTPUT["v_pelvis",vector]))
+    holoAng(2,MDL_PELVIS1:toWorld(ANIM_OUTPUT["q_pelvis",quaternion]:toAngle()))
+
+
+    # TORSO
+    ANIM_TORSO_AIM_ANG = quat(MDL_PELVIS1:toLocal(DIR_LOOK:toAngle()) * ((MDL_PELVIS2:forward():dot(DIR_LOOK) + 1)*0.5))
+    holoAng(3,MDL_PELVIS1:toWorld(ANIM_OUTPUT["q_torso",quaternion]:toAngle()))
+
+
+    # HEAD
+    ANIM_HEAD_AIM_ANG = quat(MDL_TORSO:toLocal(DIR_LOOK:toAngle()) * ((MDL_TORSO:forward():dot(DIR_LOOK) + 1)*0.5))
+    holoAng(4,MDL_TORSO:toWorld(ANIM_OUTPUT["q_head",quaternion]:toAngle()))
+
+
+    # LEGS
+    holoAng(5,MDL_PELVIS1:toWorld(ANIM_OUTPUT["q_l_leg_a",quaternion]:toAngle()))
+    holoAng(6,MDL_PELVIS1:toWorld(ANIM_OUTPUT["q_l_leg_b",quaternion]:toAngle()))
+    holoAng(7,MDL_PELVIS1:toWorld(ANIM_OUTPUT["q_l_leg_c",quaternion]:toAngle()))
+    holoAng(8,MDL_PELVIS1:toWorld(ANIM_OUTPUT["q_r_leg_a",quaternion]:toAngle()))
+    holoAng(9,MDL_PELVIS1:toWorld(ANIM_OUTPUT["q_r_leg_b",quaternion]:toAngle()))
+    holoAng(10,MDL_PELVIS1:toWorld(ANIM_OUTPUT["q_r_leg_c",quaternion]:toAngle()))
+
+
+    # ARMS
+    holoAng(11,MDL_PELVIS1:toWorld(ANIM_OUTPUT["q_l_arm_a",quaternion]:toAngle()))
+    holoAng(12,MDL_PELVIS1:toWorld(ANIM_OUTPUT["q_l_arm_b",quaternion]:toAngle()))
+    holoAng(13,MDL_PELVIS1:toWorld(ANIM_OUTPUT["q_l_arm_c",quaternion]:toAngle()))
+    holoAng(14,MDL_PELVIS1:toWorld(ANIM_OUTPUT["q_r_arm_a",quaternion]:toAngle()))
+    holoAng(15,MDL_PELVIS1:toWorld(ANIM_OUTPUT["q_r_arm_b",quaternion]:toAngle()))
+    holoAng(16,MDL_PELVIS1:toWorld(ANIM_OUTPUT["q_r_arm_c",quaternion]:toAngle()))
+
+#[            ANIM_LOOP += TIME_DELTA*360*ANIM_OUTPUT["frame_rate",number]
+
+            INFO_PELVIS_R = rangerOffset(INFO_PELVIS_Z,INFO_PELVIS_ENT1:pos(),vec(0,0,-1))
+            INFO_PELVIS_D = INFO_PELVIS_R:distance()
+
+            ANIM_OUTPUT = state__STANCE(INPUT,Direction,1,"STANCE_2H_SWORD") #tate__MOVEMENT(INPUT,Direction)
+
+            holoPos(2,INFO_PELVIS_ENT1:toWorld(ANIM_OUTPUT["v_pelvis",vector]))
+            holoAng(2,INFO_PELVIS_ENT1:toWorld(ANIM_OUTPUT["q_pelvis",quaternion]:toAngle()))
+
+            INFO_TORSO_AIM_DIR = DIR_LOOK #((INFO_PELVIS_ENT1:toWorld(vec(100,0,0))) - holoEntity(3):pos()):normalized()
+            INFO_TORSO_AIM_ANG = INFO_PELVIS_ENT2:toLocal(INFO_TORSO_AIM_DIR:toAngle()) * ((INFO_PELVIS_ENT2:forward():dot(INFO_TORSO_AIM_DIR) + 1)*0.5)
+            holoAng(3,INFO_PELVIS_ENT2:toWorld(ANIM_OUTPUT["q_torso",quaternion]:toAngle()))
+
+            holoAng(5,INFO_PELVIS_ENT1:toWorld(ANIM_OUTPUT["q_l_hip",quaternion]:toAngle()))
+            holoAng(6,INFO_PELVIS_ENT1:toWorld(ANIM_OUTPUT["q_l_knee",quaternion]:toAngle()))
+            holoAng(7,INFO_PELVIS_ENT1:toWorld(ANIM_OUTPUT["q_l_foot",quaternion]:toAngle()))
+            holoAng(8,INFO_PELVIS_ENT1:toWorld(ANIM_OUTPUT["q_r_hip",quaternion]:toAngle()))
+            holoAng(9,INFO_PELVIS_ENT1:toWorld(ANIM_OUTPUT["q_r_knee",quaternion]:toAngle()))
+            holoAng(10,INFO_PELVIS_ENT1:toWorld(ANIM_OUTPUT["q_r_foot",quaternion]:toAngle()))
+
+            holoAng(12,holoEntity(3):toWorld(ANIM_OUTPUT["q_l_shoulder",quaternion]:toAngle()))
+            holoAng(13,holoEntity(3):toWorld(ANIM_OUTPUT["q_l_elbow",quaternion]:toAngle()))
+            holoAng(16,holoEntity(3):toWorld(ANIM_OUTPUT["q_r_shoulder",quaternion]:toAngle()))
+            holoAng(17,holoEntity(3):toWorld(ANIM_OUTPUT["q_r_elbow",quaternion]:toAngle()))]#
+
+    #blend_STANCE("NONE",INPUT,Direction)
+}

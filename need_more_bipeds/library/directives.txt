@@ -1,0 +1,48 @@
+@name need_more_bipeds/library/directives
+
+# INPUTS
+@inputs [Camera]:wirelink [W A S D R] [Shift Space] [Mouse1 Mouse2] [Active] [Entity]:entity
+@persist [LCtrl] [INPUT]
+
+# MODEL
+@persist [MDL_LEGLENGTH_A MDL_LEGLENGTH_B MDL_ARMLENGTH_A MDL_ARMLENGTH_B] [MDL_PELVIS_HEIGHT] [MDL_ROOT_HEIGHT] [MDL_FOOT_WIDTH]
+@persist [MDL_ROOT MDL_PELVIS1 MDL_PELVIS2 MDL_TORSO MDL_HEAD MDL_LEG_L MDL_LEG_R MDL_ARM_L MDL_ARM_R]:entity
+
+# ANIMATIONS
+@persist [ANIM_LOOP] [ANIM_OUTPUT]:table [TIME_DELTA TIME_CURRENT]
+@persist [ANIM_TORSO_AIM_ANG ANIM_HEAD_AIM_ANG]:quaternion [ANIM_PELVIS_H] [ANIM_PELVIS_R]:ranger
+
+# CONTROLLER
+@persist [POSITION VELOCITY GRAVITY]:vector [DIR_MOVE DIR_LOOK]:vector [BBOX_MIN BBOX_MAX]:vector [BBOX_RAD]
+@persist [HEIGHT_STAND HEIGHT_CROUCH HEIGHT_JUMP HEIGHT_CURRENT] [K_GRAVITY]
+@persist [HIT_BELOW HIT_ABOVE HIT_BBOX] CROUCHING [MOVETYPE]:string
+
+# CORE
+@persist [DIR_UP DIR_DOWN]:vector [PLAYER]:entity
+
+# GLOBALS
+DIR_UP   = vec(0,0,1)
+DIR_DOWN = -DIR_UP
+
+function update_clock(N) {
+    timer("main",N)
+
+    TIME_DELTA = curtime() - TIME_CURRENT
+    TIME_CURRENT = curtime()
+
+    if (TIME_DELTA > 1) { exit() }
+}
+
+function array ik_LOCAL_QUAT_OUTPUT(ReferenceEntity:entity,BaseBoneEntity:entity,EndEffector:vector,LengthA,LengthB,Flip) {
+    local LDiff = ReferenceEntity:toLocalAxis(EndEffector - BaseBoneEntity:pos())
+    local LAngl = LDiff:toAngle():setRoll(atan(LDiff:y(),LDiff:x()))
+    local LDist = min(LDiff:length(),LengthA + LengthB - 0.05)
+
+    local IK = LAngl:rotateAroundAxis(LAngl:right(),Flip * acos((LDist^2 + LengthA^2 - LengthB^2) / (2 * LengthA * LDist)))
+
+    return array(
+        quat(IK),
+        quat(IK:rotateAroundAxis(IK:right(),180 + Flip * acos((LengthB^2 + LengthA^2 - LDist^2) / (2 * LengthA * LengthB)))),
+        quat(LAngl)
+    )
+}

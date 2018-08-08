@@ -1,0 +1,23 @@
+@name need_more_bipeds/spawn
+@trigger none
+
+if (first()) {
+    #if (!->Camera) { exit() }
+
+    #include "need_more_bipeds/model"
+    #include "need_more_bipeds/library/controller_animation"
+    #include "need_more_bipeds/library/controller_character"
+
+    timer("spawn",150)
+}
+if (clk("spawn")) {
+    if (spawn_holograms(0,1)) {
+        reset_model_info()
+        reset_character_controller()
+    }
+}
+if (clk("main")) {
+    update_clock(90)
+    update_character_controller()
+    update_animation_controller()
+}

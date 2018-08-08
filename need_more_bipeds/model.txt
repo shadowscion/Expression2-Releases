@@ -1,0 +1,156 @@
+@name need_more_bipeds/model
+@persist HS [HT XT BONES]:table
+
+# TEMP
+#include "need_more_bipeds/library/directives"
+
+local Vec = vec()
+local Ang = ang()
+
+entity():setMaterial("beer/wiremod/gate_e2")
+
+
+# MODEL CONFIG
+local MDL = table(
+    "bone_color"  = vec4(255,255,255,255),
+    "bone_model"  = "",#models/sprops/misc/origin.mdl",
+    "bone_scale"  = vec(0.25,0.25,0.25),
+
+    # root
+    "z_root"      = 50,
+
+    # pelvis
+    "z_pelvis"    = 30,
+
+    # torso
+    "z_torso"     = 5,
+
+    # head
+    "z_head"      = 15,
+
+    # leg
+    "y_hip"       = 3,
+    "x_knee"      = 18,
+    "x_foot"      = 12,
+
+    # arm
+    "z_shoulder"  = 10,
+    "y_shoulder"  = 7,
+    "x_elbow"     = 12,
+    "x_hand"      = 8
+)
+
+
+# HOLO DATA
+HT = table(
+    # root
+    array(9000,0,Vec:setZ(MDL["z_root",number]),Ang,MDL["bone_scale",vector]/4,MDL["bone_model",string],"",MDL["bone_color",vector4],MDL["bone_color",vector4],0,"root"),
+
+    # pelvis
+    array(1,9000,Vec:setZ(-MDL["z_root",number] + MDL["z_pelvis",number]),Ang,MDL["bone_scale",vector]/4,MDL["bone_model",string],"",MDL["bone_color",vector4],MDL["bone_color",vector4],0,"pelvis"),
+
+    array(2,1,Vec,Ang,MDL["bone_scale",vector],MDL["bone_model",string],"",MDL["bone_color",vector4],MDL["bone_color",vector4],0,"pelvis"),
+
+    # torso
+    array(3,2,Vec:setZ(MDL["z_torso",number]),Ang,MDL["bone_scale",vector],MDL["bone_model",string],"",MDL["bone_color",vector4],MDL["bone_color",vector4],0,"torso"),
+
+    # head
+    array(4,3,Vec:setZ(MDL["z_head",number]),Ang,MDL["bone_scale",vector],MDL["bone_model",string],"",MDL["bone_color",vector4],MDL["bone_color",vector4],0,"head"),
+
+    # left leg
+    array(5,2,Vec:setY(MDL["y_hip",number]),ang(90,0,0),MDL["bone_scale",vector],MDL["bone_model",string],"",MDL["bone_color",vector4],MDL["bone_color",vector4],0,"left_hip"),
+    array(6,5,Vec:setX(MDL["x_knee",number]),Ang,MDL["bone_scale",vector],MDL["bone_model",string],"",MDL["bone_color",vector4],MDL["bone_color",vector4],0,"left_knee"),
+    array(7,6,Vec:setX(MDL["x_foot",number]),Ang,MDL["bone_scale",vector],MDL["bone_model",string],"",MDL["bone_color",vector4],MDL["bone_color",vector4],0,"left_foot"),
+
+    # right leg
+    array(8,2,Vec:setY(-MDL["y_hip",number]),ang(90,0,0),MDL["bone_scale",vector],MDL["bone_model",string],"",MDL["bone_color",vector4],MDL["bone_color",vector4],0,"right_hip"),
+    array(9,8,Vec:setX(MDL["x_knee",number]),Ang,MDL["bone_scale",vector],MDL["bone_model",string],"",MDL["bone_color",vector4],MDL["bone_color",vector4],0,"right_knee"),
+    array(10,9,Vec:setX(MDL["x_foot",number]),Ang,MDL["bone_scale",vector],MDL["bone_model",string],"",MDL["bone_color",vector4],MDL["bone_color",vector4],0,"right_foot"),
+
+    # left arm
+    array(11,3,Vec:setY(MDL["y_shoulder",number]):setZ(MDL["z_shoulder",number]),Ang,MDL["bone_scale",vector],MDL["bone_model",string],"",MDL["bone_color",vector4],MDL["bone_color",vector4],0,"left_shoulder"),
+    array(12,11,Vec:setX(MDL["x_elbow",number]),Ang,MDL["bone_scale",vector],MDL["bone_model",string],"",MDL["bone_color",vector4],MDL["bone_color",vector4],0,"left_elbow"),
+    array(13,12,Vec:setX(MDL["x_hand",number]),Ang,MDL["bone_scale",vector],MDL["bone_model",string],"",MDL["bone_color",vector4],MDL["bone_color",vector4],0,"left_hand"),
+
+    # right arm
+    array(14,3,Vec:setY(-MDL["y_shoulder",number]):setZ(MDL["z_shoulder",number]),Ang,MDL["bone_scale",vector],MDL["bone_model",string],"",MDL["bone_color",vector4],MDL["bone_color",vector4],0,"right_shoulder"),
+    array(15,14,Vec:setX(MDL["x_elbow",number]),Ang,MDL["bone_scale",vector],MDL["bone_model",string],"",MDL["bone_color",vector4],MDL["bone_color",vector4],0,"right_elbow"),
+    array(16,15,Vec:setX(MDL["x_hand",number]),Ang,MDL["bone_scale",vector],MDL["bone_model",string],"",MDL["bone_color",vector4],MDL["bone_color",vector4],0,"right_hand"),
+
+    array(17,16,Vec:setZ(10),Ang,(MDL["bone_scale",vector] / 2):setZ(40/12),"","",MDL["bone_color",vector4],MDL["bone_color",vector4],0)
+
+)
+
+function reset_model_info() {
+    MDL_LEGLENGTH_A   = abs(holoEntity(8):toLocal(holoEntity(9):pos()):x())
+    MDL_LEGLENGTH_B   = abs(holoEntity(9):toLocal(holoEntity(10):pos()):x())
+    MDL_ARMLENGTH_A   = abs(holoEntity(11):toLocal(holoEntity(12):pos()):x())
+    MDL_ARMLENGTH_B   = abs(holoEntity(12):toLocal(holoEntity(13):pos()):x())
+    MDL_FOOT_WIDTH    = abs(holoEntity(2):toLocal(holoEntity(8):pos()):y()) + 0.5
+    MDL_ROOT_HEIGHT   = abs(entity():toLocal(holoEntity(9000):pos()):z())
+    MDL_PELVIS_HEIGHT = MDL_LEGLENGTH_A + MDL_LEGLENGTH_B
+
+    MDL_ROOT    = holoEntity(9000)
+    MDL_PELVIS1 = holoEntity(1)
+    MDL_PELVIS2 = holoEntity(2)
+    MDL_TORSO   = holoEntity(3)
+    MDL_HEAD    = holoEntity(4)
+    MDL_LEG_L   = holoEntity(5)
+    MDL_LEG_R   = holoEntity(8)
+    MDL_ARM_L   = holoEntity(11)
+    MDL_ARM_R   = holoEntity(14)
+}
+
+# SPAWN FUNCTION
+function number spawn_holograms(Shading,Factor){
+    timer("spawn",15)
+
+    local HN = HT:count()
+    while(perf() & HS < HN & holoCanCreate()){
+        HS++
+
+        local Data = HT[HS,array]
+        local Index = Data[1,number]
+        local Parent = holoEntity(Data[2,number]) ?: entity()
+
+        if (!holoEntity(Index)) {
+            holoCreate(Index)
+        }
+
+        holoPos(Index,Parent:toWorld(Data[3,vector]*Factor))
+        holoAng(Index,Parent:toWorld(Data[4,angle]))
+        holoParent(Index,Parent)
+
+        holoScale(Index,Data[5,vector]*Factor)
+        holoModel(Index,Data[6,string])
+        holoMaterial(Index,Data[7,string])
+        holoColor(Index,Data[8,vector4])
+
+        if (Shading == 1 | Data[9,number]) {
+            holoDisableShading(Index,1)
+        }
+
+        if (XT[Index,array]) {
+            local CN = XT[Index,array]:count()
+            for (I = 1,CN,2) {
+                local RCN = ceil(I/2)
+                local Pos = XT[Index,array][I,vector]
+                local Dir = XT[Index,array][I+1,vector]
+                holoClipEnabled(Index,RCN,1)
+                holoClip(Index,RCN,Pos*Factor,Dir,0)
+            }
+        }
+
+        if (Data[10,string]) {
+            BONES["index_" + Data[10,string],number] = Data[1,number]
+            BONES["entity_" + Data[10,string],entity] = holoEntity(Data[1,number])
+        }
+    }
+
+    if(HS >= HN){
+        stoptimer("spawn")
+        printColor(vec(225,255,225),"\nFinished spawning "+HS+" holograms.")
+    }
+
+    return  HS >= HN
+}

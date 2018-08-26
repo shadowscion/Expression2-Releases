@@ -1,0 +1,63 @@
+@name four_segment_ik
+@inputs GPS:vector
+@outputs 
+@persist [LENGTH_0 LENGTH_1 LENGTH_2]
+@trigger none
+
+if (first()) {
+    #-- joints    
+    LENGTH_0 = 30
+    LENGTH_1 = 50
+    LENGTH_2 = 40
+    
+    holoCreate(1, entity():pos(), vec(0.25), entity():angles())
+    holoParent(1, entity())
+    
+    holoCreate(2, holoEntity(1):toWorld(vec(LENGTH_0,0,0)), vec(0.125), entity():angles())
+    holoParent(2, 1)
+    
+    holoCreate(3, holoEntity(2):toWorld(vec(LENGTH_1,0,0)), vec(0.125), entity():angles())
+    holoParent(3, 2)
+
+    holoCreate(4, holoEntity(3):toWorld(vec(LENGTH_2,0,0)), vec(0.125), entity():angles())
+    holoParent(4, 3)
+    
+    #-- skeleton
+    holoCreate(1000, holoEntity(1):toWorld(vec(LENGTH_0/2,0,0)), vec(LENGTH_0-1,6,6)/12, entity():angles())
+    holoParent(1000, 1)
+
+    holoCreate(1001, holoEntity(2):toWorld(vec(LENGTH_1/2,0,0)), vec(LENGTH_1-1,5,5)/12, entity():angles())
+    holoParent(1001, 2)
+
+    holoCreate(1002, holoEntity(3):toWorld(vec(LENGTH_2/2,0,0)), vec(LENGTH_2-1,4,4)/12, entity():angles())
+    holoParent(1002, 3)
+
+    holoCreate(1003, holoEntity(4):toWorld(vec(LENGTH_1/2,0,0)), vec(LENGTH_1-1,3,3)/12, entity():angles())
+    holoParent(1003, 4)
+    
+    #-- ik
+    function number icos(A, B, C) {
+        return acos((A^2 + B^2 - C^2) / (2*A*B))    
+    }
+    function ik(Entity:entity,Target:vector,LengthX,LengthA,LengthB,H1,H2,H3,H4) {
+        local H1_Dir = Entity:toLocalAxis(Target - holoEntity(H1):pos())
+        local H1_Ang = H1_Dir:toAngle()
+              H1_Ang = H1_Ang:rotateAroundAxis(H1_Ang:right(), icos(min(H1_Dir:length(),LengthX + LengthA + LengthA), LengthX, LengthA + LengthA))
+
+        holoAng(H1, Entity:toWorld(H1_Ang))
+                    
+        local H2_Dir = Entity:toLocalAxis(Target - holoEntity(H2):pos())
+        local H2_Dis = min(H2_Dir:length() - LengthB, LengthA + LengthA)
+        local H2_Ang = H2_Dir:toAngle()
+
+        holoAng(H2, Entity:toWorld(H2_Ang - ang(acos(H2_Dis / (LengthA + LengthA) - 0), 0, 0)))
+        holoAng(H3, Entity:toWorld(H2_Ang))
+        holoAng(H4, Entity:toWorld(H2_Ang - ang(-acos(H2_Dis / (LengthA + LengthA) - 0), 0, 0)))   
+    }
+
+}
+
+interval(60)
+
+ik(entity(),GPS,LENGTH_0,LENGTH_1,LENGTH_2,1,2,3,4)
+

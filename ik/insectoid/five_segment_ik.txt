@@ -1,4 +1,4 @@
-@name four_segment_ik
+@name five_segment_ik
 @inputs GPS:vector
 @outputs
 @persist [LENGTH_0 LENGTH_1 LENGTH_2]
@@ -6,21 +6,24 @@
 
 if (first()) {
     #-- joints
-    LENGTH_0 = 15
-    LENGTH_1 = 25
-    LENGTH_2 = 12
+    LENGTH_0 = 10
+    LENGTH_1 = 15
+    LENGTH_2 = 20
 
-    holoCreate(1, entity():pos(), vec(0.25), entity():angles(), hsv2rgb(120, 0.25, 0.75))
+    holoCreate(1, entity():pos(), vec(0.25), entity():angles())
     holoParent(1, entity())
 
-    holoCreate(2, holoEntity(1):toWorld(vec(LENGTH_0, 0, 0)), vec(0.125), entity():angles(), hsv2rgb(120, 0.50, 0.75))
+    holoCreate(2, holoEntity(1):toWorld(vec(LENGTH_0, 0, 0)), vec(0.125), entity():angles())
     holoParent(2, 1)
 
-    holoCreate(3, holoEntity(2):toWorld(vec(LENGTH_1, 0, 0)), vec(0.125), entity():angles(), hsv2rgb(120, 0.75, 0.75))
+    holoCreate(3, holoEntity(2):toWorld(vec(LENGTH_1, 0, 0)), vec(0.125), entity():angles())
     holoParent(3, 2)
 
-    holoCreate(4, holoEntity(3):toWorld(vec(LENGTH_2, 0, 0)), vec(0.125), entity():angles(), hsv2rgb(120, 1.00, 0.75))
+    holoCreate(4, holoEntity(3):toWorld(vec(LENGTH_2, 0, 0)), vec(0.125), entity():angles())
     holoParent(4, 3)
+
+    holoCreate(5, holoEntity(4):toWorld(vec(LENGTH_1, 0, 0)), vec(0.125), entity():angles())
+    holoParent(5, 4)
 
     #-- skeleton
     local Hue = vec()
@@ -40,27 +43,37 @@ if (first()) {
     holoCreate(1003, holoEntity(4):toWorld(vec(LENGTH_1/2, 0, 0)), vec(LENGTH_1-1, 3, 3)/12, entity():angles(), hsv2rgb(Hue[2], 2/3, 1))
     holoParent(1003, 4)
 
+    holoCreate(1004, holoEntity(5):toWorld(vec(LENGTH_0/2, 0, 0)), vec(LENGTH_0-1, 2, 2)/12, entity():angles(), hsv2rgb(Hue[1], 2/3, 1))
+    holoParent(1004, 5)
+
     #-- ik
     function number icos(A, B, C) {
         return acos((A^2 + B^2 - C^2) / (2*A*B))
     }
-    function ik(Entity:entity, Target:vector, LengthX, LengthA, LengthB, H1, H2, H3, H4) {
+    function number icos2(A, B) {
+        return acos(A / (B + B))
+    }
+    function ik(Entity:entity, Target:vector, LengthX, LengthA, LengthB, H1, H2, H3, H4, H5) {
         local H1_Dir = Entity:toLocalAxis(Target - holoEntity(H1):pos())
+        local H1_Dis = min(H1_Dir:length(), LengthX + LengthA + LengthA - LengthB)
+        local H1_Ang = H1_Dir:toAngle()
 
-        holoAng(H1, Entity:toWorld(H1_Dir:toAngle() + ang(icos(min(H1_Dir:length(), LengthX + LengthA + LengthA - LengthB), LengthX, LengthA + LengthA - LengthB), 0, 0)))
+        holoAng(H1, Entity:toWorld(H1_Ang + ang(icos(H1_Dis, LengthX, LengthA + LengthA - LengthB), 0, 0)))
 
         local H2_Dir = Entity:toLocalAxis(Target - holoEntity(H2):pos())
-        local H2_Dis = min(H2_Dir:length() - LengthB, LengthA + LengthA)
+        local H2_Dis = min(H2_Dir:length() - LengthB - LengthX, LengthA + LengthA)
         local H2_Ang = H2_Dir:toAngle()
 
         holoAng(H2, Entity:toWorld(H2_Ang - ang(acos(H2_Dis / (LengthA + LengthA)), 0, 0)))
         holoAng(H3, Entity:toWorld(H2_Ang))
         holoAng(H4, Entity:toWorld(H2_Ang - ang(-acos(H2_Dis / (LengthA + LengthA)), 0, 0)))
+
+        holoAng(H5, holoEntity(H1):toWorld(ang(180 + icos(LengthA + LengthA - LengthB, LengthX, H1_Dis), 0, 0)))
     }
 
 }
 
 interval(60)
 
-ik(entity(), GPS, LENGTH_0, LENGTH_1, LENGTH_2, 1, 2, 3, 4)
+ik(entity(), GPS, LENGTH_0, LENGTH_1, LENGTH_2, 1, 2, 3, 4, 5)
 

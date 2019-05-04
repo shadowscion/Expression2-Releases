@@ -1,0 +1,132 @@
+@name metaworm
+@inputs 
+@outputs 
+@persist Base:entity Pos:vector Gravity
+@persist Count Length Seg:table SegGravity:table SegHeight:table 
+@trigger none
+
+
+if (first()) {
+    Count = 20
+    Length = 30
+    
+    Pos = entity():pos() + vec(0, 0, 200)
+    
+    for (I = 1, Count) {
+        local Prev = I > 1 ? holoEntity(I - 1) : entity()
+        
+        Seg[I, vector] = Prev:toWorld(vec(-Length, 0, 0))
+        
+        local Height = 5 + 4 + (1 - cos((I / Count) * 360)) * 4
+        
+        holoCreate(I)
+        holoPos(I, Seg[I, vector])
+        holoScaleUnits(I, vec(Length, Height * 2, Height * 2))
+        
+        holoCreate(100 + I)
+        holoModel(100 + I, "hq_sphere")
+        holoColor(100 + I, vec4(255, 0, 0, 10))
+        
+        holoCreate(200 + I)
+        holoModel(200 + I, "hq_cone")
+        holoColor(200 + I, vec4(255, 0, 0, 100))
+        
+        SegHeight[I, number] = Height
+    }
+
+    holoCreate(200)
+    holoModel(200, "hq_sphere")
+    holoColor(200, vec4(0, 255, 0, 50))
+}
+
+interval(100)
+
+local Aim = owner():eyeTrace()
+
+local DestPos = Aim:pos()
+local Speed = 50
+
+if (Pos:distance(DestPos) > 50 && owner():keyUse()) {
+    Pos += (DestPos - Pos):setZ(0):normalized() * Speed
+}
+
+#Pos = entity():pos()
+
+local Height = SegHeight[1, number]
+local RGBase = rangerOffset(Height * 2 + Speed, Pos + vec(0, 0, Speed), vec(0, 0, -1))
+local BaseDist = RGBase:distance() - Speed
+
+if (BaseDist > Height + 5) {
+    Pos += vec(0, 0, -Gravity)
+    
+    Gravity = min(Gravity + 5, 50)
+}
+elseif (BaseDist > Height) {
+    Pos -= vec(0, 0, BaseDist - Height)
+}
+
+if (BaseDist <= Height) {
+    Gravity = 0
+    
+    Pos += vec(0, 0, 1) * max(Height - BaseDist, 0)
+}
+
+
+holoPos(200, Pos)
+
+local PrevDir = -(Pos - Seg[1, vector]):normalized()
+local Prev = Pos
+for (I = 1, Count) {
+    local NewPos = Seg[I, vector]
+    
+    local Crease = (1 + (NewPos - Prev):setZ(0):normalized():dot(PrevDir:setZ(0):normalized())) / 2
+    
+    if (Crease < 0.92) {
+        NewPos += PrevDir:setZ(0):normalized() * Length
+    }
+    
+    local V = Prev - (Prev - NewPos):normalized()*Length
+    
+    local RG = rangerOffset(SegHeight[I, number] * 3 + 10, V + vec(0, 0, 10), vec(0, 0, -1))
+    local Dist = RG:distance() - 10
+    
+    holoPos(100 + I, RG:pos()) # Debug hologram for ranger position
+    
+    if (Dist > SegHeight[I, number] + 5) {
+        NewPos -= vec(0, 0, SegGravity[I, number]) # Apply gravity
+        SegGravity[I, number] = min(SegGravity[I, number] + 3, 50) # Gravity increases
+    }
+    elseif (Dist > SegHeight[I, number]) {
+        NewPos -= vec(0, 0, Dist - SegHeight[I, number]) # Align to ground if it's just a little bit too high up
+    }
+
+    if (Dist <= SegHeight[I, number]) {
+        SegGravity[I, number] = 0 # Reset gravity
+        
+        NewPos += vec(0, 0, 1) * max(SegHeight[I, number] - Dist, 0) # Make sure it stays on the right height
+    }
+    
+    local Dir = (Prev - NewPos):normalized()
+    V = Prev - Dir * Length # Update the segment position with the new position
+    
+    holoPos(200 + I, V + vec(0, 0, 20))
+    holoAng(200 + I, (V - Prev):toAngle() + ang(90, 0, 0))
+    
+    
+    local Col = (Crease - 0.9) / 0.1
+    
+    holoColor(200 + I, vec4(255* (1 - Col), 255 * Col , 0, 200))
+    
+    local AngDir = (Prev - V):normalized()
+    local Ang = AngDir:toAngle()
+    
+    if (Seg[I, vector]:distance(V) > 0.1) {
+        holoAng(I, Ang) # Don't angle unless the position changed, this prevents "spazzing holograms" when direction is vertical
+    }
+    
+    holoPos(I, (Prev + V) / 2)
+    
+    Seg[I, vector] = V
+    PrevDir = (V - Prev):normalized()
+    Prev = V
+}

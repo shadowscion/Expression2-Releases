@@ -1,22 +1,31 @@
 @name biped_gait
 @inputs 
 @outputs 
-@persist [GTime GSpan] [DT CT] [LMove RMove LOsc ROsc] [LPos RPos LHold RHold LGoto RGoto MPos MVel]:vector [MAng]:angle [MHeight MWidth]
+@persist [GTime GSpan] [DT CT] [LMove RMove LOsc ROsc] [LPos RPos LHold RHold LGoto RGoto MPos MVel]:vector [MAng]:angle [MHeight MWidth MGround MStep MOsc]
 @trigger none
 
-#L = (GTime >= 0 & GTime <= GSpan) ? (GTime / GSpan) : ((GSpan > 1) & (GTime + 1 >= 0 & GTime + 1 <= GSpan)) ? ((GTime + 1) / GSpan) : 0
-#R = (GTime >= 0.5 & GTime <= 0.5 + GSpan) ? ((GTime - 0.5) / (0.5 + GSpan - 0.5)) : ((0.5 + GSpan > 1) & (GTime + 1 >= 0.5 & GTime + 1 <= 0.5 + GSpan)) ? ((GTime + 1 - 0.5) / (0.5 + GSpan - 0.5)) : 0
-#Gait = (GTime >= Gait_start & GTime <= Gait_start + GSpan) ? ((GTime - Gait_start) / (Gait_start + GSpan - Gait_start)) : ((Gait_start + GSpan > 1) & (GTime + 1 >= Gait_start & GTime + 1 <= Gait_start + GSpan)) ? ((GTime + 1 - Gait_start) / (Gait_start + GSpan - Gait_start)) : 0
-
-if (first()) {
-    for (I = 1, 3) {
-        holoCreate(I)    
-    }
+if (first()) { 
+    #[
+        MHeight = height of hip
+        MWidth  = foot placement width
+        MGround = foot placement z offset
+        MStep   = multiplier for step height -> height = step length * MStep
+        MOsc    = multiplier for hip oscilliation
+        
+        #Gait = (GTime >= Gait_start & GTime <= Gait_start + GSpan) ? ((GTime - Gait_start) / (Gait_start + GSpan - Gait_start)) : ((Gait_start + GSpan > 1) & (GTime + 1 >= Gait_start & GTime + 1 <= Gait_start + GSpan)) ? ((GTime + 1 - Gait_start) / (Gait_start + GSpan - Gait_start)) : 0
+    ]#
     
     MHeight = 150
     MWidth  = 50
+    MGround = 6
+    MStep   = 0.25
+    MOsc    = 0.25
     
     MPos = LPos = RPos = LHold = RHold = RGoto = LGoto = entity():pos() + vec(0, 0, MHeight)
+    
+    for (I = 1, 3) {
+        holoCreate(I)    
+    }
 }
 
 
@@ -30,12 +39,12 @@ if (DT > 1) { exit() }
 
 
 #-- mech
-MVel = MAng:forward() * 175
+MVel = MAng:forward() * 75
 
 
 #-- gait
-GTime = GTime + DT / 1
-GSpan = 0.85
+GTime = GTime + DT * 0.5
+GSpan = 0.5
 
 
 #-- left
@@ -48,13 +57,13 @@ if (LTime) {
     if (LMove == 1) {
         local Check = rangerOffset(MHeight * 2, rangerOffset(MPos, toWorld(vec(0, MWidth, 0), ang(), MPos, MAng) + MVel):position(), vec(0, 0, -1))
         if (Check:hit()) {
-            LGoto = Check:position() + Check:hitNormal() * 6
+            LGoto = Check:position() + Check:hitNormal() * MGround
             
             local Dir = LGoto - LHold
-            if (Dir) {
-                local Mid = mix(LGoto, LHold, 0.85) + Dir:toAngle():up() * Dir:length() * 0.25
+            if (Dir:length() > MWidth * MStep) {
+                local Mid = mix(LGoto, LHold, 0.85) + Dir:toAngle():up() * Dir:length() * MStep
                 LPos = mix(bezier(LHold, Mid, LGoto, LTime), LPos, LTime)
-                LOsc = cos(360 * LTime) * MHeight * -0.25
+                LOsc = cos(360 * LTime) * MHeight * -MOsc
             }
             else {
                 LOsc = 0    
@@ -80,13 +89,13 @@ if (RTime) {
     if (RMove == 1) {
         local Check = rangerOffset(MHeight * 2, rangerOffset(MPos, toWorld(vec(0, -MWidth, 0), ang(), MPos, MAng) + MVel):position(), vec(0, 0, -1))
         if (Check:hit()) {
-            RGoto = Check:position() + Check:hitNormal() * 6
+            RGoto = Check:position() + Check:hitNormal() * MGround
             
             local Dir = RGoto - RHold
-            if (Dir) {
-                local Mid = mix(RGoto, RHold, 0.85) + Dir:toAngle():up() * Dir:length() * 0.25
+            if (Dir:length() > MWidth * MStep) {
+                local Mid = mix(RGoto, RHold, 0.85) + Dir:toAngle():up() * Dir:length() * MStep
                 RPos = mix(bezier(RHold, Mid, RGoto, RTime), RPos, RTime)
-                ROsc = cos(360 * RTime) * MHeight * -0.25
+                ROsc = cos(360 * RTime) * MHeight * -MOsc
             }
             else {
                 ROsc = 0
@@ -103,7 +112,7 @@ else {
 
 
 #-- mech
-MPos = (LPos + RPos) / 2 + vec(0, 0, MHeight + LOsc + ROsc)
+MPos = (LPos + RPos) / 2 + vec(0, 0, MHeight + (LOsc + ROsc) / 2)
 
 
 #-- gait

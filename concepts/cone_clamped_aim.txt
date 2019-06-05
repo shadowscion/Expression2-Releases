@@ -1,0 +1,50 @@
+@name cone_clamped_aim
+@inputs Camera:wirelink Seat:entity
+@persist [AimDirMin AimDirMax]:angle [AimLenMin] [Base]:entity
+@trigger none
+
+if (first()) {
+    Base = entity()
+
+    AimDirMin = ang(-67.5, -67.5, 0)
+    AimDirMax = ang(67.5, 67.5, 0)
+    AimLenMin = 100
+    
+    holoCreate(1)     
+
+    Camera["Parent", entity] = Base
+    Camera["Distance", number] = 12
+    Camera["Position", vector] = vec(0, 0, 6)
+
+    local Flags = array(
+        14 = 1, #ParentLocal
+        15 = 1, #AutoMove
+        16 = 0, #FreeMove
+        17 = 0, #LocalMove
+        18 = 1, #AllowZoom
+        19 = 1, #AutoUnclip
+        20 = 1, #AutoUnclipIgnoreWater
+        21 = 1, #DrawPlayer
+        22 = 1  #DrawParent
+    )
+    foreach (N:number, B:number = Flags) {
+        Camera[N] = B
+    }
+
+    rangerHitEntities(0)
+    rangerPersist(1)
+}
+
+interval(60)
+
+Driver = Seat:driver()
+if (changed(Driver)) {
+    Camera["Activated", number] = Seat:driver():isValid()
+}
+if (Driver) {
+    AimDir = Seat:toLocal(Driver:eyeAngles())
+    AimDir = clamp(AimDir, AimDirMin, AimDirMax)
+    AimRan = rangerOffset(1000, Base:pos() + AimDir:forward() * AimLenMin, AimDir:forward())
+    
+    holoPos(1, AimRan:position())
+}

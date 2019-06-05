@@ -1,0 +1,117 @@
+@name simple_gaits
+@inputs 
+@outputs KeyID
+@persist [Gaits]:table [GaitLast GaitNext]:array [GaitTime GaitShift GaitFL GaitFR GaitRL GaitRR] [DT CT] 
+@persist KeyID Keys:array
+@trigger none
+
+if (first()) {
+    function number gseq(Start, Length, Time) {
+        return (Time >= Start & Time <= Start + Length) ? ((Time - Start) / (Start + Length - Start)) : ((Start + Length > 1) & (Time + 1 >= Start & Time + 1 <= Start + Length)) ? ((Time + 1 - Start) / (Start + Length - Start)) : 0
+    }
+
+    Gaits = table(
+        "walk" = array(
+            1 / 2,      # rate
+            0.00, 0.75, # fl a, fl b
+            0.50, 0.75, # fr a, fr b
+            0.25, 0.75, # rl a, rl b
+            0.75, 0.75  # rr a, rr b
+        ),
+        "gallop" = array(
+            1 / 0.75,
+            0.00, 0.95,
+            0.10, 0.95,
+            0.25, 0.95,
+            0.35, 0.95    
+        )
+    )
+    
+    GaitLast = Gaits["walk", array]
+    GaitNext = Gaits["walk", array]
+    
+    Keys = Gaits:keys()
+    KeyID = 1
+
+    for (I = 1, 5) { 
+        holoCreate(I)
+    }
+}
+
+interval(90)
+
+DT = curtime() - CT
+CT = curtime()
+
+if (DT > 1) {
+    exit()
+}
+
+#-- sequencer
+if (GaitShift < 1) {
+    GaitShift = min(GaitShift + DT, 1)
+    
+    GaitTime += ((1 - GaitShift) * GaitLast[1, number] + GaitShift * GaitNext[1, number]) * DT
+    
+    GaitFL = gseq((1 - GaitShift) * GaitLast[2, number] + GaitShift * GaitNext[2, number], (1 - GaitShift) * GaitLast[3, number] + GaitShift * GaitNext[3, number], GaitTime)
+    GaitFR = gseq((1 - GaitShift) * GaitLast[4, number] + GaitShift * GaitNext[4, number], (1 - GaitShift) * GaitLast[5, number] + GaitShift * GaitNext[5, number], GaitTime)  
+    GaitRL = gseq((1 - GaitShift) * GaitLast[6, number] + GaitShift * GaitNext[6, number], (1 - GaitShift) * GaitLast[7, number] + GaitShift * GaitNext[7, number], GaitTime)  
+    GaitRR = gseq((1 - GaitShift) * GaitLast[8, number] + GaitShift * GaitNext[8, number], (1 - GaitShift) * GaitLast[9, number] + GaitShift * GaitNext[9, number], GaitTime)  
+}
+else {
+    GaitTime += GaitNext[1, number] * DT
+    
+    GaitFL = gseq(GaitNext[2, number], GaitNext[3, number], GaitTime)
+    GaitFR = gseq(GaitNext[4, number], GaitNext[5, number], GaitTime)  
+    GaitRL = gseq(GaitNext[6, number], GaitNext[7, number], GaitTime)  
+    GaitRR = gseq(GaitNext[8, number], GaitNext[9, number], GaitTime)  
+}
+if (GaitTime > 1) {
+    GaitTime--
+}
+
+
+#-- demo visualizer
+local Next = owner():keyAttack2()
+if (changed(Next) & Next) {
+    KeyID++
+    if (KeyID > Keys:count()) {
+        KeyID = 1    
+    }
+    
+    GaitLast = GaitNext
+    GaitNext = Gaits[Keys[KeyID, string], array]
+    GaitShift = 0
+}
+
+if (GaitFL) {
+    holoPos(1, entity():toWorld(vec(50 - cos(GaitFL * 360)*30, 50, max(sin(GaitFL * 360), 0)*30)))
+    holoAng(1, entity():toWorld(ang(max(sin(GaitFL * 360), 0)*45, 0, 0)))
+}
+
+if (GaitFR) {
+    holoPos(2, entity():toWorld(vec(50 - cos(GaitFR * 360)*30, -50, max(sin(GaitFR * 360), 0)*30)))
+    holoAng(2, entity():toWorld(ang(max(sin(GaitFR * 360), 0)*45, 0, 0))) 
+}
+
+if (GaitRL) {
+    holoPos(3, entity():toWorld(vec(-50 - cos(GaitRL * 360)*30, 25, max(sin(GaitRL * 360), 0)*10)))
+    holoAng(3, entity():toWorld(ang(max(sin(GaitRL * 360), 0)*45, 0, 0)))
+}
+
+if (GaitRR) {
+    holoPos(4, entity():toWorld(vec(-50 - cos(GaitRR * 360)*30, -25, max(sin(GaitRR * 360), 0)*10)))
+    holoAng(4, entity():toWorld(ang(max(sin(GaitRR * 360), 0)*45, 0, 0))) 
+}
+
+local P = vec()
+for (I = 1, 4) {
+    P += holoEntity(I):pos()
+}
+P /= 4
+
+local Pd = (holoEntity(3):pos() + holoEntity(4):pos())*0.5 - (holoEntity(1):pos() + holoEntity(2):pos())*0.5
+local Rd = (holoEntity(2):pos() + holoEntity(4):pos())*0.5 - (holoEntity(1):pos() + holoEntity(3):pos())*0.5
+
+holoPos(5, P + vec(0, 0, 50))
+holoAng(5, ang(atan(Pd:x(), Pd:z()) + 90, atan(Rd:y(), Rd:x()) + 90, -atan(Rd:y(), Rd:z()) - 90))

@@ -7,7 +7,7 @@
 
 if (first()) {
     function number gseq(Start, Length, Time) {
-        return (Time >= Start & Time <= Start + Length) ? ((Time - Start) / (Start + Length - Start)) : ((Start + Length > 1) & (Time + 1 >= Start & Time + 1 <= Start + Length)) ? ((Time + 1 - Start) / (Start + Length - Start)) : 0
+       return (Time >= Start & Time <= Start + Length) ? ((Time - Start) / Length) : ((Start + Length > 1) & (Time + 1 >= Start & Time + 1 <= Start + Length)) ? ((Time + 1 - Start) / Length) : 0
     }
 
     Gaits = table(
@@ -27,7 +27,7 @@ if (first()) {
         )
     )
     
-    GaitLast = Gaits["walk", array]
+    GaitLast = Gaits["gallop", array]
     GaitNext = Gaits["walk", array]
     
     Keys = Gaits:keys()

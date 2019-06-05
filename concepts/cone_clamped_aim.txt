@@ -1,6 +1,6 @@
 @name cone_clamped_aim
 @inputs Camera:wirelink Seat:entity
-@persist [AimDirMin AimDirMax]:angle [AimLenMin] [Base]:entity
+@persist [AimDirMin AimDirMax]:angle [AimLenMin AimLenMax] [Base]:entity
 @trigger none
 
 if (first()) {
@@ -9,8 +9,10 @@ if (first()) {
     AimDirMin = ang(-67.5, -67.5, 0)
     AimDirMax = ang(67.5, 67.5, 0)
     AimLenMin = 100
-    
-    holoCreate(1)     
+    AimLenMax = 1000
+
+    holoCreate(1), holoAlpha(1, 100)
+    holoCreate(2)
 
     Camera["Parent", entity] = Base
     Camera["Distance", number] = 12
@@ -42,9 +44,10 @@ if (changed(Driver)) {
     Camera["Activated", number] = Seat:driver():isValid()
 }
 if (Driver) {
-    AimDir = Seat:toLocal(Driver:eyeAngles())
-    AimDir = clamp(AimDir, AimDirMin, AimDirMax)
-    AimRan = rangerOffset(1000, Base:pos() + AimDir:forward() * AimLenMin, AimDir:forward())
-    
-    holoPos(1, AimRan:position())
+    AimDir  = clamp(Seat:toLocal(Driver:eyeAngles()), AimDirMin, AimDirMax):forward()
+    AimPos1 = rangerOffset(AimLenMin, Base:pos(), AimDir):position()
+    AimPos2 = rangerOffset(AimLenMax, AimPos1, AimDir):position()
+
+    holoPos(1, AimPos1)
+    holoPos(2, AimPos2)
 }

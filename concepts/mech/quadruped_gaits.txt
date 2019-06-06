@@ -1,0 +1,209 @@
+@name quadruped_gaits
+
+#--
+@persist [Gaits]:table [Gait_last Gait_next]:array [Gait_time Gait_shift]
+
+#--
+@persist [Mech_feet]:table [Mech_pos Mech_dir Mech_vel]:vector [Mech_ang]:angle [Mech_height Mech_speed] [Mech_slammer]:entity
+
+#--
+@persist [Time_delta Time_current] [Down Left]:vector [Ang]:angle
+
+#--
+@model models/holograms/hq_rcube_thin.mdl
+@trigger none
+
+
+if (first()) {
+    propSpawnUndo(0)
+    entity():setMaterial("models/expression 2/exprssn")
+    entity():setAng(ang())
+
+    #include "_lib/autowire"
+
+    Down = vec(0,0,-1)
+    Left = vec(0,1,0)
+
+    function table createFoot(ID:string,FootPos:vector,StepZ,GroundZ) {
+        Mech_feet[ID,table] = table(
+            "pos_foot" = FootPos,
+            "pos_next" = entity():pos(),
+            "ang_next" = quat(entity()),
+            "stepz" = StepZ,
+            "groundz" = GroundZ
+        )
+        return Mech_feet[ID,table]
+    }
+    function setFootEnt(ID:string,E:entity) {
+        Mech_feet[ID,table]["ent",entity] = E
+    }
+    function number gseq(Start,Length,Time) {
+        local Offset = Time - (Start % 1)
+        return inrange(Offset,-1,Length)*inrange(Offset % 1,0,Length)*(Offset % 1) / Length
+    }
+
+    Gaits = table(
+        "walk" = array(
+            1 / 2,50,
+            0.00,0.55,
+            0.50,0.55,
+            0.25,0.55,
+            0.75,0.55
+        ),
+        "gallop" = array(
+            1 / 1,50,
+            0.00,0.75,
+            0.10,0.75,
+            0.50,0.75,
+            0.60,0.75
+        )
+    )
+
+    Gait_last = Gaits["walk",array]
+    Gait_next = Gaits["walk",array]
+
+    for (I = 1,5) {
+        holoCreate(I)
+        holoModel(I,"models/sprops/misc/origin.mdl")
+    }
+
+    createFoot("fl",vec(65,60,0),0.45,6)
+    createFoot("fr",vec(65,-60,0),0.45,6)
+    createFoot("rl",vec(-65,25,0),0.25,6)
+    createFoot("rr",vec(-65,-25,0),0.25,6)
+
+    setFootEnt("fl",holoEntity(1))
+    setFootEnt("fr",holoEntity(2))
+    setFootEnt("rl",holoEntity(3))
+    setFootEnt("rr",holoEntity(4))
+
+    Mech_height = 100
+}
+
+if (clk("autowire")) {
+    if (entity():linkComponents()) {
+        timer("main",500)
+
+        Camera["Parent",entity] = holoEntity(1)
+        Camera["Distance",number] = 100
+        Camera["Position",vector] = vec(0,0,50)
+    }
+}
+
+if (clk("main")) {
+    timer("main",90)
+
+    Time_delta = curtime() - Time_current
+    Time_current = curtime()
+
+    if (Time_delta > 1) {
+        exit()
+    }
+
+    if (changed(Active)) {
+        Camera["Activated",number] = Active
+    }
+
+    if (Gait_shift < 1) {
+        Gait_shift = min(Gait_shift + Time_delta,1)
+
+        Gait_time += ((1 - Gait_shift)*Gait_last[1,number] + Gait_shift*Gait_next[1,number])*Time_delta
+
+        Mech_feet["fl",table]["sequence",number] = gseq((1 - Gait_shift)*Gait_last[3,number] + Gait_shift*Gait_next[3,number],(1 - Gait_shift)*Gait_last[4,number] + Gait_shift*Gait_next[4,number],Gait_time)
+        Mech_feet["fr",table]["sequence",number] = gseq((1 - Gait_shift)*Gait_last[5,number] + Gait_shift*Gait_next[5,number],(1 - Gait_shift)*Gait_last[6,number] + Gait_shift*Gait_next[6,number],Gait_time)
+        Mech_feet["rl",table]["sequence",number] = gseq((1 - Gait_shift)*Gait_last[7,number] + Gait_shift*Gait_next[7,number],(1 - Gait_shift)*Gait_last[8,number] + Gait_shift*Gait_next[8,number],Gait_time)
+        Mech_feet["rr",table]["sequence",number] = gseq((1 - Gait_shift)*Gait_last[9,number] + Gait_shift*Gait_next[9,number],(1 - Gait_shift)*Gait_last[10,number] + Gait_shift*Gait_next[10,number],Gait_time)
+
+        Mech_speed = (1 - Gait_shift)*Gait_last[2,number] + Gait_shift*Gait_next[2,number]
+    }
+    else {
+        Gait_time += Gait_next[1,number]*Time_delta
+
+        Mech_feet["fl",table]["sequence",number] = gseq(Gait_next[3,number],Gait_next[4,number],Gait_time)
+        Mech_feet["fr",table]["sequence",number] = gseq(Gait_next[5,number],Gait_next[6,number],Gait_time)
+        Mech_feet["rl",table]["sequence",number] = gseq(Gait_next[7,number],Gait_next[8,number],Gait_time)
+        Mech_feet["rr",table]["sequence",number] = gseq(Gait_next[9,number],Gait_next[10,number],Gait_time)
+
+        Mech_speed = Gait_next[2,number]
+    }
+    if (Gait_time > 1) {
+        Gait_time--
+    }
+
+    local Empty = vec()
+    foreach (K,Foot:table = Mech_feet) {
+        if (Foot["sequence",number]) {
+            if (!Foot["status",number]) {
+                soundStop(K + "step")
+                Foot["ang_hold",quaternion] = Foot["ang_next",quaternion]
+                Foot["pos_last",vector] = Foot["pos_next",vector]
+                Foot["pos_move",vector] = Mech_vel
+                Foot["status",number] = 1
+            }
+            local Check = rangerOffset(Mech_height*2,rangerOffset(Mech_pos,toWorld(Foot["pos_foot",vector],Ang,Mech_pos,Mech_ang) + Foot["pos_move",vector]):position(),Down)
+            if (Check:hit()) {
+                local Normal = Check:hitNormal()
+                Foot["pos_next",vector] = Check:position() + Normal*Foot["groundz",number]
+                local Line = Foot["pos_next",vector] - Foot["pos_last",vector]
+                if (Line:length() > Foot["groundz",number]) {
+                    Foot["pos_real",vector] = mix(bezier(Foot["pos_last",vector],mix(Foot["pos_next",vector],Foot["pos_last",vector],0.85) + Line:toAngle():up()*Line:length()*Foot["stepz",number],Foot["pos_next",vector],Foot["sequence",number]),Foot["pos_real",vector],Foot["sequence",number])
+                    Foot["ang_next",quaternion] = quat(Normal:cross(Foot["pos_move",vector]):normalized():cross(Normal),Normal)
+                    Foot["ang_real",angle] = slerp(quat(Foot["ang_real",angle]),slerp(Foot["ang_hold",quaternion],Foot["ang_next",quaternion]*qRotation(Left,sin(180*Foot["sequence",number])*45),Foot["sequence",number]),Foot["sequence",number]):toAngle()
+
+                    if (Foot["status",number] == 1) {
+                        if (Foot["ent",entity]) {
+                            Foot["ent",entity]:soundPlay(K + "move",0,"^ambient/machines/pneumatic_drill_" + randint(1,2) + ".wav")
+                        }
+                        Foot["status",number] = 2
+                    }
+
+                    soundVolume(K + "move",0.75 - 0.75*Foot["sequence",number])
+                    soundPitch(K + "move",50 - 10*Foot["sequence",number])
+                }
+            }
+        }
+        elseif (Foot["status",number]) {
+            if (Foot["status",number] == 2) {
+                if (Foot["ent",entity]) {
+                    soundStop(K + "move")
+                    Foot["ent",entity]:soundPlay(K + "step",0,"^npc/dog/dog_footstep_run0" + randint(1,9) + ".wav")
+                }
+                Mech_slammer:propManipulate(Foot["pos_next",vector],Ang,0,0,0)
+                Mech_slammer:applyForce(Down * 600000)
+            }
+            Foot["pos_real",vector] = Foot["pos_next",vector]
+            Foot["ang_real",angle] = Foot["ang_next",quaternion]:toAngle()
+            Foot["status",number] = 0
+        }
+        Empty += Foot["pos_real",vector]
+    }
+    Empty /= 4
+
+    Mech_pos = Empty - Down*Mech_height
+
+    local Dir = entity():pos() - Mech_pos
+    Mech_ang = slerp(quat(Mech_ang),quat(Dir:setZ(0),-Down),0.05):toAngle()
+    Mech_vel = Mech_ang:forward()*min(Dir:length(),Mech_speed)
+
+    holoPos(5,Mech_pos)
+    holoAng(5,Mech_ang)
+
+    holoPos(1,Mech_feet["fl",table]["pos_real",vector])
+    holoPos(2,Mech_feet["fr",table]["pos_real",vector])
+    holoPos(3,Mech_feet["rl",table]["pos_real",vector])
+    holoPos(4,Mech_feet["rr",table]["pos_real",vector])
+
+    holoAng(1,Mech_feet["fl",table]["ang_real",angle])
+    holoAng(2,Mech_feet["fr",table]["ang_real",angle])
+    holoAng(3,Mech_feet["rl",table]["ang_real",angle])
+    holoAng(4,Mech_feet["rr",table]["ang_real",angle])
+
+    if (!Mech_slammer) {
+        Mech_slammer = propSpawn("models/hunter/plates/plate.mdl",vec(),ang(),0)
+        Mech_slammer:setMass(600)
+        Mech_slammer:propPhysicalMaterial("gmod_silent")
+        Mech_slammer:setAlpha(0)
+        rangerFilter(Mech_slammer)
+        rangerPersist(1)
+    }
+}

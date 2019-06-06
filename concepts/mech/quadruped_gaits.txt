@@ -1,57 +1,31 @@
-@name quadruped_gaits
-
-#--
-@persist [Gaits]:table [Gait_last Gait_next]:array [Gait_time Gait_shift]
-
-#--
-@persist [Mech_feet]:table [Mech_pos Mech_dir Mech_vel]:vector [Mech_ang]:angle [Mech_height Mech_speed] [Mech_slammer]:entity
-
-#--
+@name _dev/quadruped_gaits
+@inputs
+@outputs
+#-- core variables
 @persist [Time_delta Time_current] [Down Left]:vector [Ang]:angle
-
-#--
-@model models/holograms/hq_rcube_thin.mdl
-@trigger none
-
+#-- mech variables
+@persist [Mech_height Mech_speed Mech_gait_time Mech_gait_transition] [Mech_pos Mech_vel]:vector [Mech_ang]:angle [Mech_gaits]:table [Mech_gait_last Mech_gait_next]:array [Mech_slammer]:entity
+#-- feet variables
+@persist [FL_a_real]:angle [FL_ent]:entity [FL_groundz FL_state FL_stepz FL_time] [FL_a_last FL_a_next]:quaternion [FL_p_foot FL_p_last FL_p_move FL_p_next FL_p_real]:vector
+@persist [FR_a_real]:angle [FR_ent]:entity [FR_groundz FR_state FR_stepz FR_time] [FR_a_last FR_a_next]:quaternion [FR_p_foot FR_p_last FR_p_move FR_p_next FR_p_real]:vector
+@persist [RL_a_real]:angle [RL_ent]:entity [RL_groundz RL_state RL_stepz RL_time] [RL_a_last RL_a_next]:quaternion [RL_p_foot RL_p_last RL_p_move RL_p_next RL_p_real]:vector
+@persist [RR_a_real]:angle [RR_ent]:entity [RR_groundz RR_state RR_stepz RR_time] [RR_a_last RR_a_next]:quaternion [RR_p_foot RR_p_last RR_p_move RR_p_next RR_p_real]:vector
 
 if (first()) {
-    propSpawnUndo(0)
-    entity():setMaterial("models/expression 2/exprssn")
-    entity():setAng(ang())
+    #-- mech variables
+    Mech_pos = entity():pos()
+    Mech_height = 100
 
-    #include "_lib/autowire"
-
-    Down = vec(0,0,-1)
-    Left = vec(0,1,0)
-
-    function table createFoot(ID:string,FootPos:vector,StepZ,GroundZ) {
-        Mech_feet[ID,table] = table(
-            "pos_foot" = FootPos,
-            "pos_next" = entity():pos(),
-            "ang_next" = quat(entity()),
-            "stepz" = StepZ,
-            "groundz" = GroundZ
-        )
-        return Mech_feet[ID,table]
-    }
-    function setFootEnt(ID:string,E:entity) {
-        Mech_feet[ID,table]["ent",entity] = E
-    }
-    function number gseq(Start,Length,Time) {
-        local Offset = Time - (Start % 1)
-        return inrange(Offset,-1,Length)*inrange(Offset % 1,0,Length)*(Offset % 1) / Length
-    }
-
-    Gaits = table(
+    Mech_gaits = table(
         "walk" = array(
-            1 / 2,50,
+            0.50,50,
             0.00,0.55,
             0.50,0.55,
             0.25,0.55,
             0.75,0.55
         ),
         "gallop" = array(
-            1 / 1,50,
+            1.00,50,
             0.00,0.75,
             0.10,0.75,
             0.50,0.75,
@@ -59,39 +33,56 @@ if (first()) {
         )
     )
 
-    Gait_last = Gaits["walk",array]
-    Gait_next = Gaits["walk",array]
+    Mech_gait_last = Mech_gait_next = Mech_gaits["walk",array]
+
+    function number gseq(Start,Length,Time) {
+        local Offset = Time - (Start % 1)
+        return inrange(Offset,-1,Length)*inrange(Offset % 1,0,Length)*(Offset % 1)/Length
+    }
+    function string getStepHitSound()) {
+        return "^npc/dog/dog_footstep_run0" + randint(1,9) + ".wav"
+    }
+
+    #-- feet variables
+    FL_groundz = 6
+    FR_groundz = 6
+    RL_groundz = 6
+    RR_groundz = 6
+
+    FL_stepz = 0.35
+    FR_stepz = 0.35
+    RL_stepz = 0.25
+    RR_stepz = 0.25
+
+    FL_p_foot = vec(65,65,0)
+    FR_p_foot = vec(65,-65,0)
+    RL_p_foot = vec(-65,25,0)
+    RR_p_foot = vec(-65,-25,0)
+
+    FL_p_last = FL_p_next = FL_p_real = entity():toWorld(FL_p_foot)
+    FR_p_last = FR_p_next = FR_p_real = entity():toWorld(FR_p_foot)
+    RL_p_last = RL_p_next = RL_p_real = entity():toWorld(RL_p_foot)
+    RR_p_last = RR_p_next = RR_p_real = entity():toWorld(RR_p_foot)
 
     for (I = 1,5) {
         holoCreate(I)
         holoModel(I,"models/sprops/misc/origin.mdl")
     }
 
-    createFoot("fl",vec(65,60,0),0.45,6)
-    createFoot("fr",vec(65,-60,0),0.45,6)
-    createFoot("rl",vec(-65,25,0),0.25,6)
-    createFoot("rr",vec(-65,-25,0),0.25,6)
+    FL_ent = holoEntity(1)
+    FR_ent = holoEntity(2)
+    RL_ent = holoEntity(3)
+    RR_ent = holoEntity(4)
 
-    setFootEnt("fl",holoEntity(1))
-    setFootEnt("fr",holoEntity(2))
-    setFootEnt("rl",holoEntity(3))
-    setFootEnt("rr",holoEntity(4))
+    #-- core variables
+    Down = vec(0,0,-1)
+    Left = vec(0,1,0)
 
-    Mech_height = 100
+    timer("update",500)
 }
-
-if (clk("autowire")) {
-    if (entity():linkComponents()) {
-        timer("main",500)
-
-        Camera["Parent",entity] = holoEntity(1)
-        Camera["Distance",number] = 100
-        Camera["Position",vector] = vec(0,0,50)
-    }
-}
-
-if (clk("main")) {
-    timer("main",90)
+if (clk("update")) {
+    #-- sim
+    timer("update",90)
 
     Time_delta = curtime() - Time_current
     Time_current = curtime()
@@ -100,86 +91,210 @@ if (clk("main")) {
         exit()
     }
 
-    if (changed(Active)) {
-        Camera["Activated",number] = Active
-    }
+    #-- gait sequencer
+    if (Mech_gait_transition < 1) {
+        Mech_gait_transition = min(Mech_gait_transition + Time_delta,1)
 
-    if (Gait_shift < 1) {
-        Gait_shift = min(Gait_shift + Time_delta,1)
+        FL_time = gseq((1 - Mech_gait_transition)*Mech_gait_last[3,number] + Mech_gait_transition*Mech_gait_next[3,number],(1 - Mech_gait_transition)*Mech_gait_last[4,number] + Mech_gait_transition*Mech_gait_next[4,number],Mech_gait_time)
+        FR_time = gseq((1 - Mech_gait_transition)*Mech_gait_last[5,number] + Mech_gait_transition*Mech_gait_next[5,number],(1 - Mech_gait_transition)*Mech_gait_last[6,number] + Mech_gait_transition*Mech_gait_next[6,number],Mech_gait_time)
+        RL_time = gseq((1 - Mech_gait_transition)*Mech_gait_last[7,number] + Mech_gait_transition*Mech_gait_next[7,number],(1 - Mech_gait_transition)*Mech_gait_last[8,number] + Mech_gait_transition*Mech_gait_next[8,number],Mech_gait_time)
+        RR_time = gseq((1 - Mech_gait_transition)*Mech_gait_last[9,number] + Mech_gait_transition*Mech_gait_next[9,number],(1 - Mech_gait_transition)*Mech_gait_last[10,number] + Mech_gait_transition*Mech_gait_next[10,number],Mech_gait_time)
 
-        Gait_time += ((1 - Gait_shift)*Gait_last[1,number] + Gait_shift*Gait_next[1,number])*Time_delta
-
-        Mech_feet["fl",table]["sequence",number] = gseq((1 - Gait_shift)*Gait_last[3,number] + Gait_shift*Gait_next[3,number],(1 - Gait_shift)*Gait_last[4,number] + Gait_shift*Gait_next[4,number],Gait_time)
-        Mech_feet["fr",table]["sequence",number] = gseq((1 - Gait_shift)*Gait_last[5,number] + Gait_shift*Gait_next[5,number],(1 - Gait_shift)*Gait_last[6,number] + Gait_shift*Gait_next[6,number],Gait_time)
-        Mech_feet["rl",table]["sequence",number] = gseq((1 - Gait_shift)*Gait_last[7,number] + Gait_shift*Gait_next[7,number],(1 - Gait_shift)*Gait_last[8,number] + Gait_shift*Gait_next[8,number],Gait_time)
-        Mech_feet["rr",table]["sequence",number] = gseq((1 - Gait_shift)*Gait_last[9,number] + Gait_shift*Gait_next[9,number],(1 - Gait_shift)*Gait_last[10,number] + Gait_shift*Gait_next[10,number],Gait_time)
-
-        Mech_speed = (1 - Gait_shift)*Gait_last[2,number] + Gait_shift*Gait_next[2,number]
+        Mech_speed = (1 - Mech_gait_transition)*Mech_gait_last[2,number] + Mech_gait_transition*Mech_gait_next[2,number]
     }
     else {
-        Gait_time += Gait_next[1,number]*Time_delta
+        Mech_gait_time += Mech_gait_next[1,number]*Time_delta
 
-        Mech_feet["fl",table]["sequence",number] = gseq(Gait_next[3,number],Gait_next[4,number],Gait_time)
-        Mech_feet["fr",table]["sequence",number] = gseq(Gait_next[5,number],Gait_next[6,number],Gait_time)
-        Mech_feet["rl",table]["sequence",number] = gseq(Gait_next[7,number],Gait_next[8,number],Gait_time)
-        Mech_feet["rr",table]["sequence",number] = gseq(Gait_next[9,number],Gait_next[10,number],Gait_time)
+        FL_time = gseq(Mech_gait_next[3,number],Mech_gait_next[4,number],Mech_gait_time)
+        FR_time = gseq(Mech_gait_next[5,number],Mech_gait_next[6,number],Mech_gait_time)
+        RL_time = gseq(Mech_gait_next[7,number],Mech_gait_next[8,number],Mech_gait_time)
+        RR_time = gseq(Mech_gait_next[9,number],Mech_gait_next[10,number],Mech_gait_time)
 
-        Mech_speed = Gait_next[2,number]
+        Mech_speed = Mech_gait_next[2,number]
     }
-    if (Gait_time > 1) {
-        Gait_time--
+    if (Mech_gait_time > 1) {
+        Mech_gait_time--
     }
 
-    local Empty = vec()
-    foreach (K,Foot:table = Mech_feet) {
-        if (Foot["sequence",number]) {
-            if (!Foot["status",number]) {
-                soundStop(K + "step")
-                Foot["ang_hold",quaternion] = Foot["ang_next",quaternion]
-                Foot["pos_last",vector] = Foot["pos_next",vector]
-                Foot["pos_move",vector] = Mech_vel
-                Foot["status",number] = 1
-            }
-            local Check = rangerOffset(Mech_height*2,rangerOffset(Mech_pos,toWorld(Foot["pos_foot",vector],Ang,Mech_pos,Mech_ang) + Foot["pos_move",vector]):position(),Down)
-            if (Check:hit()) {
-                local Normal = Check:hitNormal()
-                Foot["pos_next",vector] = Check:position() + Normal*Foot["groundz",number]
-                local Line = Foot["pos_next",vector] - Foot["pos_last",vector]
-                if (Line:length() > Foot["groundz",number]) {
-                    Foot["pos_real",vector] = mix(bezier(Foot["pos_last",vector],mix(Foot["pos_next",vector],Foot["pos_last",vector],0.85) + Line:toAngle():up()*Line:length()*Foot["stepz",number],Foot["pos_next",vector],Foot["sequence",number]),Foot["pos_real",vector],Foot["sequence",number])
-                    Foot["ang_next",quaternion] = quat(Normal:cross(Foot["pos_move",vector]):normalized():cross(Normal),Normal)
-                    Foot["ang_real",angle] = slerp(quat(Foot["ang_real",angle]),slerp(Foot["ang_hold",quaternion],Foot["ang_next",quaternion]*qRotation(Left,sin(180*Foot["sequence",number])*45),Foot["sequence",number]),Foot["sequence",number]):toAngle()
+    #-- stepgen
+    if (FL_time) {
+        if (!FL_state) {
+            soundStop("FL_step")
+            FL_a_last = FL_a_next
+            FL_p_last = FL_p_next
+            FL_p_move = Mech_vel
+            FL_state = 1
+        }
+        local Check = rangerOffset(Mech_height*2,rangerOffset(Mech_pos,toWorld(FL_p_foot,Ang,Mech_pos,Mech_ang) + FL_p_move):position(),Down)
+        if (Check:hit()) {
+            local Normal = Check:hitNormal()
+            FL_p_next = Check:position() + Normal*FL_groundz
+            local Line = FL_p_next - FL_p_last
+            if (Line:length() > FL_groundz) {
+                FL_p_real = mix(bezier(FL_p_last,mix(FL_p_next,FL_p_last,0.85) + Line:toAngle():up()*Line:length()*FL_stepz,FL_p_next,FL_time),FL_p_real,FL_time)
+                FL_a_next = quat(Normal:cross(FL_p_move):normalized():cross(Normal),Normal)
+                FL_a_real = slerp(quat(FL_a_real),slerp(FL_a_last,FL_a_next*qRotation(Left,sin(180*FL_time)*45),FL_time),FL_time):toAngle()
 
-                    if (Foot["status",number] == 1) {
-                        if (Foot["ent",entity]) {
-                            Foot["ent",entity]:soundPlay(K + "move",0,"^ambient/machines/pneumatic_drill_" + randint(1,2) + ".wav")
-                        }
-                        Foot["status",number] = 2
+                if (FL_state == 1) {
+                    if (FL_ent) {
+                        FL_ent:soundPlay("FL_move",0,"^ambient/machines/pneumatic_drill_" + randint(1,2) + ".wav")
                     }
+                    FL_state = 2
+                }
 
-                    soundVolume(K + "move",0.75 - 0.75*Foot["sequence",number])
-                    soundPitch(K + "move",50 - 10*Foot["sequence",number])
-                }
+                soundVolume("FL_move",0.75 - 0.75*FL_time)
+                soundPitch("FL_move",50 - 10*FL_time)
             }
         }
-        elseif (Foot["status",number]) {
-            if (Foot["status",number] == 2) {
-                if (Foot["ent",entity]) {
-                    soundStop(K + "move")
-                    Foot["ent",entity]:soundPlay(K + "step",0,"^npc/dog/dog_footstep_run0" + randint(1,9) + ".wav")
-                }
-                Mech_slammer:propManipulate(Foot["pos_next",vector],Ang,0,0,0)
-                Mech_slammer:applyForce(Down * 600000)
-            }
-            Foot["pos_real",vector] = Foot["pos_next",vector]
-            Foot["ang_real",angle] = Foot["ang_next",quaternion]:toAngle()
-            Foot["status",number] = 0
-        }
-        Empty += Foot["pos_real",vector]
     }
-    Empty /= 4
+    elseif (FL_state) {
+        if (FL_state == 2) {
+            if (FL_ent) {
+                soundStop("FL_move")
+                FL_ent:soundPlay("FL_step",0,getStepHitSound()))
+            }
+            Mech_slammer:propManipulate(FL_p_next,Ang,0,0,0)
+            Mech_slammer:applyForce(Down*600000)
+        }
+        FL_p_real = FL_p_next
+        FL_a_real = FL_a_next:toAngle()
+        FL_state = 0
+    }
+    #-- stepgen
+    if (FR_time) {
+        if (!FR_state) {
+            soundStop("FR_step")
+            FR_a_last = FR_a_next
+            FR_p_last = FR_p_next
+            FR_p_move = Mech_vel
+            FR_state = 1
+        }
+        local Check = rangerOffset(Mech_height*2,rangerOffset(Mech_pos,toWorld(FR_p_foot,Ang,Mech_pos,Mech_ang) + FR_p_move):position(),Down)
+        if (Check:hit()) {
+            local Normal = Check:hitNormal()
+            FR_p_next = Check:position() + Normal*FR_groundz
+            local Line = FR_p_next - FR_p_last
+            if (Line:length() > FR_groundz) {
+                FR_p_real = mix(bezier(FR_p_last,mix(FR_p_next,FR_p_last,0.85) + Line:toAngle():up()*Line:length()*FR_stepz,FR_p_next,FR_time),FR_p_real,FR_time)
+                FR_a_next = quat(Normal:cross(FR_p_move):normalized():cross(Normal),Normal)
+                FR_a_real = slerp(quat(FR_a_real),slerp(FR_a_last,FR_a_next*qRotation(Left,sin(180*FR_time)*45),FR_time),FR_time):toAngle()
 
-    Mech_pos = Empty - Down*Mech_height
+                if (FR_state == 1) {
+                    if (FR_ent) {
+                        FR_ent:soundPlay("FR_move",0,"^ambient/machines/pneumatic_drill_" + randint(1,2) + ".wav")
+                    }
+                    FR_state = 2
+                }
+
+                soundVolume("FR_move",0.75 - 0.75*FR_time)
+                soundPitch("FR_move",50 - 10*FR_time)
+            }
+        }
+    }
+    elseif (FR_state) {
+        if (FR_state == 2) {
+            if (FR_ent) {
+                soundStop("FR_move")
+                FR_ent:soundPlay("FR_step",0,getStepHitSound()))
+            }
+            Mech_slammer:propManipulate(FR_p_next,Ang,0,0,0)
+            Mech_slammer:applyForce(Down*600000)
+        }
+        FR_p_real = FR_p_next
+        FR_a_real = FR_a_next:toAngle()
+        FR_state = 0
+    }
+    #-- stepgen
+    if (RL_time) {
+        if (!RL_state) {
+            soundStop("RL_step")
+            RL_a_last = RL_a_next
+            RL_p_last = RL_p_next
+            RL_p_move = Mech_vel
+            RL_state = 1
+        }
+        local Check = rangerOffset(Mech_height*2,rangerOffset(Mech_pos,toWorld(RL_p_foot,Ang,Mech_pos,Mech_ang) + RL_p_move):position(),Down)
+        if (Check:hit()) {
+            local Normal = Check:hitNormal()
+            RL_p_next = Check:position() + Normal*RL_groundz
+            local Line = RL_p_next - RL_p_last
+            if (Line:length() > RL_groundz) {
+                RL_p_real = mix(bezier(RL_p_last,mix(RL_p_next,RL_p_last,0.85) + Line:toAngle():up()*Line:length()*RL_stepz,RL_p_next,RL_time),RL_p_real,RL_time)
+                RL_a_next = quat(Normal:cross(RL_p_move):normalized():cross(Normal),Normal)
+                RL_a_real = slerp(quat(RL_a_real),slerp(RL_a_last,RL_a_next*qRotation(Left,sin(180*RL_time)*45),RL_time),RL_time):toAngle()
+
+                if (RL_state == 1) {
+                    if (RL_ent) {
+                        RL_ent:soundPlay("RL_move",0,"^ambient/machines/pneumatic_drill_" + randint(1,2) + ".wav")
+                    }
+                    RL_state = 2
+                }
+
+                soundVolume("RL_move",0.75 - 0.75*RL_time)
+                soundPitch("RL_move",50 - 10*RL_time)
+            }
+        }
+    }
+    elseif (RL_state) {
+        if (RL_state == 2) {
+            if (RL_ent) {
+                soundStop("RL_move")
+                RL_ent:soundPlay("RL_step",0,getStepHitSound()))
+            }
+            Mech_slammer:propManipulate(RL_p_next,Ang,0,0,0)
+            Mech_slammer:applyForce(Down*600000)
+        }
+        RL_p_real = RL_p_next
+        RL_a_real = RL_a_next:toAngle()
+        RL_state = 0
+    }
+    #-- stepgen
+    if (RR_time) {
+        if (!RR_state) {
+            soundStop("RR_step")
+            RR_a_last = RR_a_next
+            RR_p_last = RR_p_next
+            RR_p_move = Mech_vel
+            RR_state = 1
+        }
+        local Check = rangerOffset(Mech_height*2,rangerOffset(Mech_pos,toWorld(RR_p_foot,Ang,Mech_pos,Mech_ang) + RR_p_move):position(),Down)
+        if (Check:hit()) {
+            local Normal = Check:hitNormal()
+            RR_p_next = Check:position() + Normal*RR_groundz
+            local Line = RR_p_next - RR_p_last
+            if (Line:length() > RR_groundz) {
+                RR_p_real = mix(bezier(RR_p_last,mix(RR_p_next,RR_p_last,0.85) + Line:toAngle():up()*Line:length()*RR_stepz,RR_p_next,RR_time),RR_p_real,RR_time)
+                RR_a_next = quat(Normal:cross(RR_p_move):normalized():cross(Normal),Normal)
+                RR_a_real = slerp(quat(RR_a_real),slerp(RR_a_last,RR_a_next*qRotation(Left,sin(180*RR_time)*45),RR_time),RR_time):toAngle()
+
+                if (RR_state == 1) {
+                    if (RR_ent) {
+                        RR_ent:soundPlay("RR_move",0,"^ambient/machines/pneumatic_drill_" + randint(1,2) + ".wav")
+                    }
+                    RR_state = 2
+                }
+
+                soundVolume("RR_move",0.75 - 0.75*RR_time)
+                soundPitch("RR_move",50 - 10*RR_time)
+            }
+        }
+    }
+    elseif (RR_state) {
+        if (RR_state == 2) {
+            if (RR_ent) {
+                soundStop("RR_move")
+                RR_ent:soundPlay("RR_step",0,getStepHitSound()))
+            }
+            Mech_slammer:propManipulate(RR_p_next,Ang,0,0,0)
+            Mech_slammer:applyForce(Down*600000)
+        }
+        RR_p_real = RR_p_next
+        RR_a_real = RR_a_next:toAngle()
+        RR_state = 0
+    }
+
+    #-- mech
+    Mech_pos = (FL_p_real + FR_p_real + RL_p_real + RR_p_real)/4 - Down*Mech_height
 
     local Dir = entity():pos() - Mech_pos
     Mech_ang = slerp(quat(Mech_ang),quat(Dir:setZ(0),-Down),0.05):toAngle()
@@ -188,15 +303,15 @@ if (clk("main")) {
     holoPos(5,Mech_pos)
     holoAng(5,Mech_ang)
 
-    holoPos(1,Mech_feet["fl",table]["pos_real",vector])
-    holoPos(2,Mech_feet["fr",table]["pos_real",vector])
-    holoPos(3,Mech_feet["rl",table]["pos_real",vector])
-    holoPos(4,Mech_feet["rr",table]["pos_real",vector])
+    holoPos(1,FL_p_real)
+    holoPos(2,FR_p_real)
+    holoPos(3,RL_p_real)
+    holoPos(4,RR_p_real)
 
-    holoAng(1,Mech_feet["fl",table]["ang_real",angle])
-    holoAng(2,Mech_feet["fr",table]["ang_real",angle])
-    holoAng(3,Mech_feet["rl",table]["ang_real",angle])
-    holoAng(4,Mech_feet["rr",table]["ang_real",angle])
+    holoAng(1,FL_a_real)
+    holoAng(2,FR_a_real)
+    holoAng(3,RL_a_real)
+    holoAng(4,RR_a_real)
 
     if (!Mech_slammer) {
         Mech_slammer = propSpawn("models/hunter/plates/plate.mdl",vec(),ang(),0)

@@ -1,0 +1,104 @@
+@name _lib/autowire
+@inputs [W A S D] [Active] [Mouse1 Mouse2] [Shift Space Alt] [Vehicle]:entity
+@persist [POD HUD CAM] [Camera]:wirelink
+
+timer("autowire", 100)
+
+POD = 1
+HUD = 0
+CAM = 1
+
+if (POD | CAM | HUD) {
+    local E = entity()
+    if (!E["vehicle", entity]:isValid()) {
+        E["vehicle", entity] = seatSpawn("", entity():pos() + vec(0, 0, 30), entity():angles(), 1)
+    }
+}
+
+function notify(E:entity, Was:string) {
+    E:soundPlay(Was, 0.081, "garrysmod/balloon_pop_cute.wav"), soundPitch(Was, random(90, 150))
+    printColor(vec(0, 255, 0), E:type(), vec(255, 255, 255), " was " + Was + ".")
+}
+
+function number entity:linkComponents() {
+    timer("autowire", 100)
+
+    local AimEnt = owner():aimEntity()
+    if (AimEnt:owner() != owner()) {
+        return 0
+    }
+
+    local AimType = AimEnt:type()
+    local LinkTypes = table(
+        "gmod_wire_cameracontroller" = POD,
+        "gmod_wire_egp_hud" = HUD,
+        "gmod_wire_pod" = CAM
+    )
+
+    local TotalN = 0
+    local ValidN = 0
+
+    foreach (Type:string, Value:number = LinkTypes) {
+        if (Value == 0) { continue }
+        if (This[Type, entity]:isValid()) {
+            ValidN++
+            switch (Type) {
+                case "gmod_wire_cameracontroller",
+                    local Flags = array(
+                        14 = 1, #ParentLocal
+                        15 = 1, #AutoMove
+                        16 = 0, #FreeMove
+                        17 = 0, #LocalMove
+                        18 = 1, #AllowZoom
+                        19 = 1, #AutoUnclip
+                        20 = 1, #AutoUnclipIgnoreWater
+                        21 = 1, #DrawPlayer
+                        22 = 1  #DrawParent
+                    )
+
+                    Camera = This[Type, entity]:wirelink()
+                    foreach (N:number, B:number = Flags) {
+                        Camera[N] = B
+                    }
+                break
+                case "gmod_wire_pod",
+                    local Inputs =  table(
+                        "W" = "W",
+                        "A" = "A",
+                        "S" = "S",
+                        "D" = "D",
+                        "Alt" = "Alt",
+                        "Shift" = "Shift",
+                        "Space" = "Space",
+                        "Mouse1" = "Mouse1",
+                        "Mouse2" = "Mouse2",
+                        "Active" = "Active",
+                        "Vehicle" = "Entity"
+                    )
+
+                    foreach (Input:string, Output:string = Inputs) {
+                        This:createWire(This[Type, entity], Input, Output)
+                    }
+                break
+                case "gmod_wire_egp_hud",
+                    EGP = This[Type, entity]:wirelink()
+                break
+            }
+        }
+        else {
+            if (AimType == Type) {
+                This[Type, entity] = AimEnt
+                notify(AimEnt, "linked")
+            }
+        }
+        TotalN++
+    }
+
+    if (TotalN == ValidN) {
+        stoptimer("autowire")
+        notify(This, "linked and wired to " + TotalN + " entities")
+        return 1
+    }
+
+    return 0
+}

@@ -39,7 +39,7 @@ if (first()) {
         local Offset = Time - (Start % 1)
         return inrange(Offset,-1,Length)*inrange(Offset % 1,0,Length)*(Offset % 1)/Length
     }
-    function string getStepHitSound()) {
+    function string getStepHitSound() {
         return "^npc/dog/dog_footstep_run0" + randint(1,9) + ".wav"
     }
 
@@ -151,7 +151,7 @@ if (clk("update")) {
         if (FL_state == 2) {
             if (FL_ent) {
                 soundStop("FL_move")
-                FL_ent:soundPlay("FL_step",0,getStepHitSound()))
+                FL_ent:soundPlay("FL_step",0,getStepHitSound())
             }
             Mech_slammer:propManipulate(FL_p_next,Ang,0,0,0)
             Mech_slammer:applyForce(Down*600000)
@@ -195,7 +195,7 @@ if (clk("update")) {
         if (FR_state == 2) {
             if (FR_ent) {
                 soundStop("FR_move")
-                FR_ent:soundPlay("FR_step",0,getStepHitSound()))
+                FR_ent:soundPlay("FR_step",0,getStepHitSound())
             }
             Mech_slammer:propManipulate(FR_p_next,Ang,0,0,0)
             Mech_slammer:applyForce(Down*600000)
@@ -239,7 +239,7 @@ if (clk("update")) {
         if (RL_state == 2) {
             if (RL_ent) {
                 soundStop("RL_move")
-                RL_ent:soundPlay("RL_step",0,getStepHitSound()))
+                RL_ent:soundPlay("RL_step",0,getStepHitSound())
             }
             Mech_slammer:propManipulate(RL_p_next,Ang,0,0,0)
             Mech_slammer:applyForce(Down*600000)
@@ -283,7 +283,7 @@ if (clk("update")) {
         if (RR_state == 2) {
             if (RR_ent) {
                 soundStop("RR_move")
-                RR_ent:soundPlay("RR_step",0,getStepHitSound()))
+                RR_ent:soundPlay("RR_step",0,getStepHitSound())
             }
             Mech_slammer:propManipulate(RR_p_next,Ang,0,0,0)
             Mech_slammer:applyForce(Down*600000)

@@ -1,0 +1,166 @@
+@name _dev/laserweapon2
+@inputs Laser_thruster:wirelink
+@persist [Laser_charge Laser_fire Laser_ready] Time_current
+@trigger none
+
+if (first()) {
+    #ifdef concmd(string)
+        concmd("wire_thruster_oweffect fire_smoke_big")
+    #endif
+    
+    function holoCreate(N,P,Pos:vector,Ang:angle,Scale:vector,Model:string) {
+        local Parent = holoEntity(P) ?: entity()
+        holoCreate(N,Parent:toWorld(Pos),Scale,Parent:toWorld(Ang),vec4(255,255,255,0),Model)
+        holoParent(N,Parent) 
+    }
+    function holoClip(N,CN,IDX,Pos:vector,Dir:vector) {
+        holoClipEnabled(N,CN,1)
+        holoClip(N,CN,Pos,Dir,holoEntity(IDX))
+    }
+    function materializeLaser() {
+        for (I = 110,115) {
+            if (I == 110 | I == 113) {
+                holoColor(I,vec(255,255,255))
+                holoMaterial(I,"models/debug/debugwhite")
+            }
+            else {
+                holoColor(I,vec(255,255,255))
+                holoMaterial(I,"models/alyx/emptool_glow")
+            }
+            if (I > 112) {
+                holoClipEnabled(I,1)
+                holoClip(I,vec(),vec(-1,0,0),holoEntity(116))
+            }
+            holoDisableShading(I,1)
+            local E = holoEntity(I)
+            E["original_scale",vector] = holoScale(I)
+        }
+    }
+    
+    holoCreate(110,93,vec(),ang(),vec(1.025,1.025,1.025),"icosphere2")
+    holoCreate(111,110,vec(),ang(),vec(1.5625,1.5625,1.5625),"icosphere2")
+    holoCreate(112,110,vec(),ang(),vec(2.125,2.125,2.125),"icosphere2")
+    holoCreate(113,110,vec(),ang(90,0,0),vec(0.2125,0.2125,50),"models/props_trainstation/trainstation_column001.mdl")
+    holoCreate(114,110,vec(),ang(90,0,0),vec(0.3906,0.3906,50),"models/props_trainstation/trainstation_column001.mdl")
+    holoCreate(115,110,vec(),ang(90,0,0),vec(0.5469,0.5469,50),"models/props_trainstation/trainstation_column001.mdl")
+    holoCreate(116,110,vec(),ang(),vec(15),"models/sprops/misc/origin.mdl")
+    
+    materializeLaser()
+    
+    runOnLast(1)
+}
+
+if (last()) {
+    Laser_thruster:entity():deparent()
+}
+
+interval(90)
+
+Time_delta = curtime() - Time_current
+Time_current = curtime()
+
+if (Time_delta > 1) { exit() }
+
+local Mouse1 = owner():keyAttack2()
+if (Laser_ready) {
+    switch (Laser_fire) {
+        case 0,
+            if (Mouse1) {
+                soundStop("laser_charge1")
+                soundStop("laser_charge2")
+                soundStop("laser_fire1")
+                soundStop("laser_fire2")
+                soundStop("laser_fire3")
+                soundStop("laser_scream")
+                holoEntity(110):soundPlay("laser_charge1",0,"npc/combine_gunship/dropship_engine_near_loop1.wav")
+                holoEntity(111):soundPlay("laser_charge2",0,"thrusters/mh1.wav")
+                holoEntity(112):soundPlay("laser_scream",0,"npc/dog/dog_scared1.wav")
+                Laser_ready = randint(91,144)
+                Laser_fire = 1
+            }
+        break   
+        case 1,
+            if (Mouse1) {
+                if (Laser_charge < 1) {
+                    Laser_charge = min(Laser_charge + Time_delta,1)
+                    for (I = 110,112) {
+                        local E = holoEntity(I)
+                        holoAlpha(I,Laser_charge*255)
+                        holoScale(I,bezier(holoScale(I),E["original_scale",vector] + vec(1),E["original_scale",vector],Laser_charge))
+                    }
+                    soundPitch("laser_charge1",77*(1 - Laser_charge))
+                    soundPitch("laser_charge2",144*(1 - Laser_charge))
+                    soundPitch("laser_scream",Laser_ready + 100*Laser_charge)
+                    if (Laser_charge == 1) {
+                        #ifdef particle(number,number,number,string,vector,vector,vector)
+                        particleGravity(vec(0,0,-600))
+                        for (I = 1,30) {
+                            local Dir = holoEntity(110):forward():rotate(random(-40,40),random(-80,80),0)
+                            particle(random(1,2),random(15,30),0,"effects/energyball",vec(255),holoEntity(110):pos() + random(30,60)*Dir,random(300,600)*Dir)
+                        }
+                        #endif
+                        for (I = 113,115) {
+                            local E = holoEntity(I)
+                            holoAlpha(I,255)
+                            holoScale(I,E["original_scale",vector])
+                        }
+                        holoEntity(113):soundPlay("laser_fire1",0,"ambient/energy/ion_cannon_shot2.wav")
+                        holoEntity(114):soundPlay("laser_fire2",0,"ambient/machines/machine_whine1.wav")
+                        holoEntity(116):soundPlay("laser_fire3",0,"npc/stalker/laser_burn.wav")
+                        soundPitch("laser_fire1",50)
+                        soundPitch("laser_fire2",255)
+                        Laser_thruster["A",number] = 1
+                    }
+                }
+                else {
+                    holoAng(110,(owner():eyeTrace():position() - holoEntity(110):pos()):toAngle())
+                    local HitRanger = rangerOffset(9999999,holoEntity(110):pos(),holoEntity(110):forward())
+                    holoPos(116,holoEntity(110):toWorld(vec(HitRanger:distance() - 12,0,0)))
+                }
+            }
+            else {
+                Laser_thruster["A",number] = 0
+                Laser_fire = 2
+            }
+        break
+        case 2,
+            if (Laser_charge > 0) {
+                Laser_charge = max(Laser_charge - Time_delta,0)
+                soundPitch("laser_charge1",77*(1 - Laser_charge))
+                soundPitch("laser_charge2",144*(1 - Laser_charge))
+                soundPitch("laser_fire2",255*Laser_charge)
+                for (I = 110,115) {
+                    local E = holoEntity(I)
+                    holoAlpha(I,Laser_charge*255)
+                    holoScale(I,holoScale(I)*Laser_charge)
+                }
+            }     
+            if (Laser_charge == 0) {
+                soundStop("laser_charge1")
+                soundStop("laser_charge2")
+                soundStop("laser_fire1")
+                soundStop("laser_fire2")
+                soundStop("laser_fire3")
+                soundStop("laser_scream")
+                Laser_fire = 0
+            }
+        break
+    }
+}
+else {
+    if (Laser_thruster:entity()) {
+        local Pos = holoEntity(116):pos()
+        local Ang = holoEntity(116):angles()
+        
+        Laser_thruster:entity():setPos(Pos)
+        Laser_thruster:entity():setAng(Ang)
+        
+        if ((Laser_thruster:entity():pos() - Pos):length() < 1 & vec(Laser_thruster:entity():angles() - Ang):length() < 1) {
+            rangerFilter(Laser_thruster:entity())
+            rangerPersist(1)
+            Laser_thruster:entity():setAlpha(1)
+            Laser_thruster:entity():parentTo(holoEntity(116))
+            Laser_ready = 1
+        }
+    }
+}

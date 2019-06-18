@@ -1,8 +1,8 @@
 @name octoped
 @inputs
-@outputs Gait_time
+@outputs Base_pos:vector Test:vector V
 @persist [Base_height Gait_time Gait_perc Gait_duration Gait_stance Gait_rate Gait_speed Dt Ct]
-@persist [Base_pos Base_dir UDir FDir RDir]:vector [Base_ang]:angle [Gait_timings]:array [Gaits Base_feet]:table
+@persist [Base_pos Base_up UDir FDir RDir]:vector [Base_ang]:angle [Gait_timings]:array [Gaits Base_feet]:table
 @trigger none
 
 if (first()) {
@@ -28,27 +28,7 @@ if (first()) {
         Foot["pos_next",vector] = Pos
         Foot["pos_real",vector] = Pos
     }
-    function vector updateFoot(N,InAir) {
-        local Foot = Base_feet[N,table]
-        if (InAir) {
-            if (Foot["event",number] == 0) {
-                Foot["pos_last",vector] = Foot["pos_next",vector]
-                Foot["pos_next",vector] = rangerOffset(Base_height*4,rangerOffset(Base_pos,toWorld(Foot["pos",vector],ang(),Base_pos,Base_ang) + Base_dir*Gait_speed):position(),-UDir):position()
-                Foot["event",number] = 1
-            }
-            local Diff = Foot["pos_next",vector] - Foot["pos_last",vector]
-            if (Diff) {
-                local Perc = (Gait_perc - Gait_stance) / (1 - Gait_stance)
-                Foot["pos_real",vector] = bezier(Foot["pos_last",vector],(Foot["pos_next",vector] + Foot["pos_last",vector])*0.5 + Diff:toAngle():up()*Diff:length()*0.5,Foot["pos_next",vector],Perc)
-            }
-        }
-        elseif (Foot["event",number]) {
-            Foot["pos_real",vector] = Foot["pos_next",vector]
-            Foot["event",number] = 0
-        }
-        return Foot["pos_real",vector]
-    }
-    function vector updateGait() {
+    function void updateGait() {
         Gait_time += Gait_rate*Dt
         if (Gait_time > Gait_duration) {
             Gait_time -= Gait_duration
@@ -56,33 +36,56 @@ if (first()) {
         elseif (Gait_time < 0) {
             Gait_time += Gait_duration
         }
-        local Pos = vec()
-        local Num = 0
         foreach (K:number,Timing:number = Gait_timings) {
             Gait_perc = (Gait_time / Gait_duration) + Timing
             if (Gait_perc > 1) {
                 Gait_perc--
             }
-            Pos += updateFoot(K,Gait_perc > Gait_stance)
-            Num++
+            local Foot = Base_feet[K,table]
+            if (Gait_perc > Gait_stance) {
+                if (Foot["event",number] == 0) {
+                    local Check = rangerOffset(Base_pos,toWorld(Foot["pos",vector],ang(),Base_pos,Base_ang) + Base_ang:forward()*Gait_speed)
+                    if (!Check:hit()) {
+                        Check = rangerOffset(Base_height*4,Check:position(),-Base_up)
+                    }
+                    Foot["pos_last",vector] = Foot["pos_next",vector]
+                    Foot["pos_next",vector] = Check:position()
+                    Foot["event",number] = 1
+                }
+                local Diff = Foot["pos_next",vector] - Foot["pos_last",vector]
+                if (Diff) {
+                    local Perc = (Gait_perc - Gait_stance) / (1 - Gait_stance)
+                    Foot["pos_real",vector] = bezier(Foot["pos_last",vector],(Foot["pos_next",vector] + Foot["pos_last",vector])*0.5 + quat(Diff,Base_up):up()*Diff:length()*0.25,Foot["pos_next",vector],Perc)
+                }
+            }
+            elseif (Foot["event",number]) {
+                Foot["pos_real",vector] = Foot["pos_next",vector]
+                Foot["event",number] = 0
+            }
         }
-        return Pos / Num
     }
 
     #---------------------------------------------------------------
     #[ TESTING ]#
     Base_height = 100
 
-    Base_feet = table(
-        1 = table("pos" = vec(200,200,Base_height)),
-        2 = table("pos" = vec(200,-200,Base_height)),
-        3 = table("pos" = vec(66.667,200,Base_height)),
-        4 = table("pos" = vec(66.667,-200,Base_height)),
-        5 = table("pos" = vec(-66.667,200,Base_height)),
-        6 = table("pos" = vec(-66.667,-200,Base_height)),
-        7 = table("pos" = vec(-200,200,Base_height)),
-        8 = table("pos" = vec(-200,-200,Base_height))
-    )
+#[    Base_feet = table(
+        1 = table("pos" = vec(200,100,Base_height)),
+        2 = table("pos" = vec(200,-100,Base_height)),
+        3 = table("pos" = vec(66.667,100,Base_height)),
+        4 = table("pos" = vec(66.667,-100,Base_height)),
+        5 = table("pos" = vec(-66.667,100,Base_height)),
+        6 = table("pos" = vec(-66.667,-100,Base_height)),
+        7 = table("pos" = vec(-200,100,Base_height)),
+        8 = table("pos" = vec(-200,-100,Base_height))
+    )]#
+
+    local Radius = 100
+    for (I = 0,3) {
+        local Pos = vec(Radius,0,Base_height):rotate(0,(180 / 4)*I + 22.5,0)
+        Base_feet[I*2 + 1,table] = table("pos" = Pos)
+        Base_feet[I*2 + 2,table] = table("pos" = Pos*vec(1,-1,1))
+    }
 
     Gaits = table(
         "tetrapod" = table(
@@ -100,7 +103,7 @@ if (first()) {
                 8 = 0.00 #-- rr
             )
         ),
-        "ripple" = table(
+        "wave" = table(
             "speed" = 100,
             "rate" = 1.0,
             "length" = 0.5,
@@ -114,6 +117,21 @@ if (first()) {
                 7 = 0.75,#-- rl
                 8 = 0.25 #-- rr
             )
+        ),
+        "ripple" = table(
+            "speed" = 200,
+            "rate" = 1.0,
+            "length" = 0.5,
+            "timings" = array(
+                1 = 0.00,#-- fl
+                2 = 0.50,#-- fr
+                3 = 0.75,#-- fml
+                4 = 0.25,#-- fmr
+                5 = 0.00,#-- rml
+                6 = 0.50,#-- rmr
+                7 = 0.25,#-- rl
+                8 = 0.75 #-- rr
+            )
         )
     )
 
@@ -123,22 +141,51 @@ if (first()) {
 
     for (I = 1,Base_feet:count()) {
         holoCreate(I)
+        holoModel(I,"icosphere3")
         resetFoot(I)
     }
 
     holoCreate(100)
 }
 
-interval(60)
+interval(90)
 
 Dt = curtime() - Ct
 Ct = curtime()
 
 if (Dt > 1) { exit() }
 
-Base_dir = vec(1,0,0)
-Base_ang = Base_dir:toAngle()
-Base_pos = updateGait() + UDir*Base_height
+updateGait()
+
+#-- diffs
+local Front = vec()
+Front += Base_feet[1,table]["pos_real",vector] + Base_feet[2,table]["pos_real",vector]
+Front += Base_feet[3,table]["pos_real",vector] + Base_feet[4,table]["pos_real",vector]
+Front /= 4
+
+local Rear = vec()
+Rear += Base_feet[5,table]["pos_real",vector] + Base_feet[6,table]["pos_real",vector]
+Rear += Base_feet[7,table]["pos_real",vector] + Base_feet[8,table]["pos_real",vector]
+Rear /= 4
+
+local Left = vec()
+Left += Base_feet[1,table]["pos_real",vector] + Base_feet[3,table]["pos_real",vector]
+Left += Base_feet[5,table]["pos_real",vector] + Base_feet[7,table]["pos_real",vector]
+Left /= 4
+
+local Right = vec()
+Right += Base_feet[2,table]["pos_real",vector] + Base_feet[4,table]["pos_real",vector]
+Right += Base_feet[6,table]["pos_real",vector] + Base_feet[8,table]["pos_real",vector]
+Right /= 4
+
+#-- angle
+local DiffP = holoEntity(100):toLocalAxis(Front - Rear)
+local DiffR = holoEntity(100):toLocalAxis(Right - Left)
+Base_ang = holoEntity(100):toWorld(ang(atan(DiffP:x(),DiffP:z()) - 90,0,atan(-DiffR:y(),DiffR:z()) - 90))
+Base_up = Base_ang:up()
+
+#-- avg
+Base_pos = (Front + Rear)/2 + Base_up*Base_height
 
 holoPos(100,Base_pos)
 holoAng(100,Base_ang)

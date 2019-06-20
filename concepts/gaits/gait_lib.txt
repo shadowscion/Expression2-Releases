@@ -1,7 +1,7 @@
 @name gait_lib
 @inputs
 @outputs
-@persist [G_timer G_timer_duration G_current_update G_current_stance G_current_speed G_height] [Dt Ct]
+@persist [G_timer G_timer_duration G_current_update G_current_stance G_current_speed G_height] [Dt Ct] [IK1 IK2 IK3 IK4 IKB]
 @persist [G_feet G_timings]:table [G_current_timings]:array [G_pos G_dir]:vector [G_ang]:angle
 @trigger none
 
@@ -11,7 +11,7 @@ if (first()) {
         speed   -> movement speed
         update  -> cycles per second
         stance  -> percentage of cycle foot is in the air
-        timings -> foot timings, front to back, left to right
+        timings -> foot timings,front to back,left to right
     ]#
 
     G_timings = table(
@@ -19,21 +19,21 @@ if (first()) {
             "tetrapod" = table(
                 "speed"   = 100,
                 "update"  = 1,
-                "stance"  = 0.50,
+                "stance"  = 1/2,
                 "timings" = array(0,1/2,1/2,0,0,1/2,1/2,0)
             ),
             "ripple" = table(
                 "speed"   = 100,
                 "update"  = 1,
-                "stance"  = 0.50,
-                "timings" = array(0,1/2,1/4,3/4,1/2,0,3/4,1/4)
+                "stance"  = 1/2,
+                "timings" = array(0,1/2,1/6,2/3,1/3,5/6,1/2,0)
             )
         ),
         "hexa" = table(
             "tripod" = table(
                 "speed"   = 100,
                 "update"  = 1,
-                "stance"  = 0.50,
+                "stance"  = 1/2,
                 "timings" = array(0,1/2,1/2,0,0,1/2)
             ),
             "wave"   = table(
@@ -47,6 +47,28 @@ if (first()) {
                 "update"  = 1,
                 "stance"  = 1/3,
                 "timings" = array(2/3,1/3,0,1/6,5/6,1/2)
+            )
+        ),
+        "quad" = table(
+            "pairs" = table(
+                "speed"   = 100,
+                "update"  = 1,
+                "stance"  = 1/2,
+                "timings" = array(0,1/2,1/2,0)
+            ),
+            "singleton" = table(
+                "speed"   = 100,
+                "update"  = 1,
+                "stance"  = 1/4,
+                "timings" = array(0,1/2,3/4,1/4)
+            )
+        ),
+        "bip" = table(
+            "walk" = table(
+                "speed"   = 100,
+                "update"  = 1,
+                "stance"  = 1/2,
+                "timings" = array(0,1/2)
             )
         )
     )
@@ -98,7 +120,7 @@ if (first()) {
                 local Diff = Foot["nextStep",vector] - Foot["lastStep",vector]
                 if (Diff) {
                     Perc = (Perc - G_current_stance)/(1 - G_current_stance)
-                    Foot["realStep",vector] = mix(bezier(Foot["lastStep",vector],mix(Foot["lastStep",vector],Foot["nextStep",vector],0.5) + quat(Diff,G_ang:up()):up()*Diff:length()*0.25,Foot["nextStep",vector],Perc),Foot["realStep",vector],Perc)
+                    Foot["realStep",vector] = mix(bezier(Foot["lastStep",vector],mix(Foot["lastStep",vector],Foot["nextStep",vector],0.5) + quat(Diff,G_ang:up()):up()*G_height,Foot["nextStep",vector],Perc),Foot["realStep",vector],Perc)
                 }
             }
             elseif (Foot["takeStep",number]) {
@@ -120,33 +142,79 @@ if (first()) {
 
         setGait(Type,Gait,1)
         local Num = 0
-        if (Type == "hexa") { Num = 6 }
-        if (Type == "octo") { Num = 8 }
+        if (Type == "bip") { Num = 2 }
+        elseif (Type == "quad") { Num = 4 }
+        elseif (Type == "hexa") { Num = 6 }
+        elseif (Type == "octo") { Num = 8 }
 
-        local Width = Length/_PHI
-        local C = 0
-        for (I = 0,Num/2 - 1) {
-            local T = I/(Num/2 - 1)
-            local X = (1 - T)*Length + T*(-Length)
-            C++,G_feet[C,table] = table("pos" = vec(X,Width,0))
-            C++,G_feet[C,table] = table("pos" = vec(X,-Width,0))
+        for (I = 1,Num/2) {
+            local Pos = vec(Length,0,0):rotate(0,(180/(Num/2))*(I - 1) + (180/Num),0)
+            G_feet:pushTable(table("pos" = Pos))
+            G_feet:pushTable(table("pos" = Pos:setY(-Pos:y())))
         }
         resetFeet()
+
         for (I = 1,Num) {
             holoCreate(I,G_feet[I,table]["stepReal",vector])
         }
         holoCreate(100)
     }
+    function autoLegs(Type:string,Gait:string,Height,Length,IL1,IL2,IL3,IL4) {
+        G_height = Height
+        G_pos = entity():pos() + vec(0,0,G_height)
+        G_ang = ang()
 
-    #autoFeet("hexa","tripod",75,100)
-    #autoFeet("hexa","ripple",75,100)
-    #autoFeet("hexa","wave",75,100)
+        setGait(Type,Gait,1)
+        local Num = 0
+        if (Type == "bip") { Num = 2 }
+        elseif (Type == "quad") { Num = 4 }
+        elseif (Type == "hexa") { Num = 6 }
+        elseif (Type == "octo") { Num = 8 }
 
-    #autoFeet("octo","tetrapod",75,100)
-    autoFeet("octo","ripple",75,100)
+        for (I = 1,Num/2) {
+            local Pos = vec(Length,0,0):rotate(0,(180/(Num/2))*(I - 1) + (180/Num),0)
+            G_feet:pushTable(table("pos" = Pos))
+            G_feet:pushTable(table("pos" = Pos:setY(-Pos:y())))
+        }
+        resetFeet()
+
+        holoCreate(100)
+        local L = (IL1 + IL2 + IL3 + IL4 - G_height)/4
+        for (I = 1,Num) {
+            local N = I*1000
+            holoCreate(N,holoEntity(100):toWorld(G_feet[I,table]["pos",vector]:normalized()*L),vec(IL1*2,8,8)/12)
+            holoClipEnabled(N,1),holoClip(N,vec(),vec(1,0,0),0)
+            holoParent(N,100)
+
+            for (J = 1,4) {
+                N++
+                holoCreate(N,holoEntity(N - 1):toWorld(vec(select(J,IL1,IL2,IL4,IL3),0,0)),vec(select(J,IL2,IL3,IL4,IL3)*2,8-J,8-J)/12)
+                holoClipEnabled(N,1),holoClip(N,vec(),vec(1,0,0),0)
+                holoParent(N,N - 1)
+            }
+        }
+
+        IK1 = IL1
+        IK2 = IL2
+        IK3 = IL3
+        IK4 = IL4
+        IKB = IL1 + IL2 + IL3 + IL4
+    }
+
+    autoLegs("octo","ripple",50,100,30,30,40,40)
+    #autoLegs("octo","tetrapod",50,100,30,30,40,40)
+
+    #autoLegs("hexa","tripod",50,100,30,30,40,40)
+    #autoLegs("hexa","ripple",50,100,30,30,40,40)
+    #autoLegs("hexa","wave",50,100,30,30,40,40)
+
+    #autoLegs("quad","pairs",50,100,30,30,40,40)
+    #autoLegs("quad","singleton",50,100,30,30,40,40)
+
+    #autoLegs("bip","walk",50,100,30,30,40,40)
 }
 
-interval(60)
+interval(90)
 
 Dt = curtime() - Ct
 Ct = curtime()
@@ -155,12 +223,29 @@ if (Dt > 1) { exit() }
 
 updateGait()
 
-G_ang = G_ang:rotateAroundAxis(vec(0,0,1),22.5*Dt)
+G_ang = G_ang:rotateAroundAxis(vec(0,0,1),15*Dt)
 G_dir = G_ang:forward()
+
+local Base = holoEntity(100)
 
 holoPos(100,G_pos)
 holoAng(100,G_ang)
 
 for (I = 1,G_current_timings:count()) {
-    holoPos(I,G_feet[I,table]["realStep",vector])
+    local Target = G_feet[I,table]["realStep",vector]
+
+    local N = I*1000
+    local Diff = Base:toLocalAxis(Target - holoEntity(N):pos())
+    local Dist = 1 - min(Diff:length()/2,IKB)/IKB
+
+    local Angle = Diff:toAngle()
+    holoAng(N,Base:toWorld(Angle + ang(45*Dist,0,0)))
+    holoAng(N + 1,Base:toWorld(Angle - ang(135*Dist,0,0)))
+
+    Diff = Base:toLocalAxis(Target - holoEntity(N + 2):pos())
+    Dist = min(Diff:length() - IK4,IK3 + IK3 - 0.5)
+
+    holoAng(N + 2,Base:toWorld(Diff:toAngle() - ang(acos(Dist^2/(2*Dist*IK3)),0,0)))
+    holoAng(N + 3,holoEntity(N + 2):toWorld(ang(-asin(Dist/(IK3 + IK3)) + 90,0,0)))
+    holoAng(N + 4,holoEntity(N + 2):toWorld(ang(-acos((IK3^2 + IK3^2 - Dist^2)/(2*IK3*IK3)) + 180,0,0)))
 }

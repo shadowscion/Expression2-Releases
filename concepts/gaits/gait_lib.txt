@@ -1,0 +1,166 @@
+@name gait_lib
+@inputs
+@outputs
+@persist [G_timer G_timer_duration G_current_update G_current_stance G_current_speed G_height] [Dt Ct]
+@persist [G_feet G_timings]:table [G_current_timings]:array [G_pos G_dir]:vector [G_ang]:angle
+@trigger none
+
+if (first()) {
+    #---------------------------------------------------------------
+    #[ GAIT LIB
+        speed   -> movement speed
+        update  -> cycles per second
+        stance  -> percentage of cycle foot is in the air
+        timings -> foot timings, front to back, left to right
+    ]#
+
+    G_timings = table(
+        "octo" = table(
+            "tetrapod" = table(
+                "speed"   = 100,
+                "update"  = 1,
+                "stance"  = 0.50,
+                "timings" = array(0,1/2,1/2,0,0,1/2,1/2,0)
+            ),
+            "ripple" = table(
+                "speed"   = 100,
+                "update"  = 1,
+                "stance"  = 0.50,
+                "timings" = array(0,1/2,1/4,3/4,1/2,0,3/4,1/4)
+            )
+        ),
+        "hexa" = table(
+            "tripod" = table(
+                "speed"   = 100,
+                "update"  = 1,
+                "stance"  = 0.50,
+                "timings" = array(0,1/2,1/2,0,0,1/2)
+            ),
+            "wave"   = table(
+                "speed"   = 100,
+                "update"  = 1,
+                "stance"  = 1/6,
+                "timings" = array(1/3,1/6,0,5/6,2/3,1/2)
+            ),
+            "ripple" = table(
+                "speed"   = 100,
+                "update"  = 1,
+                "stance"  = 1/3,
+                "timings" = array(2/3,1/3,0,1/6,5/6,1/2)
+            )
+        )
+    )
+    function resetFeet() {
+        for (I = 1,G_feet:count()) {
+            local Pos = rangerOffset(G_height,toWorld(G_feet[I,table]["pos",vector],ang(),G_pos,G_ang),vec(0,0,-1)):position()
+            G_feet[I,table]["lastStep",vector] = Pos
+            G_feet[I,table]["nextStep",vector] = Pos
+            G_feet[I,table]["realStep",vector] = Pos
+        }
+    }
+    function setGait(Type:string,Name:string,Duration) {
+        if (G_timings:exists(Type) & G_timings[Type,table]:exists(Name)) {
+            local G = G_timings[Type,table][Name,table]
+            G_current_timings = G["timings",array]
+            G_current_stance = 1 - G["stance",number]
+            G_current_update = G["update",number]
+            G_current_speed = G["speed",number]
+            G_timer_duration = Duration
+        }
+        else {
+            error(format("Invalid gait <%s> <%s>",Type,Name))
+        }
+    }
+    function updateGait() {
+        G_timer += G_current_update*Dt
+        if (G_timer > G_timer_duration) {
+            G_timer -= G_timer_duration
+        }
+        elseif (G_timer < 0) {
+            G_timer += G_timer_duration
+        }
+        local Pos = vec()
+        for (I = 1,G_current_timings:count()) {
+            local Perc = (G_timer/G_timer_duration) + G_current_timings[I,number]
+            if (Perc > 1) {
+                Perc--
+            }
+            local Foot = G_feet[I,table]
+            if (Perc > G_current_stance) {
+                if (Foot["takeStep",number] == 0) {
+                    local Ranger = rangerOffset(G_current_speed,rangerOffset(G_pos,toWorld(Foot["pos",vector]:setZ(G_height),ang(),G_pos,G_ang)):position(),G_dir)
+                    if (!Ranger:hit()) {
+                        Ranger = rangerOffset(Ranger:distance() + G_current_speed + G_height*2,Ranger:position(),vec(0,0,-1))
+                    }
+                    Foot["nextStep",vector] = Ranger:position()
+                    Foot["takeStep",number] = 1
+                }
+                local Diff = Foot["nextStep",vector] - Foot["lastStep",vector]
+                if (Diff) {
+                    Perc = (Perc - G_current_stance)/(1 - G_current_stance)
+                    Foot["realStep",vector] = mix(bezier(Foot["lastStep",vector],mix(Foot["lastStep",vector],Foot["nextStep",vector],0.5) + quat(Diff,G_ang:up()):up()*Diff:length()*0.25,Foot["nextStep",vector],Perc),Foot["realStep",vector],Perc)
+                }
+            }
+            elseif (Foot["takeStep",number]) {
+                Foot["lastStep",vector] = Foot["nextStep",vector]
+                Foot["realStep",vector] = Foot["nextStep",vector]
+                Foot["takeStep",number] = 0
+            }
+            Pos += Foot["realStep",vector]
+        }
+        G_pos = Pos/G_current_timings:count() + G_ang:up()*G_height
+    }
+
+    #---------------------------------------------------------------
+    #[ TESTING ]#
+    function autoFeet(Type:string,Gait:string,Height,Length) {
+        G_height = Height
+        G_pos = entity():pos() + vec(0,0,G_height)
+        G_ang = ang()
+
+        setGait(Type,Gait,1)
+        local Num = 0
+        if (Type == "hexa") { Num = 6 }
+        if (Type == "octo") { Num = 8 }
+
+        local Width = Length/_PHI
+        local C = 0
+        for (I = 0,Num/2 - 1) {
+            local T = I/(Num/2 - 1)
+            local X = (1 - T)*Length + T*(-Length)
+            C++,G_feet[C,table] = table("pos" = vec(X,Width,0))
+            C++,G_feet[C,table] = table("pos" = vec(X,-Width,0))
+        }
+        resetFeet()
+        for (I = 1,Num) {
+            holoCreate(I,G_feet[I,table]["stepReal",vector])
+        }
+        holoCreate(100)
+    }
+
+    #autoFeet("hexa","tripod",75,100)
+    #autoFeet("hexa","ripple",75,100)
+    #autoFeet("hexa","wave",75,100)
+
+    #autoFeet("octo","tetrapod",75,100)
+    autoFeet("octo","ripple",75,100)
+}
+
+interval(60)
+
+Dt = curtime() - Ct
+Ct = curtime()
+
+if (Dt > 1) { exit() }
+
+updateGait()
+
+G_ang = G_ang:rotateAroundAxis(vec(0,0,1),22.5*Dt)
+G_dir = G_ang:forward()
+
+holoPos(100,G_pos)
+holoAng(100,G_ang)
+
+for (I = 1,G_current_timings:count()) {
+    holoPos(I,G_feet[I,table]["realStep",vector])
+}

@@ -1,0 +1,315 @@
+#@name 2048 game
+@inputs EGP:wirelink
+@outputs 
+@persist EGPN EGPScore EGPBest Numbers:string Prev Tiles:string Owner:entity NumberIndex Score GAMEOVER WastedIndex
+@persist Session:gtable
+@trigger none
+
+if (first()) {
+    EGP:egpClear()
+    EGP:egpDrawTopLeft(1)
+    
+    
+    Session = gTable("2048_Session")
+
+    Numbers = "a2b4c8d16e32f64g128h256i512j1024k2048"
+    
+    function string string:tPrint() {
+        local String = ""
+        for (I = 1, 16) {
+            String = String + This[I] + " "
+            if (I % 4 == 0) { String = String + "\n" }
+        }
+        printColor(vec(255, 255, 255), "#######\n" + String + "#######\n")
+        return This
+    }
+    
+    function string getValue( Key:string ) {
+        if (Key == "-") { return "" }
+        return Numbers:matchFirst(Key + "%d+"):sub(2)
+    }
+
+    function number string:getTotalValue() {
+        local Value = 0
+    
+        This = This:replace("a", ""):replace("-", "")
+        for (I = 1, This:length()) {
+            Value += (toByte(This[I]) - 97) * getValue(This[I]):toNumber()
+        }
+        return Value
+    }
+
+    function number validate( String:string ) {
+        return String:length() == 16 & String:gmatch("-"):count() < 15
+    }
+    
+    function string randomize() {
+        local String = ""
+        local Seed = randint(2, 4)
+        local Count = 0
+    
+        for (I = 1, 16) {
+            local Char = randint(90, 110)
+            if (Count <= Seed & inrange(Char, 97, 98)) { # 97-107 = a-k
+                Count++
+                String = String + toChar(Char)
+            } else {
+                String = String + "-"
+            }
+        }
+    
+        if (!validate(String)) { String = randomize() }
+    
+        return String 
+    }
+    
+    function string string:setChar( Index, String:string ) {
+        return This:sub(1, Index - 1) + String + This:sub(Index + 1)
+    }
+    
+    function string string:setRandomChar() {
+        if (This:find("-")) {
+            while (1) {
+                local Index = randint(1, 16)
+                if (This[Index] == "-") {
+                    return This:setChar( Index, toChar(randint(97, 98)) )
+                }
+            }
+        }
+        return This
+    }
+    
+    
+    
+    function string string:displaceLeft() {
+        return This:replace("-", "") + This:replaceRE("%a", "")
+    }
+    
+    function string string:displaceRight() {
+        return This:replaceRE("%a", "") + This:replace("-", "")
+    }
+    
+    function string string:convergeRight() {
+        local String = ""
+        for (I = 1, 4) {
+            local Sub = This:sub((I - 1) * 4 + 1, I * 4):displaceRight()
+            for (J = 4, 1, -1) {
+                local Next = Sub[J - 1]
+        
+                if (Next == "-") { break }
+                if (Next == Sub[J]) {
+                    Sub = Sub:setChar(J, toChar(toByte(Next) + 1)):setChar(J - 1, "-")
+                }         
+            }
+            String = String + Sub:displaceRight()
+        }
+        return String:setRandomChar()
+    }
+    
+    function string string:convergeLeft() {
+        local String = ""
+        for (I = 1, 4) {
+            local Sub = This:sub((I - 1) * 4 + 1, I * 4):displaceLeft()
+            for (J = 1, 4) {
+                local Next = Sub[J + 1]
+        
+                if (Next == "-") { break }
+                if (Next == Sub[J]) {
+                    Sub = Sub:setChar(J, toChar(toByte(Next) + 1)):setChar(J + 1, "-")
+                }         
+            }
+            String = String + Sub:displaceLeft()
+        }
+        return String:setRandomChar()
+    }
+    
+    function string string:convergeUp() {
+        for (I = 1, 4) {
+            local Sub = ""
+            for (J = 1, 4) {
+                Sub = Sub + This[J * 4 - I + 1]
+            }
+    
+            Sub = Sub:displaceLeft()
+            for (K = 1, 4) {
+                local Next = Sub[K + 1]
+        
+                if (Next == "-") { break }
+                if (Next == Sub[K]) {
+                    Sub = Sub:setChar(K, toChar(toByte(Next) + 1)):setChar(K + 1, "-")
+                }             
+            }
+    
+            Sub = Sub:displaceLeft()
+            for (L = 1, 4) {
+                This = This:setChar(L * 4 - I + 1, Sub[L])
+            }
+        }
+        return This:setRandomChar()
+    }
+    
+    
+    function string string:convergeDown() {
+        for (I = 1, 4) {
+            local Sub = ""
+            for (J = 1, 4) {
+                Sub = Sub + This[J * 4 - I + 1]
+            }
+    
+            Sub = Sub:displaceRight()
+            for (K = 4, 1, -1) {
+                local Next = Sub[K - 1]
+        
+                if (Next == "-") { break }
+                if (Next == Sub[K]) {
+                    Sub = Sub:setChar(K, toChar(toByte(Next) + 1)):setChar(K - 1, "-")
+                }             
+            }
+    
+            Sub = Sub:displaceRight()
+            for (L = 1, 4) {
+                This = This:setChar(L * 4 - I + 1, Sub[L])
+            }
+        }
+        return This:setRandomChar()
+    }
+
+    EGPN++
+    
+    EGP:egpRoundedBox(EGPN, vec2(0, 0), vec2(512, 512))
+    EGP:egpRadius(EGPN, 4)
+    EGP:egpColor(EGPN, vec(15, 15, 15))
+    
+    EGPN++
+    
+    EGP:egpText(EGPN, "Score: 0", vec2(0, -32))
+    EGP:egpSize(EGPN, 32)
+    
+    EGPScore = EGPN
+
+    EGPN++
+    
+    EGP:egpText(EGPN, "Best: " + Session["Best", string], vec2(256, -32))
+    EGP:egpSize(EGPN, 32)
+    
+    EGPBest = EGPN
+        
+    for (I = 1, 16) {
+        local X = (I - 1) % 4
+        local Y = floor((I - 1) / 4)
+        
+        EGPN++
+        
+        EGP:egpRoundedBox(EGPN, vec2(X * 128 + 2, Y * 128 + 2), vec2(124, 124))
+        EGP:egpRadius(EGPN, 4)
+        EGP:egpColor(EGPN, vec(50, 50, 60))
+    }
+    
+    for (I = 1, 16) {
+        EGPN++
+        
+        local Number = getValue(Tiles[I])
+        
+        EGP:egpText(EGPN, Number, vec2(0, -36))
+        EGP:egpAlign(EGPN, 1)
+        EGP:egpParent(EGPN, EGPN - 16)
+        EGP:egpSize(EGPN, 72)
+    }
+    
+    NumberIndex = EGPN - 16
+    
+
+    EGPN++
+    EGP:egpBox(EGPN, vec2(0, 0), vec2(512, 512))
+    EGP:egpColor(EGPN, vec(10, 10, 10))
+    EGP:egpAlpha(EGPN, 200)
+    
+    WastedIndex = EGPN
+    
+    
+    EGPN++
+    EGP:egpText(EGPN, "WASTED", vec2(256, 200))
+    EGP:egpFont(EGPN, "Coolvetica", 108)
+    EGP:egpColor(EGPN, vec(10, 10, 10))
+    EGP:egpAlign(EGPN, 1)
+    
+    EGPN++
+    EGP:egpText(EGPN, "WASTED", vec2(0, 0))
+    EGP:egpFont(EGPN, "Coolvetica", 104)
+    EGP:egpColor(EGPN, vec(75, 10, 10))
+    EGP:egpAlign(EGPN, 1)
+    EGP:egpParent(EGPN, EGPN - 1)
+    
+    
+    for (I = 0, 2) {
+        EGP:egpAlpha(WastedIndex + I, 0)    
+    }
+
+    function setNewNumbers() {
+        for (I = 1, 16) {
+            local Number = getValue(Tiles[I])
+            local Index = NumberIndex + I
+            EGP:egpSetText(Index, Number)
+            EGP:egpColor(Index, mix(vec(255, 50, 50), vec(255, 255, 50), Number:toNumber() / 2048))
+        }    
+    }
+
+    Tiles = randomize()
+    setNewNumbers()
+    
+    Owner = findPlayerByName("shadow")
+    runOnKeys(Owner, 1)
+}
+
+if (keyClk(Owner)) {
+    local Key = keyClkPressed()
+    if (Owner:keyPressed(Key)) {
+        if (!GAMEOVER) {
+            switch (Key) {
+                case "up", 
+                    Tiles = Tiles:convergeUp()
+                    break
+                
+                case "down", 
+                    Tiles = Tiles:convergeDown()
+                    break
+                    
+                case "left", 
+                    Tiles = Tiles:convergeLeft()
+                    break
+                
+                case "right", 
+                    Tiles = Tiles:convergeRight()
+                    break
+            }
+            
+            if (changed(Tiles)) {
+                setNewNumbers()
+    
+                EGP:egpSetText(EGPScore, "Score: " + Tiles:getTotalValue())
+                
+                soundPlay("blip", 0, "buttons/button9.wav")
+                soundPitch("blip", 255)
+            } else {
+                local Temp = Tiles
+                Temp = Temp:convergeUp()
+                Temp = Temp:convergeDown()
+                Temp = Temp:convergeLeft()
+                Temp = Temp:convergeRight()
+                
+                if (Temp == Tiles) {
+                    local Score = Tiles:getTotalValue() 
+                    if (Score > Session["Best", string]:matchFirst("(%d+)"):toNumber()) {
+                        Session["Best", string] = Tiles:getTotalValue() + "("+Owner:name()+")"
+                        EGP:egpSetText(EGPBest, "Best: " + Session["Best", string])
+                    }
+                    GAMEOVER = 1
+                    
+                    for (I = 0, 2) {
+                        EGP:egpAlpha(WastedIndex + I, I == 0 ? 200 : 255)    
+                    }
+                }
+            }
+        }
+    }
+}

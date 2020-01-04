@@ -1,0 +1,124 @@
+@name _lib/ik_optimized_wingleg
+@inputs 
+@outputs Flare
+@persist GPS:entity L1 L2 L3 [Forward Right Up]:vector
+
+
+if (first()) {
+    Forward = vec(1,0,0)
+    Right = vec(0,-1,0)
+    Up = vec(0,0,1)
+    
+    propSpawnUndo(0)
+    
+    GPS = propSpawn("models/hunter/blocks/cube025x025x025.mdl",entity():toWorld(Right*-30),0)
+    
+    L1 = 64
+    L2 = 84
+    L3 = 84
+    
+    holoCreate(1,entity():toWorld(vec(0,20,0)),vec(L1*2,6,12)/12),holoParent(1,entity())
+    holoCreate(2,holoEntity(1):toWorld(vec(L1,0,0)),vec(L2*2,5,10)/12),holoParent(2,1)
+    holoCreate(3,holoEntity(2):toWorld(vec(L2,0,0)),vec(L3*2,4,8)/12),holoParent(3,2)
+    holoCreate(4,holoEntity(3):toWorld(vec(L3,0,0)),vec(L3*6,3,6)/12),holoParent(4,3)
+    for (I = 1,4) { 
+        holoClipEnabled(I,1)
+        holoClip(I,vec(),vec(1,0,0),0)
+    }
+
+    holoCreate(101,entity():toWorld(vec(0,-20,0)),vec(L1*2,6,12)/12),holoParent(101,entity())
+    holoCreate(102,holoEntity(101):toWorld(vec(L1,0,0)),vec(L2*2,5,10)/12),holoParent(102,101)
+    holoCreate(103,holoEntity(102):toWorld(vec(L2,0,0)),vec(L3*2,4,8)/12),holoParent(103,102)
+    holoCreate(104,holoEntity(103):toWorld(vec(L3,0,0)),vec(L3*6,3,6)/12),holoParent(104,103)
+    for (I = 1,4) { 
+        holoClipEnabled(I+100,1)
+        holoClip(I+100,vec(),vec(1,0,0),0)
+    }
+    
+    function optimizer(A,B,C,D,L1,L2,L3,Base:string,TargetPos:string) {
+        
+        local Str = format("@persist [Holo%d Holo%d Holo%d Holo%d]:entity\n\n\n", A, B, C, D)
+        
+        Str += format("\n\n\nHolo%d = holoEntity(%d)\nHolo%d = holoEntity(%d)\nHolo%d = holoEntity(%d)\nHolo%d = holoEntity(%d)\n\n\n",A,A,B,B,C,C,D,D)
+        
+        Str += "
+        local TargetDir = Base:toLocalAxis(TargetPos - holoEntity(A):pos())
+        holoAng(A,Base:toWorld((quat(TargetDir:toAngle():setRoll(atan(TargetDir:y(),TargetDir:x())))*qRotation(Forward,DirDot*15)*qRotation(Right,-90*(1 - min(1,TargetDir:length() / (L1 + L3) - 0.5)))):toAngle()))
+        
+        local TargetDir = holoEntity(A):toLocalAxis(TargetPos - holoEntity(B):pos())
+        local L4 = min(TargetDir:length(),L2 + L3)
+        
+        holoAng(B,holoEntity(A):toWorld(ang(atan(TargetDir:x(),TargetDir:z()) - acos((L4^2 + L2^2 - L3^2) / (2*L4*L2)) - 90,0,0)))
+        holoAng(C,holoEntity(B):toWorld(ang(180 - acos((L3^2 + L2^2 - L4^2) / (2*L3*L2)),0,0)))
+        holoAng(D,holoEntity(A):toWorld(ang(atan(TargetDir:x(),TargetDir:z()) + 50,0,0)))"
+        
+        
+        Str = Str:replace("Base", Base)
+        Str = Str:replace("TargetPos", TargetPos)
+        Str = Str:replace("holoEntity(A)", "Holo" + A)
+        Str = Str:replace("holoEntity(B)", "Holo" + B)
+        Str = Str:replace("holoEntity(C)", "Holo" + C)
+        Str = Str:replace("holoEntity(D)", "Holo" + D)
+        Str = Str:replace("holoAng(A", "holoAng(" + A)
+        Str = Str:replace("holoAng(B", "holoAng(" + B)
+        Str = Str:replace("holoAng(C", "holoAng(" + C)
+        Str = Str:replace("holoAng(D", "holoAng(" + D)
+            
+        if (L2^2 - L3^2 == 0) {
+            Str = Str:replace("acos((L4^2 + L2^2 - L3^2)", "acos(L4^2")
+        }
+        else {
+            Str = Str:replace("acos((L4^2 + L2^2 - L3^2)", "acos((L4^2 + " + (L2^2 - L3^2) + ")")
+        }
+        
+        Str = Str:replace("(L1 + L3)", (L1 + L3) + "")
+        Str = Str:replace("L2 + L3", (L2 + L3) + "")
+        Str = Str:replace("L3^2 + L2^2", (L3^2 + L2^2) + "")
+        Str = Str:replace("(2*L3*L2)", (2 * L3 * L2) + "")
+        Str = Str:replace("(2*L4*L2)", "(L4*" + (2 * L2) + ")")
+        Str = Str:replace("L1^2", L1^2 + "")
+        Str = Str:replace("L2^2", L2^2 + "")
+        Str = Str:replace("L3^2", L3^2 + "")
+        Str = Str:replace("L1", L1 + "")
+        Str = Str:replace("L2", L2 + "")
+        Str = Str:replace("L3", L3 + "")
+
+        printTable(array(Str))
+    }    
+    
+   # optimizer(1,2,3,4,L1,L2,L3,"Base","GPS:pos()")
+
+}
+
+interval(90)
+  
+#--
+local Base = entity()
+local DirDot = abs(Base:right():dot((owner():aimPos() - Base:pos()):normalized()))
+
+
+#--
+local TargetPos = GPS:pos()
+
+local TargetDir = Base:toLocalAxis(TargetPos - holoEntity(1):pos())
+holoAng(1,Base:toWorld((quat(TargetDir:toAngle():setRoll(atan(TargetDir:y(),TargetDir:x())))*qRotation(Forward,DirDot*30)*qRotation(Right,-90*(1 - min(1,TargetDir:length() / (L1 + L3) - 0.5)))):toAngle()))
+
+local TargetDir = holoEntity(1):toLocalAxis(TargetPos - holoEntity(2):pos())
+local L4 = min(TargetDir:length(),L2 + L3)
+
+holoAng(2,holoEntity(1):toWorld(ang(atan(TargetDir:x(),TargetDir:z()) - acos((L4^2 + L2^2 - L3^2) / (2*L4*L2)) - 90,0,0)))
+holoAng(3,holoEntity(2):toWorld(ang(180 - acos((L3^2 + L2^2 - L4^2) / (2*L3*L2)),0,0)))
+holoAng(4,holoEntity(1):toWorld(ang(atan(TargetDir:x(),TargetDir:z()) + 50,0,0)))
+
+
+local TargetPos = Base:toWorld(Base:toLocal(GPS:pos()) * vec(1, -1, 1))
+
+local TargetDir = Base:toLocalAxis(TargetPos - holoEntity(101):pos())
+holoAng(101,Base:toWorld((quat(TargetDir:toAngle():setRoll(atan(TargetDir:y(),TargetDir:x())))*qRotation(Forward,-DirDot*30)*qRotation(Right,-90*(1 - min(1,TargetDir:length() / (L1 + L3) - 0.5)))):toAngle()))
+
+local TargetDir = holoEntity(101):toLocalAxis(TargetPos - holoEntity(102):pos())
+local L4 = min(TargetDir:length(),L2 + L3)
+
+holoAng(102,holoEntity(101):toWorld(ang(atan(TargetDir:x(),TargetDir:z()) - acos((L4^2 + L2^2 - L3^2) / (2*L4*L2)) - 90,0,0)))
+holoAng(103,holoEntity(102):toWorld(ang(180 - acos((L3^2 + L2^2 - L4^2) / (2*L3*L2)),0,0)))
+holoAng(104,holoEntity(101):toWorld(ang(atan(TargetDir:x(),TargetDir:z()) + 50,0,0)))

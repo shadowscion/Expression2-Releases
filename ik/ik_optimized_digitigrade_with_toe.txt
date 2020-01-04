@@ -1,0 +1,154 @@
+@name _lib/ik_optimized_digitigrade_with_toe
+@inputs GPS:vector GPS2:vector
+@outputs 
+@persist [L_AtoB L_BtoC L_CtoD L_DtoE]
+@trigger none
+@model models/maxofs2d/cube_tool.mdl
+
+#[
+    Digitigrade IK by shadowscion
+    WARNING: NOT OPTIMIZED!
+]#
+
+if (first()) {
+    function void holoCreate(N, P, Pos:vector, Ang:angle, Scale:vector, Model:string, Material:string, Color:vector4) {
+        local PR = holoEntity(P) ?: entity()
+        holoCreate(N, PR:toWorld(Pos), Scale, PR:toWorld(Ang))   
+        holoModel(N, Model)
+        holoMaterial(N, Material)
+        holoColor(N, Color)
+        holoParent(N, PR) 
+    }
+    function number icos(A, B, C) {
+        return acos((A^2 + B^2 - C^2) / (2*A*B))    
+    }
+    function ik(A, B, C, D, E, Base:entity, IK:vector) {
+        #--
+        local H_A = holoEntity(A)
+        local H_B = holoEntity(B)
+        local H_C = holoEntity(C)
+        local H_D = holoEntity(D)
+        local H_E = holoEntity(E)
+        
+        #-- A
+        local Dir = Base:toLocalAxis(IK - H_A:pos())
+        holoAng(A,Base:toWorld((quat(Dir:toAngle():setRoll(atan(Dir:y(),Dir:x())))*qRotation(vec(0,-1,0),90*(1 - min(1,Dir:length() / (L_BtoC + L_CtoD + L_DtoE) - 0.5)) - 15)):toAngle()))
+
+        #-- B
+        local Dir = H_A:toLocalAxis(IK - H_B:pos())
+        holoAng(B, H_A:toWorld(ang(atan(Dir:x(), Dir:z()) - 60 + (1 - min(1, Dir:length() / (L_CtoD + L_DtoE) - 0.5))*45, 0, 0)))
+        
+        #-- C
+        local Dir = H_B:toLocalAxis(IK - H_C:pos())
+        local Dis = min(Dir:length(), L_CtoD + L_DtoE)
+        
+        holoAng(C, H_B:toWorld(ang(atan(Dir:x(), Dir:z()) - 90 + acos((Dis^2 + L_CtoD^2 - L_DtoE^2) / (2*Dis*L_CtoD)), 0, 0)))
+
+        #-- D
+        holoAng(D, H_C:toWorld(ang(acos((L_DtoE^2 + L_CtoD^2 - Dis^2) / (2*L_DtoE*L_CtoD)) - 180, 0, 0)))
+    }  
+    
+    function optimizer(A,B,C,D,E,L1,L2,L3,L4,Base:string,TargetPos:string) {
+        
+        local Str = format("@persist [Holo%d Holo%d Holo%d Holo%d]:entity\n\n\n", A, B, C, D)
+        
+        Str += format("\n\n\nHolo%d = holoEntity(%d)\nHolo%d = holoEntity(%d)\nHolo%d = holoEntity(%d)\nHolo%d = holoEntity(%d)\n\n\n\n",A,A,B,B,C,C,D,D)
+        
+        Str += "
+        local TargetDir = Base:toLocalAxis(TargetPos - holoEntity(A):pos())
+        holoAng(A,Base:toWorld((quat(TargetDir:toAngle():setRoll(atan(TargetDir:y(),TargetDir:x())))*qRotation(vec(0,-1,0),90*(1 - min(1,TargetDir:length() / (L2 + L3 + L4) - 0.5)) - 15)):toAngle()))
+
+        local TargetDir = holoEntity(A):toLocalAxis(TargetPos - holoEntity(B):pos())
+        holoAng(B, holoEntity(A):toWorld(ang(atan(TargetDir:x(), TargetDir:z()) - 60 + (1 - min(1, TargetDir:length() / (L3 + L4) - 0.5))*45, 0, 0)))
+
+        local TargetDir = holoEntity(B):toLocalAxis(TargetPos - holoEntity(C):pos())
+        local TargetDis = min(TargetDir:length(), L3 + L4)
+        
+        holoAng(C, holoEntity(B):toWorld(ang(atan(TargetDir:x(), TargetDir:z()) - 90 + acos((TargetDis^2 + L3^2 - L4^2) / (2*TargetDis*L3)), 0, 0)))
+        holoAng(D, holoEntity(C):toWorld(ang(acos((L4^2 + L3^2 - TargetDis^2) / (2*L4*L3)) - 180, 0, 0)))
+        holoAng(E, Base:angles())"
+        
+        Str = Str:replace("Base", Base)
+        Str = Str:replace("TargetPos", TargetPos)
+        
+        Str = Str:replace("holoEntity(A)", "Holo" + A)
+        Str = Str:replace("holoEntity(B)", "Holo" + B)
+        Str = Str:replace("holoEntity(C)", "Holo" + C)
+        Str = Str:replace("holoEntity(D)", "Holo" + D)
+        
+        Str = Str:replace("holoAng(A", "holoAng(" + A)
+        Str = Str:replace("holoAng(B", "holoAng(" + B)
+        Str = Str:replace("holoAng(C", "holoAng(" + C)
+        Str = Str:replace("holoAng(D", "holoAng(" + D)  
+        Str = Str:replace("holoAng(E", "holoAng(" + E) 
+        
+        Str = Str:replace("(L2 + L3 + L4)", (L2 + L3 + L4) + "")
+        Str = Str:replace("(L3 + L4)", (L3 + L4) + "")
+        
+        Str = Str:replace("(TargetDis^2 + L3^2 - L4^2)", "(TargetDis^2 + " + (L3^2 - L4^2) + ")")
+        Str = Str:replace("(2*TargetDis*L3)", "(TargetDis*" + (2*L3) + ")")
+
+        Str = Str:replace("(L4^2 + L3^2 - TargetDis^2)", "(" + (L4^2 + L3^2) + " - TargetDis^2)")
+        Str = Str:replace("(2*L4*L3)", (2*L4*L3) + "")
+        
+        Str = Str:replace(", L3 + L4)", ", " + (L3 + L4) + ")")
+        Str = Str:replace("L1^2", L1^2 + "")
+        Str = Str:replace("L2^2", L2^2 + "")
+        Str = Str:replace("L3^2", L3^2 + "")
+        Str = Str:replace("L4^2", L4^2 + "")
+        Str = Str:replace("L1", L1 + "")
+        Str = Str:replace("L2", L2 + "")
+        Str = Str:replace("L3", L3 + "")
+        Str = Str:replace("L4", L4 + "")
+        
+        printTable(array(Str))
+    } 
+    
+    #optimizer(15,16,17,L1,L2,L3,"Mech_base","RL_p_real")
+   # optimizer(30,31,32,L1,L2,L3,"Mech_base","RR_p_real")    
+    
+      
+    
+    
+    
+    L_AtoB = 40           # x/154
+    L_BtoC = 32 #L_AtoB*0.650
+    L_CtoD = 28 #L_AtoB*1.156
+    L_DtoE = 24 #L_AtoB*0.500
+    
+   # optimizer(2,3,4,5,6,L_AtoB,L_BtoC,L_CtoD,L_DtoE,"Mech_base","RL_p_real")
+    optimizer(7,8,9,10,11,L_AtoB,L_BtoC,L_CtoD,L_DtoE,"Mech_base","RR_p_real")
+    
+    
+    holoCreate(1, 0, vec(), ang(), vec(0.25), "", "", vec4(255))
+    
+    holoCreate(2, 1, vec(0, L_AtoB*0.325, 0), ang(), vec(6)/12, "", "", vec4(255))       #-- hip joint
+    holoCreate(3, 2, vec(L_AtoB, 0, 0), ang(), vec(5)/12, "", "", vec4(255))             #-- shin joint
+    holoCreate(4, 3, vec(L_BtoC, 0, 0), ang(), vec(4)/12, "", "", vec4(255))             #-- pre-ankle joint
+    holoCreate(5, 4, vec(L_CtoD, 0, 0), ang(), vec(3)/12, "", "", vec4(255))             #-- ankle joint
+    holoCreate(6, 5, vec(L_DtoE, 0, 0), ang(), vec(3)/12, "", "", vec4(255))             #-- toes (end)
+    
+    for (I = 1, 4) {
+        local N = 600+I
+        local L = select(I, L_AtoB, L_BtoC, L_CtoD, L_DtoE)
+        holoCreate(N, 1+I, vec(L*0.5, 0, 0), ang(), vec(L, 5-I, 5-I)/12, "", "", vec4(0, 0, 125, 255))    
+    }
+    
+    holoCreate(7, 1, vec(0, -L_AtoB*0.325, 0), ang(), vec(6)/12, "", "", vec4(255))      #-- hip joint
+    holoCreate(8, 7, vec(L_AtoB, 0, 0), ang(), vec(5)/12, "", "", vec4(255))             #-- shin joint
+    holoCreate(9, 8, vec(L_BtoC, 0, 0), ang(), vec(4)/12, "", "", vec4(255))             #-- pre-ankle joint
+    holoCreate(10, 9, vec(L_CtoD, 0, 0), ang(), vec(3)/12, "", "", vec4(255))            #-- ankle joint
+    holoCreate(11, 10, vec(L_DtoE, 0, 0), ang(), vec(3)/12, "", "", vec4(255))           #-- toes (end)
+    
+    for (I = 1, 4) {
+        local N = 700+I
+        local L = select(I, L_AtoB, L_BtoC, L_CtoD, L_DtoE)
+        holoCreate(N, 6+I, vec(L*0.5, 0, 0), ang(), vec(L, 5-I, 5-I)/12, "", "", vec4(125, 0, 0, 255))    
+    }
+}
+
+interval(60)
+
+ik(2, 3, 4, 5, 6, holoEntity(1), GPS)
+#ik(7, 8, 9, 10, 11, holoEntity(1), GPS2)
+

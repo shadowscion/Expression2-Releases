@@ -1,0 +1,134 @@
+@name new_wing
+@inputs 
+@outputs Test
+@persist 
+@trigger 
+
+if (first()) {
+    function number lerp(A,B,T) {
+        return (1 - T)*A + T*B    
+    }
+    function void holoCreate(N, P, Pos:vector, Ang:angle, Scale:vector, Model:string, Material:string, Color:vector4) {
+        local PR = holoEntity(P) ?: entity()
+        holoCreate(N, PR:toWorld(Pos), Scale, PR:toWorld(Ang))   
+        holoModel(N, Model)
+        holoMaterial(N, Material)
+        holoColor(N, Color)
+        holoParent(N, PR) 
+    }
+    
+    holoCreate(1,0,vec(),ang(),vec(1,1,1),"models/sprops/misc/bone_from_x.mdl","",vec4(255,255,255,255))
+    
+    #-- wing arm
+    holoCreate(2,1,vec(0,10,0),ang(),vec(84,12,12)/12,"models/sprops/misc/bone_from_x.mdl","",vec4(255,155,155,255))
+    holoCreate(3,2,vec(84,0,0),ang(),vec(84,12,12)/12,"models/sprops/misc/bone_from_x.mdl","",vec4(255,155,155,255))
+    
+    #-- wing spike
+    holoCreate(4,2,vec(84,0,0),ang(),vec(84,10,10)/12,"models/sprops/misc/bone_from_x.mdl","",vec4(155,255,155,255))
+    
+    #-- wing end
+    holoCreate(5,3,vec(84,0,0),ang(),vec(108,8,8)/12,"models/sprops/misc/bone_from_x.mdl","",vec4(155,155,255,255))
+    holoCreate(6,5,vec(108,0,0),ang(),vec(108,8,8)/12,"models/sprops/misc/bone_from_x.mdl","",vec4(155,155,255,255))
+    
+    #-- web ctrl 1
+    holoCreate(7,1,vec(0,10,0),ang(),vec(24,2,2)/12,"models/sprops/misc/bone_from_x.mdl","",vec4(255,255,0,255))
+    
+    #-- web 1
+    holoCreate(10,2,vec(0,0,0),ang(0,0,0),vec(0.25/12,50,50),"cube","",vec4(255,125,0,100))
+    
+    holoClipEnabled(10,1,1)
+    holoClip(10,1,vec(),vec(0,0,-1),holoEntity(2))
+
+    holoClipEnabled(10,2,1)
+    holoClip(10,2,vec(),vec(0,0,-1),holoEntity(4))
+    
+    holoClipEnabled(10,3,1)
+    holoClip(10,3,vec(),vec(0,0,1),holoEntity(7))    
+        
+    #-- web ctrl 2
+    holoCreate(8,4,vec(84,0,0),ang(),vec(24,2,2)/12,"models/sprops/misc/bone_from_x.mdl","",vec4(255,255,0,255))   
+    
+    #-- web 2
+    holoCreate(11,3,vec(0,0,-25*12),ang(0,0,0),vec(50,0.25/12,50),"cube","",vec4(255,125,0,100))
+    
+    holoClipEnabled(11,1,1)
+    holoClip(11,1,vec(),vec(0,0,1),holoEntity(4)) # spike
+    
+    holoClipEnabled(11,2,1)
+    holoClip(11,2,vec(),vec(0,0,-1),holoEntity(5)) # end1
+    
+    holoClipEnabled(11,3,1)
+    holoClip(11,3,vec(),vec(0,0,-1),holoEntity(6)) # end1
+
+    holoClipEnabled(11,4,1)
+    holoClip(11,4,vec(),vec(0,0,1),holoEntity(8)) # ctrl
+    
+ 
+    
+    local Q = quat(holoEntity(1))
+    
+    #l roll
+    Q *= qRotation(vec(1,0,0),90)
+    
+    #l pitch
+    Q *= qRotation(vec(0,0,1),0)
+    
+    #l yaw
+    Q *= qRotation(vec(0,-1,0),-45)
+    
+    holoAng(2,Q:toAngle())
+    holoAng(3,holoEntity(2):toWorld(ang(-45, 0, 0)))
+    holoAng(4,holoEntity(2):toWorld(ang(135, 0, 0)))
+    holoAng(5,holoEntity(3):toWorld(ang(135, 0, 0)))
+    holoAng(6,holoEntity(3):toWorld(ang(135 + 45, 0, 0)))
+}
+
+interval(60)
+
+T = curtime()
+
+Speed = 1
+Cos = cos(T*360*Speed)
+Sin = sin(T*360*Speed)
+
+TC = Cos*0.5 + 0.5
+TS = Sin*0.5 + 0.5
+
+
+local Q = quat(holoEntity(1))
+
+#l roll
+Q *= qRotation(vec(1,0,0), lerp(45, 135, TS))
+
+#l pitch
+Q *= qRotation(vec(0,0,1), 0)
+
+#l yaw
+Q *= qRotation(vec(0,-1,0),lerp(-100, -80, TS))
+
+
+holoAng(2,Q:toAngle())
+
+holoAng(3,holoEntity(2):toWorld(ang(-45, -lerp(-45,75,TC), 0)))
+
+local Dir = holoEntity(3):toLocalAxis(holoEntity(6):toWorld(vec(108,0,0)) - holoEntity(4):pos())
+holoAng(4,holoEntity(3):toWorld(ang(atan(Dir:x(),Dir:z()) - lerp(75, 35, TC), 0, 0)))
+
+holoAng(5,holoEntity(3):toWorld(ang(lerp(135, 45, TC), 0, 0)))
+holoAng(6,holoEntity(3):toWorld(ang(lerp(180, 67.5, TC), 0, 0)))
+
+holoAng(7,quat(holoEntity(4):toWorld(vec(84,0,0)) - holoEntity(7):pos(), holoEntity(2):up()):toAngle())
+holoAng(8,quat(holoEntity(6):toWorld(vec(108,0,0)) - holoEntity(8):pos(), holoEntity(4):up()):toAngle())
+
+
+P1 = holoEntity(2):pos()
+P2 = holoEntity(3):pos()
+P3 = holoEntity(4):toWorld(vec(84,0,0))
+
+Pos = (P1 + P2 + P3)/3
+Dir = (P2 - P1):cross(P3 - P1)
+Nrm = Dir / Dir:length()
+
+holoAng(10,quat(Nrm,holoEntity(2):up()):toAngle())
+
+

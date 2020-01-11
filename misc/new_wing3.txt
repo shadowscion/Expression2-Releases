@@ -19,27 +19,27 @@ if (first()) {
         holoParent(N,PR) 
     }
     
-    local WebMat = "models/props_wasteland/rockcliff02b"
+    local WebMat = "" #"models/props_wasteland/rockcliff02b"
     
     local Color1 = vec4(50,50,50,255)
     local Color2 = vec4(255,0,0,255)
-    local Color3 = vec4(255,255,255,255)
+    local Color3 = vec4(255,255,0,55)
     
     holoCreate(1,0,vec(0,0,20),ang(),vec(3,1,1),"models/sprops/misc/bone_from_x.mdl","",Color1)
     
     #-- wing arm
     holoCreate(2,1,vec(0,10,0),ang(),vec(84,16,16)/12,"models/sprops/misc/bone_from_x.mdl","",Color1)
-    holoCreate(3,2,vec(84,0,0),ang(),vec(84,15,15)/12,"models/sprops/misc/bone_from_x.mdl","",Color1)
+    holoCreate(3,2,vec(84,0,0),ang(),vec(84,16,16)/12,"models/sprops/misc/bone_from_x.mdl","",Color1)
     
     #-- wing fingers
-    holoCreate(4,3,vec(84,0,0),ang(),vec(84,14,14)/12,"models/sprops/misc/bone_from_x.mdl","",Color1)
-    holoCreate(5,4,vec(84,0,0),ang(),vec(132+12,13,13)/12,"models/sprops/misc/bone_from_x.mdl","",Color1)
+    holoCreate(4,3,vec(84,0,0),ang(),vec(84,15,15)/12,"models/sprops/misc/bone_from_x.mdl","",Color1)
+    holoCreate(5,4,vec(84,0,0),ang(),vec(132+12,15,15)/12,"models/sprops/misc/bone_from_x.mdl","",Color1)
     
-    holoCreate(6,3,vec(84,0,0),ang(),vec(84,12,12)/12,"models/sprops/misc/bone_from_x.mdl","",Color1)
-    holoCreate(7,6,vec(84,0,0),ang(),vec(132+12,11,11)/12,"models/sprops/misc/bone_from_x.mdl","",Color1)
+    holoCreate(6,3,vec(84,0,0),ang(),vec(84,14,14)/12,"models/sprops/misc/bone_from_x.mdl","",Color1)
+    holoCreate(7,6,vec(84,0,0),ang(),vec(132+24,14,14)/12,"models/sprops/misc/bone_from_x.mdl","",Color1)
     
-    holoCreate(8,3,vec(84,0,0),ang(),vec(84,10,10)/12,"models/sprops/misc/bone_from_x.mdl","",Color1)
-    holoCreate(9,8,vec(84,0,0),ang(),vec(132+12,9,9)/12,"models/sprops/misc/bone_from_x.mdl","",Color1)
+    holoCreate(8,3,vec(84,0,0),ang(),vec(84,13,13)/12,"models/sprops/misc/bone_from_x.mdl","",Color1)
+    holoCreate(9,8,vec(84,0,0),ang(),vec(132+36,13,13)/12,"models/sprops/misc/bone_from_x.mdl","",Color1)
     
     #-- wing clip controls
     holoCreate(10,2,vec(84,0,0),ang(),vec(24,4,4)/12,"models/sprops/misc/bone_from_x.mdl","",Color2)

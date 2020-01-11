@@ -1,8 +1,9 @@
 @name new_wing3
 @inputs 
 @outputs 
-@persist Ang:angle
+@persist Ang:angle Wing_rate Wing_time
 @trigger none
+@model models/props_phx/construct/metal_plate1.mdl
 
 if (first()) {
     function number mix(A,B,T) {
@@ -13,61 +14,89 @@ if (first()) {
         local PR = holoEntity(P) ?: entity()
         holoCreate(N,PR:toWorld(Pos),Scale,PR:toWorld(Ang))   
         holoModel(N,Model)
-        holoMaterial(N,Material)
+        #holoMaterial(N,Material)
         holoColor(N,Color)
         holoParent(N,PR) 
+        #holoDisableShading(N,1)
     }
     
-    holoCreate(1,0,vec(),ang(),vec(3,1,1),"models/sprops/misc/bone_from_x.mdl","",vec4(255,255,255,255))
+    local Color1 = vec4(50,50,50,255)
+    local Color2 = vec4(255,255,0,255)
+    local Color3 = vec4(175,175,175,255)
+    
+    holoCreate(1,0,vec(0,0,20),ang(),vec(3,1,1),"models/sprops/misc/bone_from_x.mdl","",Color1)
     
     #-- wing arm
-    holoCreate(2,1,vec(0,10,0),ang(),vec(84,12,12)/12,"models/sprops/misc/bone_from_x.mdl","",vec4(hsv2rgb(0,0.85,0.85),255))
-    holoCreate(3,2,vec(84,0,0),ang(),vec(84,12,12)/12,"models/sprops/misc/bone_from_x.mdl","",vec4(hsv2rgb(0,0.85,0.85),255))
+    holoCreate(2,1,vec(0,10,0),ang(),vec(84,16,16)/12,"models/sprops/misc/bone_from_x.mdl","",Color1)
+    holoCreate(3,2,vec(84,0,0),ang(),vec(84,15,15)/12,"models/sprops/misc/bone_from_x.mdl","",Color1)
     
     #-- wing fingers
-    holoCreate(4,3,vec(84,0,0),ang(),vec(84,12,12)/12,"models/sprops/misc/bone_from_x.mdl","",vec4(hsv2rgb(120,0.85,0.85),255))
-    holoCreate(5,4,vec(84,0,0),ang(),vec(132,12,12)/12,"models/sprops/misc/bone_from_x.mdl","",vec4(hsv2rgb(120,0.85,0.85),255))
+    holoCreate(4,3,vec(84,0,0),ang(),vec(84,14,14)/12,"models/sprops/misc/bone_from_x.mdl","",Color1)
+    holoCreate(5,4,vec(84,0,0),ang(),vec(132+12,13,13)/12,"models/sprops/misc/bone_from_x.mdl","",Color1)
     
-    holoCreate(6,3,vec(84,0,0),ang(),vec(84,12,12)/12,"models/sprops/misc/bone_from_x.mdl","",vec4(hsv2rgb(180,0.85,0.85),255))
-    holoCreate(7,6,vec(84,0,0),ang(),vec(132,12,12)/12,"models/sprops/misc/bone_from_x.mdl","",vec4(hsv2rgb(180,0.85,0.85),255))
+    holoCreate(6,3,vec(84,0,0),ang(),vec(84,12,12)/12,"models/sprops/misc/bone_from_x.mdl","",Color1)
+    holoCreate(7,6,vec(84,0,0),ang(),vec(132+12,11,11)/12,"models/sprops/misc/bone_from_x.mdl","",Color1)
     
-    holoCreate(8,3,vec(84,0,0),ang(),vec(84,12,12)/12,"models/sprops/misc/bone_from_x.mdl","",vec4(hsv2rgb(240,0.85,0.85),255))
-    holoCreate(9,8,vec(84,0,0),ang(),vec(132,12,12)/12,"models/sprops/misc/bone_from_x.mdl","",vec4(hsv2rgb(240,0.85,0.85),255))
+    holoCreate(8,3,vec(84,0,0),ang(),vec(84,10,10)/12,"models/sprops/misc/bone_from_x.mdl","",Color1)
+    holoCreate(9,8,vec(84,0,0),ang(),vec(132+12,9,9)/12,"models/sprops/misc/bone_from_x.mdl","",Color1)
     
     #-- wing clip controls
-    holoCreate(10,3,vec(0,0,0),ang(),vec(24,4,4)/12,"models/sprops/misc/bone_from_x.mdl","",vec4(hsv2rgb(60,0.85,0.85),255))
-    holoCreate(11,4,vec(84,0,0),ang(),vec(24,4,4)/12,"models/sprops/misc/bone_from_x.mdl","",vec4(hsv2rgb(60,0.85,0.85),255))
-    holoCreate(12,6,vec(84,0,0),ang(),vec(24,4,4)/12,"models/sprops/misc/bone_from_x.mdl","",vec4(hsv2rgb(60,0.85,0.85),255))
+    holoCreate(10,2,vec(84,0,0),ang(),vec(24,4,4)/12,"models/sprops/misc/bone_from_x.mdl","",Color2)
+    holoCreate(11,4,vec(84,0,0),ang(),vec(24,4,4)/12,"models/sprops/misc/bone_from_x.mdl","",Color2)
+    holoCreate(12,6,vec(84,0,0),ang(),vec(24,4,4)/12,"models/sprops/misc/bone_from_x.mdl","",Color2)
+    holoCreate(13,5,vec(132,0,0),ang(),vec(24,4,4)/12,"models/sprops/misc/bone_from_x.mdl","",Color2)
+    holoCreate(14,7,vec(132,0,0),ang(),vec(24,4,4)/12,"models/sprops/misc/bone_from_x.mdl","",Color2)
+   
     
     #-- wing webbing
-    holoCreate(20,3,vec(0,0,-25*12),ang(),vec(50,0.125/12,50),"cube","",vec4(hsv2rgb(30,0.85,0.85),255/2))
+    holoCreate(20,3,vec(0,0,-25*12),ang(),vec(50,0.0125/12,50),"cube","",Color3)
     holoClipEnabled(20,1,1)
     holoClip(20,1,vec(),vec(0,0,1),holoEntity(10))
     holoClipEnabled(20,2,1)
     holoClip(20,2,vec(),vec(0,0,-1),holoEntity(4))
     
-    holoCreate(21,4,vec(0,0,25*12),ang(),vec(50,0.125/12,50),"cube","",vec4(hsv2rgb(30,0.85,0.85),255/2))
+    holoCreate(21,4,vec(0,0,25*12),ang(),vec(50,0.0125/12,50),"cube","",Color3)
     holoClipEnabled(21,1,1)
-    holoClip(21,1,vec(),vec(0,0,-1),holoEntity(11))
+    holoClip(21,1,vec(),vec(0,0,1),holoEntity(11))
     holoClipEnabled(21,2,1)
     holoClip(21,2,vec(),vec(0,0,-1),holoEntity(6))
     
-    holoCreate(22,6,vec(0,0,25*12),ang(),vec(50,0.125/12,50),"cube","",vec4(hsv2rgb(30,0.85,0.85),255/2))
+    holoCreate(22,6,vec(0,0,25*12),ang(),vec(50,0.0125/12,50),"cube","",Color3)
     holoClipEnabled(22,1,1)
-    holoClip(22,1,vec(),vec(0,0,-1),holoEntity(12))
+    holoClip(22,1,vec(),vec(0,0,1),holoEntity(12))
     holoClipEnabled(22,2,1)
-    holoClip(22,2,vec(),vec(0,0,-1),holoEntity(8))        
+    holoClip(22,2,vec(),vec(0,0,-1),holoEntity(8))  
+    
+    holoCreate(23,5,vec(0,0,25*12),ang(),vec(50,0.0125/12,50),"cube","",Color3)
+    holoClipEnabled(23,1,1)
+    holoClip(23,1,vec(),vec(0,0,-1),holoEntity(11))  
+    holoClipEnabled(23,2,1)
+    holoClip(23,2,vec(),vec(0,0,1),holoEntity(13))  
+    holoClipEnabled(23,3,1)
+    holoClip(23,3,vec(),vec(0,0,-1),holoEntity(7))
+    
+    holoCreate(24,7,vec(0,0,25*12),ang(),vec(50,0.0125/12,50),"cube","",Color3)
+    holoClipEnabled(24,1,1)
+    holoClip(24,1,vec(),vec(0,0,-1),holoEntity(12))  
+    holoClipEnabled(24,2,1)
+    holoClip(24,2,vec(),vec(0,0,1),holoEntity(14))  
+    holoClipEnabled(24,3,1)
+    holoClip(24,3,vec(),vec(0,0,-1),holoEntity(9))
 }
 
 interval(60)
 
-local Wing_time = curtime()/1
-local Wing_perc = 1
+Up_dot = 1 #entity():forward():dot(vec(0,0,1))
+
+local Time_delta = 60/1000
+local Wing_perc = abs(clamp(Up_dot*2, -0.25, 1))
+Wing_rate = 0.5*Wing_rate + 0.5*(0.5 + sin(Wing_time*360 + 180)*0.25)*Wing_perc
+Wing_time += Wing_rate*Time_delta
 
 local CosT = cos(Wing_time*360)*Wing_perc
-local CosL = CosT*0.5 + 0.5
 local SinT = sin(Wing_time*360)*Wing_perc
 local SinL = SinT*0.5 + 0.5
+local CosL = CosT*0.5 + 0.5
 
 #-- wing arm
 holoAng(2,(quat(holoEntity(1))*qRotation(vec(1,0,0),mix(30,165,CosL))*qRotation(vec(0,-1,0),mix(-90,-45,CosL))):toAngle())
@@ -76,17 +105,23 @@ holoAng(3,holoEntity(2):toWorld(ang(mix(-90,-15,SinL),0,mix(-45,45,SinL))))
 #-- wing fingers
 local Spread = mix(90, 165, 1-SinL)
 holoAng(4,holoEntity(3):toWorld(Ang:setPitch(Spread)))
-holoAng(5,holoEntity(4):toWorld(Ang:setPitch(15)))
 
 Spread += mix(-45, -15, CosL)
 holoAng(6,holoEntity(3):toWorld(Ang:setPitch(Spread)))
-holoAng(7,holoEntity(6):toWorld(Ang:setPitch(15)))
 
 Spread += mix(-45, -15, CosL)
 holoAng(8,holoEntity(3):toWorld(Ang:setPitch(Spread)))
+
+#-- wing tips
+local Pitch = mix(-45, 15, SinL)
+holoAng(5,holoEntity(4):toWorld(Ang:setPitch(15)))
+holoAng(7,holoEntity(6):toWorld(Ang:setPitch(15)))
 holoAng(9,holoEntity(8):toWorld(Ang:setPitch(15)))
 
 #-- wing clip controls
 holoAng(10,quat(holoEntity(5):pos() - holoEntity(10):pos(), holoEntity(3):up()):toAngle())
-holoAng(11,quat(holoEntity(7):pos() - holoEntity(11):pos(), holoEntity(4):up()):toAngle())
-holoAng(12,quat(holoEntity(9):pos() - holoEntity(12):pos(), holoEntity(6):up()):toAngle())
+holoAng(11,quat(holoEntity(7):pos() - holoEntity(11):pos(), holoEntity(3):up()):toAngle())
+holoAng(12,quat(holoEntity(9):pos() - holoEntity(12):pos(), holoEntity(3):up()):toAngle())
+
+holoAng(13,quat(holoEntity(7):toWorld(vec(132,0,0)) - holoEntity(13):pos(), holoEntity(3):up()):toAngle())
+holoAng(14,quat(holoEntity(9):toWorld(vec(132,0,0)) - holoEntity(14):pos(), holoEntity(3):up()):toAngle())

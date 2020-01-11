@@ -14,15 +14,16 @@ if (first()) {
         local PR = holoEntity(P) ?: entity()
         holoCreate(N,PR:toWorld(Pos),Scale,PR:toWorld(Ang))   
         holoModel(N,Model)
-        #holoMaterial(N,Material)
+        holoMaterial(N,Material)
         holoColor(N,Color)
         holoParent(N,PR) 
-        #holoDisableShading(N,1)
     }
     
+    local WebMat = "models/props_wasteland/rockcliff02b"
+    
     local Color1 = vec4(50,50,50,255)
-    local Color2 = vec4(255,255,0,255)
-    local Color3 = vec4(175,175,175,255)
+    local Color2 = vec4(255,0,0,255)
+    local Color3 = vec4(255,255,255,255)
     
     holoCreate(1,0,vec(0,0,20),ang(),vec(3,1,1),"models/sprops/misc/bone_from_x.mdl","",Color1)
     
@@ -47,27 +48,31 @@ if (first()) {
     holoCreate(13,5,vec(132,0,0),ang(),vec(24,4,4)/12,"models/sprops/misc/bone_from_x.mdl","",Color2)
     holoCreate(14,7,vec(132,0,0),ang(),vec(24,4,4)/12,"models/sprops/misc/bone_from_x.mdl","",Color2)
    
+    holoCreate(15,1,vec(-0,10,0),ang(),vec(24,4,4)/12,"models/sprops/misc/bone_from_x.mdl","",Color2)
+    
     
     #-- wing webbing
-    holoCreate(20,3,vec(0,0,-25*12),ang(),vec(50,0.0125/12,50),"cube","",Color3)
+    holoCreate(20,5,vec(0,0,-25*12),ang(),vec(50,0.0125/12,50),"cube",WebMat,Color3)
     holoClipEnabled(20,1,1)
     holoClip(20,1,vec(),vec(0,0,1),holoEntity(10))
     holoClipEnabled(20,2,1)
     holoClip(20,2,vec(),vec(0,0,-1),holoEntity(4))
-    
-    holoCreate(21,4,vec(0,0,25*12),ang(),vec(50,0.0125/12,50),"cube","",Color3)
+    holoClipEnabled(20,3,1)
+    holoClip(20,3,vec(),vec(0,0,-1),holoEntity(3))   
+        
+    holoCreate(21,4,vec(0,0,25*12),ang(),vec(50,0.0125/12,50),"cube",WebMat,Color3)
     holoClipEnabled(21,1,1)
     holoClip(21,1,vec(),vec(0,0,1),holoEntity(11))
     holoClipEnabled(21,2,1)
     holoClip(21,2,vec(),vec(0,0,-1),holoEntity(6))
     
-    holoCreate(22,6,vec(0,0,25*12),ang(),vec(50,0.0125/12,50),"cube","",Color3)
+    holoCreate(22,6,vec(0,0,25*12),ang(),vec(50,0.0125/12,50),"cube",WebMat,Color3)
     holoClipEnabled(22,1,1)
     holoClip(22,1,vec(),vec(0,0,1),holoEntity(12))
     holoClipEnabled(22,2,1)
     holoClip(22,2,vec(),vec(0,0,-1),holoEntity(8))  
     
-    holoCreate(23,5,vec(0,0,25*12),ang(),vec(50,0.0125/12,50),"cube","",Color3)
+    holoCreate(23,5,vec(0,0,25*12),ang(),vec(50,0.0125/12,50),"cube",WebMat,Color3)
     holoClipEnabled(23,1,1)
     holoClip(23,1,vec(),vec(0,0,-1),holoEntity(11))  
     holoClipEnabled(23,2,1)
@@ -75,13 +80,22 @@ if (first()) {
     holoClipEnabled(23,3,1)
     holoClip(23,3,vec(),vec(0,0,-1),holoEntity(7))
     
-    holoCreate(24,7,vec(0,0,25*12),ang(),vec(50,0.0125/12,50),"cube","",Color3)
+    holoCreate(24,7,vec(0,0,25*12),ang(),vec(50,0.0125/12,50),"cube",WebMat,Color3)
     holoClipEnabled(24,1,1)
     holoClip(24,1,vec(),vec(0,0,-1),holoEntity(12))  
     holoClipEnabled(24,2,1)
     holoClip(24,2,vec(),vec(0,0,1),holoEntity(14))  
     holoClipEnabled(24,3,1)
     holoClip(24,3,vec(),vec(0,0,-1),holoEntity(9))
+    
+    
+    holoCreate(25,1,vec(0,10,0),ang(),vec(0.0125/12,50,50),"cube",WebMat,Color3)
+    holoClipEnabled(25,1,1)
+    holoClip(25,1,vec(),vec(0,0,-1),holoEntity(10))
+    holoClipEnabled(25,2,1)
+    holoClip(25,2,vec(),vec(0,0,1),holoEntity(15))
+    holoClipEnabled(25,3,1)
+    holoClip(25,3,vec(),vec(0,0,-1),holoEntity(2))     
 }
 
 interval(60)
@@ -91,7 +105,7 @@ Up_dot = 1 #entity():forward():dot(vec(0,0,1))
 local Time_delta = 60/1000
 local Wing_perc = abs(clamp(Up_dot*2, -0.25, 1))
 Wing_rate = 0.5*Wing_rate + 0.5*(0.5 + sin(Wing_time*360 + 180)*0.25)*Wing_perc
-Wing_time += Wing_rate*Time_delta
+Wing_time += Wing_rate*Time_delta*2
 
 local CosT = cos(Wing_time*360)*Wing_perc
 local SinT = sin(Wing_time*360)*Wing_perc
@@ -113,15 +127,20 @@ Spread += mix(-45, -15, CosL)
 holoAng(8,holoEntity(3):toWorld(Ang:setPitch(Spread)))
 
 #-- wing tips
-local Pitch = mix(-45, 15, SinL)
 holoAng(5,holoEntity(4):toWorld(Ang:setPitch(15)))
 holoAng(7,holoEntity(6):toWorld(Ang:setPitch(15)))
 holoAng(9,holoEntity(8):toWorld(Ang:setPitch(15)))
 
 #-- wing clip controls
-holoAng(10,quat(holoEntity(5):pos() - holoEntity(10):pos(), holoEntity(3):up()):toAngle())
+holoAng(10,quat(holoEntity(5):toWorld(vec(132,0,0)) - holoEntity(10):pos(), holoEntity(3):forward()):toAngle())
 holoAng(11,quat(holoEntity(7):pos() - holoEntity(11):pos(), holoEntity(3):up()):toAngle())
 holoAng(12,quat(holoEntity(9):pos() - holoEntity(12):pos(), holoEntity(3):up()):toAngle())
-
 holoAng(13,quat(holoEntity(7):toWorld(vec(132,0,0)) - holoEntity(13):pos(), holoEntity(3):up()):toAngle())
 holoAng(14,quat(holoEntity(9):toWorld(vec(132,0,0)) - holoEntity(14):pos(), holoEntity(3):up()):toAngle())
+
+local P1 = holoEntity(15):pos()
+local P2 = holoEntity(3):pos()
+local P3 = holoEntity(5):toWorld(vec(132,0,0))
+
+holoAng(15,quat(P3 - P1, holoEntity(2):up()):toAngle())
+holoAng(25, quat((P2 - P1):cross(P3 - P1),holoEntity(2):up()):toAngle())

@@ -1,0 +1,92 @@
+@name new_wing3
+@inputs 
+@outputs 
+@persist Ang:angle
+@trigger none
+
+if (first()) {
+    function number mix(A,B,T) {
+        return (1 - T)*A + T*B    
+    }
+    
+    function void holoCreate(N,P,Pos:vector,Ang:angle,Scale:vector,Model:string,Material:string,Color:vector4) {
+        local PR = holoEntity(P) ?: entity()
+        holoCreate(N,PR:toWorld(Pos),Scale,PR:toWorld(Ang))   
+        holoModel(N,Model)
+        holoMaterial(N,Material)
+        holoColor(N,Color)
+        holoParent(N,PR) 
+    }
+    
+    holoCreate(1,0,vec(),ang(),vec(3,1,1),"models/sprops/misc/bone_from_x.mdl","",vec4(255,255,255,255))
+    
+    #-- wing arm
+    holoCreate(2,1,vec(0,10,0),ang(),vec(84,12,12)/12,"models/sprops/misc/bone_from_x.mdl","",vec4(hsv2rgb(0,0.85,0.85),255))
+    holoCreate(3,2,vec(84,0,0),ang(),vec(84,12,12)/12,"models/sprops/misc/bone_from_x.mdl","",vec4(hsv2rgb(0,0.85,0.85),255))
+    
+    #-- wing fingers
+    holoCreate(4,3,vec(84,0,0),ang(),vec(84,12,12)/12,"models/sprops/misc/bone_from_x.mdl","",vec4(hsv2rgb(120,0.85,0.85),255))
+    holoCreate(5,4,vec(84,0,0),ang(),vec(132,12,12)/12,"models/sprops/misc/bone_from_x.mdl","",vec4(hsv2rgb(120,0.85,0.85),255))
+    
+    holoCreate(6,3,vec(84,0,0),ang(),vec(84,12,12)/12,"models/sprops/misc/bone_from_x.mdl","",vec4(hsv2rgb(180,0.85,0.85),255))
+    holoCreate(7,6,vec(84,0,0),ang(),vec(132,12,12)/12,"models/sprops/misc/bone_from_x.mdl","",vec4(hsv2rgb(180,0.85,0.85),255))
+    
+    holoCreate(8,3,vec(84,0,0),ang(),vec(84,12,12)/12,"models/sprops/misc/bone_from_x.mdl","",vec4(hsv2rgb(240,0.85,0.85),255))
+    holoCreate(9,8,vec(84,0,0),ang(),vec(132,12,12)/12,"models/sprops/misc/bone_from_x.mdl","",vec4(hsv2rgb(240,0.85,0.85),255))
+    
+    #-- wing clip controls
+    holoCreate(10,3,vec(0,0,0),ang(),vec(24,4,4)/12,"models/sprops/misc/bone_from_x.mdl","",vec4(hsv2rgb(60,0.85,0.85),255))
+    holoCreate(11,4,vec(84,0,0),ang(),vec(24,4,4)/12,"models/sprops/misc/bone_from_x.mdl","",vec4(hsv2rgb(60,0.85,0.85),255))
+    holoCreate(12,6,vec(84,0,0),ang(),vec(24,4,4)/12,"models/sprops/misc/bone_from_x.mdl","",vec4(hsv2rgb(60,0.85,0.85),255))
+    
+    #-- wing webbing
+    holoCreate(20,3,vec(0,0,-25*12),ang(),vec(50,0.125/12,50),"cube","",vec4(hsv2rgb(30,0.85,0.85),255/2))
+    holoClipEnabled(20,1,1)
+    holoClip(20,1,vec(),vec(0,0,1),holoEntity(10))
+    holoClipEnabled(20,2,1)
+    holoClip(20,2,vec(),vec(0,0,-1),holoEntity(4))
+    
+    holoCreate(21,4,vec(0,0,25*12),ang(),vec(50,0.125/12,50),"cube","",vec4(hsv2rgb(30,0.85,0.85),255/2))
+    holoClipEnabled(21,1,1)
+    holoClip(21,1,vec(),vec(0,0,-1),holoEntity(11))
+    holoClipEnabled(21,2,1)
+    holoClip(21,2,vec(),vec(0,0,-1),holoEntity(6))
+    
+    holoCreate(22,6,vec(0,0,25*12),ang(),vec(50,0.125/12,50),"cube","",vec4(hsv2rgb(30,0.85,0.85),255/2))
+    holoClipEnabled(22,1,1)
+    holoClip(22,1,vec(),vec(0,0,-1),holoEntity(12))
+    holoClipEnabled(22,2,1)
+    holoClip(22,2,vec(),vec(0,0,-1),holoEntity(8))        
+}
+
+interval(60)
+
+local Wing_time = curtime()/1
+local Wing_perc = 1
+
+local CosT = cos(Wing_time*360)*Wing_perc
+local CosL = CosT*0.5 + 0.5
+local SinT = sin(Wing_time*360)*Wing_perc
+local SinL = SinT*0.5 + 0.5
+
+#-- wing arm
+holoAng(2,(quat(holoEntity(1))*qRotation(vec(1,0,0),mix(30,165,CosL))*qRotation(vec(0,-1,0),mix(-90,-45,CosL))):toAngle())
+holoAng(3,holoEntity(2):toWorld(ang(mix(-90,-15,SinL),0,mix(-45,45,SinL))))
+
+#-- wing fingers
+local Spread = mix(90, 165, 1-SinL)
+holoAng(4,holoEntity(3):toWorld(Ang:setPitch(Spread)))
+holoAng(5,holoEntity(4):toWorld(Ang:setPitch(15)))
+
+Spread += mix(-45, -15, CosL)
+holoAng(6,holoEntity(3):toWorld(Ang:setPitch(Spread)))
+holoAng(7,holoEntity(6):toWorld(Ang:setPitch(15)))
+
+Spread += mix(-45, -15, CosL)
+holoAng(8,holoEntity(3):toWorld(Ang:setPitch(Spread)))
+holoAng(9,holoEntity(8):toWorld(Ang:setPitch(15)))
+
+#-- wing clip controls
+holoAng(10,quat(holoEntity(5):pos() - holoEntity(10):pos(), holoEntity(3):up()):toAngle())
+holoAng(11,quat(holoEntity(7):pos() - holoEntity(11):pos(), holoEntity(4):up()):toAngle())
+holoAng(12,quat(holoEntity(9):pos() - holoEntity(12):pos(), holoEntity(6):up()):toAngle())

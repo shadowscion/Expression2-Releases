@@ -1,0 +1,233 @@
+@name new_wing_4
+@inputs GPS:vector 
+@outputs Test
+@persist ANG:angle HN CN ST DATA_mdl:table [Time_delta Time_current]
+@persist [Wing_rate Wing_time]
+@persist [H0 H1 H2]:entity [H13 H14 H15 H18 H19 H20]:entity
+@persist [H29 H30 H31 H32 H33 H34 H35 H36 H37 H38 H39 H40 H41 H42]:entity
+@persist [H43 H44 H45 H46 H47 H48 H49 H50 H51 H52 H53 H54 H55 H56]:entity
+@trigger none
+@model models/props_phx/construct/metal_plate1.mdl
+
+if (first()) {
+    
+    Gap = 0.125
+    DATA_mdl = table(
+    #-- ROOT
+        table(0,9999,vec(-25,0,65),ANG,vec(),"models/sprops/misc/bone_from_x.mdl","grp:bones","com:root"),
+        
+    #-- PELVIS
+        table(1,0,vec(0,0,0),ANG,vec(2.5,3,3),"models/sprops/misc/bone_from_x.mdl","grp:bones","com:pelvis"),
+    
+    #-- TORSO
+        table(2,1,vec(35,0,-7.5),ANG,vec(1.917,2,2),"models/sprops/misc/bone_from_x.mdl","grp:bones","com:torso"),
+    
+    #-- WING_LEFT_STRUCTURE
+        table(29,2,vec(10,15,20),ANG,vec(7,1.333,1.333),"models/sprops/misc/bone_from_x.mdl","grp:bones","com:wing_left_structure"),
+        table(30,29,vec(84,0,0),ANG,vec(7,1.333,1.333),"models/sprops/misc/bone_from_x.mdl","grp:bones"),
+        
+        table(31,30,vec(84,0,0),ANG,vec(50,0.01,50),"models/hunter/blocks/cube05x05x05.mdl","grp:wing_webbing",array(vec(0,0,Gap),vec(0,0,-1),30,vec(0,0,Gap),vec(0,0,-1),31,vec(0,0,Gap),vec(0,0,-1),32,vec(0,0,0),vec(0,0,1),37)),
+        
+        
+        table(32,31,vec(84,0,0),ANG,vec(1),"models/sprops/misc/origin.mdl","grp:wing_clip_ctrl"),
+        
+        table(33,30,vec(84,0,0),ANG,vec(50,0.01,50),"models/hunter/blocks/cube05x05x05.mdl","grp:wing_webbing",array(vec(0,0,Gap),vec(0,0,-1),33,vec(0,0,-Gap),vec(0,0,1),31,vec(0,0,-Gap),vec(0,0,1),38)),
+        table(34,33,vec(84,0,0),ANG,vec(50,0.01,50),"models/hunter/blocks/cube05x05x05.mdl","grp:wing_webbing",array(vec(0,0,Gap),vec(0,0,-1),34,vec(0,0,-Gap),vec(0,0,1),32,vec(0,0,0),vec(0,0,1),40,vec(0,0,Gap),vec(0,0,-1),38)),
+        
+        table(35,30,vec(84,0,0),ANG,vec(50,0.01,50),"models/hunter/blocks/cube05x05x05.mdl","grp:wing_webbing",array(vec(0,0,0),vec(0,0,-1),35,vec(0,0,-Gap),vec(0,0,1),33,vec(0,0,-Gap),vec(0,0,1),39)),
+        table(36,35,vec(84,0,0),ANG,vec(50,0.01,50),"models/hunter/blocks/cube05x05x05.mdl","grp:wing_webbing",array(vec(0,0,0),vec(0,0,-1),36,vec(0,0,-Gap),vec(0,0,1),34,vec(0,0,0),vec(0,0,1),41,vec(0,0,Gap),vec(0,0,-1),39)),
+        table(100,2,vec(10,15,20),ANG,vec(0.001,50,50),"models/hunter/blocks/cube05x05x05.mdl","grp:wing_webbing",array(vec(0,-Gap,0),vec(0,1,0),100,vec(),vec(0,0,-1),29,vec(0,0,Gap),vec(0,0,-1),37)),
+        table(101,100,vec(0,0,0),ANG,vec(0.001,50,50),"models/hunter/blocks/cube05x05x05.mdl","grp:wing_webbing",array(
+            vec(),vec(0,1,0),101,
+            vec(),vec(0,0,1),102,
+            vec(),vec(0,0,1),103
+        )),
+            
+    #-- WING_LEFT_CLIP_CTRL
+        table(37,29,vec(84,0,0),ANG,vec(1),"models/sprops/misc/origin.mdl","grp:wing_clip_ctrl","com:wing_left_clip_ctrl"),
+        table(38,31,vec(84,0,0),ANG,vec(1),"models/sprops/misc/origin.mdl","grp:wing_clip_ctrl"),
+        table(39,33,vec(84,0,0),ANG,vec(1),"models/sprops/misc/origin.mdl","grp:wing_clip_ctrl"),
+        table(40,32,vec(132,0,0),ANG,vec(1),"models/sprops/misc/origin.mdl","grp:wing_clip_ctrl"),
+        table(41,34,vec(132,0,0),ANG,vec(1),"models/sprops/misc/origin.mdl","grp:wing_clip_ctrl"),
+        table(102,1,vec(0,10,15),ANG,vec(1),"models/sprops/misc/origin.mdl","grp:wing_clip_ctrl"),
+        table(103,1,vec(0,10,15),ANG,vec(1),"models/sprops/misc/origin.mdl","grp:wing_clip_ctrl")
+    )
+
+    timer("spawn",150)
+}
+elseif (clk("spawn")) {
+    timer("spawn",15)
+    if (ST == 0) {
+        while (perf(50) & holoCanCreate() & HN < DATA_mdl:count()) {
+            HN++
+            local INFO_mdl = DATA_mdl[HN,table]
+            local Index = INFO_mdl[1,number]
+            local Parent = holoEntity(INFO_mdl[2,number]) ?: entity()
+            holoCreate(Index,Parent:toWorld(INFO_mdl[3,vector]),INFO_mdl[5,vector],Parent:toWorld(INFO_mdl[4,angle]))
+            holoModel(Index,INFO_mdl[6,string])
+            holoParent(Index,Parent)
+            
+            if (INFO_mdl[7,string] == "grp:wing_webbing") {
+                holoMaterial(Index,"models/props_wasteland/rockcliff02b")
+                holoColor(Index,vec4(161,157,137,255))
+                holoDisableShading(Index,1)
+            }
+        }
+        if (HN == DATA_mdl:count()) {
+            HN = 0
+            ST++
+        }
+    }
+    else {
+        while (perf(50) & HN < DATA_mdl:count()) {
+            HN++
+            local INFO_mdl = DATA_mdl[HN,table]
+            local Index = INFO_mdl[1,number]
+            if (INFO_mdl:count() > 6) {
+                for (N = 7,INFO_mdl:count()) {
+                    local Clips = INFO_mdl[N,array] 
+                    if (Clips) {
+                        for (I = 1,Clips:count(),3) {
+                            holoClipEnabled(Index,ceil(I / 3),1)
+                            holoClip(Index,ceil(I / 3),Clips[I,vector],Clips[I + 1,vector],holoEntity(Clips[I + 2,number]))
+                            CN++
+                        }
+                    }
+                }
+            }
+        }
+        if (HN >= DATA_mdl:count()) {
+            timer("postspawn",150)
+            stoptimer("spawn")
+            printColor(
+                vec(255,255,255),"filename: ",vec(155,255,0),entity():getName(),
+                vec(255,255,255),"\nholocount: ",vec(155,255,0),HN,
+                vec(255,255,255),"\nclipcount: ",vec(155,255,0),CN)
+        }
+    }
+}
+elseif (clk("postspawn")) {
+    timer("main",150)
+
+    H0 = holoEntity(0)
+    H1 = holoEntity(1)
+    H2 = holoEntity(2)
+    
+    H13 = holoEntity(13)
+    H14 = holoEntity(14)
+    H15 = holoEntity(15)
+    H18 = holoEntity(18)
+    H19 = holoEntity(19)
+    H20 = holoEntity(20)
+
+    H29 = holoEntity(29)
+    H30 = holoEntity(30)
+    H31 = holoEntity(31)
+    H32 = holoEntity(32)
+    H33 = holoEntity(33)
+    H34 = holoEntity(34)
+    H35 = holoEntity(35)
+    H36 = holoEntity(36)
+    H37 = holoEntity(37)
+    H38 = holoEntity(38)
+    H39 = holoEntity(39)
+    H40 = holoEntity(40)
+    H41 = holoEntity(41)
+    H42 = holoEntity(42)
+
+    H43 = holoEntity(43)
+    H44 = holoEntity(44)
+    H45 = holoEntity(45)
+    H46 = holoEntity(46)
+    H47 = holoEntity(47)
+    H48 = holoEntity(48)
+    H49 = holoEntity(49)
+    H50 = holoEntity(50)
+    H51 = holoEntity(51)
+    H52 = holoEntity(52)
+    H53 = holoEntity(53)
+    H54 = holoEntity(54)
+    H55 = holoEntity(55)
+    H56 = holoEntity(56)
+}
+elseif (clk("main")) {
+    timer("main",60)   
+    
+    Time_delta = curtime() - Time_current
+    Time_current = curtime()
+    
+    if (Time_delta > 1) { 
+        exit() 
+    }
+
+    local Wing_perc = 1
+    Wing_rate = 0.5*Wing_rate + 0.5*(0.5 + sin(Wing_time*360 + 180)*0.25)*Wing_perc
+    Wing_time += Wing_rate*Time_delta*2
+    Wing_time = Wing_time % 1
+    
+    local CosT = cos(Wing_time*360)*Wing_perc
+    local SinT = sin(Wing_time*360)*Wing_perc
+    local SinL = SinT*0.5 + 0.5
+    local CosL = CosT*0.5 + 0.5
+
+    FDir = vec(1,0,0)
+    RDir = vec(0,-1,0)
+    UDir = vec(0,0,1)
+    
+    Mode = 1
+    if (Mode) {
+        holoAng(29,(quat(H2)*qRotation(FDir,((1 - CosL)*47 + 160*CosL))*qRotation(RDir,(-(1 - CosL)*90 - 45*CosL))):toAngle())
+        holoAng(30,H29:toWorld(ang((-(1 - SinL)*90 - 15*SinL),0,(-(1 - SinL)*45 + 45*SinL))))
+    
+        local Spread = ((1 - (1-SinL))*90 + 165*(1-SinL))
+        holoAng(31,H30:toWorld(ANG:setPitch(Spread)))
+        holoAng(32,H31:toWorld(ANG:setPitch(15)))
+    
+        Spread += (-(1 - CosL)*45 - 15*CosL)
+        holoAng(33,H30:toWorld(ANG:setPitch(Spread)))
+        holoAng(34,H33:toWorld(ANG:setPitch(15)))
+    
+        Spread += (-(1 - CosL)*45 - 15*CosL)
+        holoAng(35,H30:toWorld(ANG:setPitch(Spread)))
+        holoAng(36,H35:toWorld(ANG:setPitch(15)))        
+    } 
+    else {
+        local L1 = 84
+        local L2 = 84
+        
+        local TargetPos = GPS #H0:toWorld(vec(45, 65, -68)) #GPSW
+        local TargetDir = H0:toLocalAxis(TargetPos - holoEntity(29):pos())
+        local TargetDis = min(TargetDir:length(), L1+L2)
+        
+        holoAng(29,H0:toWorld( (quat(TargetDir:toAngle():setRoll(atan(TargetDir:y(),TargetDir:x()))) *qRotation(vec(1,0,0),15 - (TargetDir:z() / (L1 + L2)) * 15)* qRotation(vec(0,-1,0),-acos((TargetDis^2 + L1^2 - L2^2) / (2*TargetDis*L1)))):toAngle()))
+        holoAng(30,holoEntity(29):toWorld(ang(acos((L2^2 + L1^2 - TargetDis^2) / (2*L2*L1)) + 180,0,0)))
+    
+        holoAng(31,holoEntity(30):toWorld(ang(170,0,0)))
+        holoAng(32,holoEntity(31):toWorld(ang(15,0,0)))
+        holoAng(33,holoEntity(30):toWorld(ang(160,0,0)))
+        holoAng(34,holoEntity(33):toWorld(ang(10,0,0)))
+        holoAng(35,holoEntity(30):toWorld(ang(145,0,0)))
+        holoAng(36,holoEntity(35):toWorld(ang(5,0,0)))    
+    }
+    
+    local H30_up = H30:up()
+    holoAng(37,quat(H32:toWorld(vec(132,0,0)) - H37:pos(),H30:forward()):toAngle())
+    holoAng(38,quat(H34:pos() - H38:pos(),H30_up):toAngle())
+    holoAng(39,quat(H36:pos() - H39:pos(),H30_up):toAngle())
+    holoAng(40,quat(H34:toWorld(vec(132,0,0)) - H40:pos(),H30_up):toAngle())
+    holoAng(41,quat(H36:toWorld(vec(132,0,0)) - H41:pos(),H30_up):toAngle())      
+
+    local P1 = holoEntity(100):pos()
+    local P2 = holoEntity(30):pos()
+    local P3 = holoEntity(40):pos()
+    holoAng(100,quat((P2 - P1):cross(P3 - P1),quat(P3 - P1,holoEntity(1):forward()):forward()):toAngle())
+
+
+    local P1 = holoEntity(101):pos()
+    local P2 = holoEntity(1):toWorld(vec(0,10,15))
+    local P3 = holoEntity(100):toWorld(vec(0,0,132))
+    holoAng(101,quat((P2 - P1):cross(P3 - P1),quat(P3 - P1,holoEntity(1):forward()):forward()):toAngle())
+    holoAng(102,quat(holoEntity(101):toWorld(vec(0,0,132/2)) - holoEntity(102):pos(),holoEntity(1):forward()):toAngle())
+    holoAng(103,quat(holoEntity(29):pos() - holoEntity(103):pos(),holoEntity(102):forward()):toAngle())
+
+}

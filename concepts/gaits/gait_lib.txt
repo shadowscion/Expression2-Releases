@@ -24,7 +24,7 @@ if (first()) {
             ),
             "ripple" = table(
                 "speed"   = 100,
-                "update"  = 1,
+                "update"  = 2,
                 "stance"  = 1/2,
                 "timings" = array(0,1/2,1/6,2/3,1/3,5/6,1/2,0)
             )
@@ -120,7 +120,7 @@ if (first()) {
                 local Diff = Foot["nextStep",vector] - Foot["lastStep",vector]
                 if (Diff) {
                     Perc = (Perc - G_current_stance)/(1 - G_current_stance)
-                    Foot["realStep",vector] = mix(bezier(Foot["lastStep",vector],mix(Foot["lastStep",vector],Foot["nextStep",vector],0.5) + quat(Diff,G_ang:up()):up()*G_height,Foot["nextStep",vector],Perc),Foot["realStep",vector],Perc)
+                    Foot["realStep",vector] = mix(bezier(Foot["lastStep",vector],mix(Foot["lastStep",vector],Foot["nextStep",vector],0.5) + quat(Diff,G_ang:up()):up()*G_height*2,Foot["nextStep",vector],Perc),Foot["realStep",vector],Perc)
                 }
             }
             elseif (Foot["takeStep",number]) {
@@ -178,19 +178,24 @@ if (first()) {
         }
         resetFeet()
 
-        holoCreate(100)
+        holoCreate(100,vec(),vec((Length*2)/_PI):setZ(Height/4)/12)
+        holoModel(100,"cylinder")
+        holoColor(100,hsv2rgb(0,0.5,1))
+        
         local L = (IL1 + IL2 + IL3 + IL4 - G_height)/4
         for (I = 1,Num) {
             local N = I*1000
             holoCreate(N,holoEntity(100):toWorld(G_feet[I,table]["pos",vector]:normalized()*L),vec(IL1*2,8,8)/12)
             holoClipEnabled(N,1),holoClip(N,vec(),vec(1,0,0),0)
             holoParent(N,100)
-
+            holoColor(N,hsv2rgb(20,0.5,1))
+            
             for (J = 1,4) {
                 N++
                 holoCreate(N,holoEntity(N - 1):toWorld(vec(select(J,IL1,IL2,IL4,IL3),0,0)),vec(select(J,IL2,IL3,IL4,IL3)*2,8-J,8-J)/12)
                 holoClipEnabled(N,1),holoClip(N,vec(),vec(1,0,0),0)
                 holoParent(N,N - 1)
+                holoColor(N,hsv2rgb(20+ (60 / 4)*J,0.5,1))
             }
         }
 
@@ -223,7 +228,7 @@ if (Dt > 1) { exit() }
 
 updateGait()
 
-G_ang = G_ang:rotateAroundAxis(vec(0,0,1),15*Dt)
+G_ang = G_ang:rotateAroundAxis(vec(0,0,1),25*Dt)
 G_dir = G_ang:forward()
 
 local Base = holoEntity(100)

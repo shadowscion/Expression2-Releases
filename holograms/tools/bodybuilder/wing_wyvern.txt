@@ -1,5 +1,8 @@
 @name holograms/tools/bodybuilder/wing_wyvern
 
+#[
+    Spawn this chip and it will generate the usable file in the e2shared folder
+]#
 
 #-- SETTINGS
 INDEX_START = 50

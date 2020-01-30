@@ -1,0 +1,365 @@
+@name holograms/tools/bodybuilder/wing_wyvern
+
+
+#-- SETTINGS
+INDEX_START = 50
+
+P1 = 1 #-- pelvis index
+P2 = 2 #-- torso index
+
+Wing_leglen1 = 61
+Wing_leglen2 = 61
+Wing_finlen1 = 58
+Wing_finlen2 = 116
+
+
+#-- NO TOUCHY
+N1 = 1 + INDEX_START
+N2 = 2 + INDEX_START
+N3 = 3 + INDEX_START
+N4 = 4 + INDEX_START
+N5 = 5 + INDEX_START
+N6 = 6 + INDEX_START
+N7 = 7 + INDEX_START
+N8 = 8 + INDEX_START
+N9 = 9 + INDEX_START
+N10 = 10 + INDEX_START
+N11 = 11 + INDEX_START
+N12 = 12 + INDEX_START
+N13 = 13 + INDEX_START
+N14 = 14 + INDEX_START
+N15 = 15 + INDEX_START
+N16 = 16 + INDEX_START
+N17 = 17 + INDEX_START
+
+Holo = "
+    Wing_leglen1 = 61
+    Wing_leglen2 = 61
+    Wing_finlen1 = 58
+    Wing_finlen2 = 116
+
+    Wing_leglen1 = min(Wing_leglen1,Wing_finlen1)
+    Wing_leglen2 = min(Wing_leglen2,Wing_finlen2)
+
+    #-- BODY
+    HN++,HT[HN,table] = table(" + P1 + ",0,vec(),ang(),vec(2.5,3,3),\"models/sprops/misc/bone_from_x.mdl\",\"g:bone\")
+    HN++,HT[HN,table] = table(" + P2 + "," + P1 + ",vec(35,0,-7.5),ang(),vec(1.917,2,2),\"models/sprops/misc/bone_from_x.mdl\",\"g:bone\")
+
+    #-- LEFT WING
+    HN++,HT[HN,table] = table(" + N1 + "," + P2 + ",vec(28,8,2),ang(),vec(Wing_leglen1,12,12)/12,\"models/sprops/misc/bone_from_x.mdl\",\"g:bone\")
+    HN++,HT[HN,table] = table(" + N2 + "," + N1 + ",vec(Wing_leglen1,0,0),ang(),vec(Wing_leglen2,12,12)/12,\"models/sprops/misc/bone_from_x.mdl\",\"g:bone\")
+    HN++,HT[HN,table] = table(" + N3 + "," + N2 + ",vec(Wing_leglen2,0,0),ang(),vec(2,2,0.01),\"models/hunter/plates/plate16x16.mdl\",\"g:wingskin\",array(vec(0,0,0.25),vec(0,0,-1)," + N2 + ",vec(0,-0.25,0),vec(0,1,0)," + N3 + ",vec(0,-0.25,0),vec(0,1,0)," + N4 + ",vec(0,0,-0.25),vec(0,0,1)," + N11 + "))
+    HN++,HT[HN,table] = table(" + N4 + "," + N3 + ",vec(Wing_finlen1,0,0),ang(0,15,0),vec(Wing_finlen2,8,8)/12,\"models/sprops/misc/bone_from_x.mdl\",\"g:bone\")
+    HN++,HT[HN,table] = table(" + N5 + "," + N2 + ",vec(Wing_leglen2,0,0),ang(),vec(2,2,0.01),\"models/hunter/plates/plate16x16.mdl\",\"g:wingskin\",array(vec(0,0.25,0),vec(0,-1,0)," + N3 + ",vec(0,-0.25,0),vec(0,1,0)," + N5 + ",vec(0,0,-0.25),vec(0,0,1)," + N12 + "))
+    HN++,HT[HN,table] = table(" + N6 + "," + N5 + ",vec(Wing_finlen1,0,0),ang(0,15,0),vec(2,2,0.01),\"models/hunter/plates/plate16x16.mdl\",\"g:wingskin\",array(vec(0,0.25,0),vec(0,-1,0)," + N4 + ",vec(0,-0.25,0),vec(0,1,0)," + N6 + ",vec(0,0,0.25),vec(0,0,-1)," + N12 + ",vec(0,0,-0.25),vec(0,0,1)," + N13 + "))
+    HN++,HT[HN,table] = table(" + N7 + "," + N2 + ",vec(Wing_leglen2,0,0),ang(),vec(2,2,0.01),\"models/hunter/plates/plate16x16.mdl\",\"g:wingskin\",array(vec(0,0.25,0),vec(0,-1,0)," + N5 + ",vec(0,-0.25,0),vec(0,1,0)," + N7 + ",vec(0,0,-0.25),vec(0,0,1)," + N14 + "))
+    HN++,HT[HN,table] = table(" + N8 + "," + N7 + ",vec(Wing_finlen1,0,0),ang(0,15,0),vec(2,2,0.01),\"models/hunter/plates/plate16x16.mdl\",\"g:wingskin\",array(vec(0,0.25,0),vec(0,-1,0)," + N6 + ",vec(0,-0.25,0),vec(0,1,0)," + N8 + ",vec(0,0,0.25),vec(0,0,-1)," + N14 + ",vec(0,0,-0.25),vec(0,0,1)," + N15 + "))
+    HN++,HT[HN,table] = table(" + N9 + "," + P2 + ",vec(28,8,2),ang(),vec(2,2,0.01),\"models/hunter/plates/plate16x16.mdl\",\"g:wingskin\",array(vec(0,0,0.25),vec(0,0,-1)," + N1 + ",vec(0,0.25,0),vec(0,-1,0)," + N9 + ",vec(0,0,0.25),vec(0,0,-1)," + N11 + "))
+    HN++,HT[HN,table] = table(" + N10 + "," + P2 + ",vec(28,8,2),ang(),vec(2,2,0.01),\"models/hunter/plates/plate16x16.mdl\",\"g:wingskin\",array(vec(0,0.25,0),vec(0,-1,0)," + N10 + ",vec(0,0,-0.25),vec(0,0,1)," + N16 + ",vec(0,0,-0.25),vec(0,0,1)," + N17 + "))
+    HN++,HT[HN,table] = table(" + N11 + "," + N1 + ",vec(Wing_leglen1,0,0),ang(),vec(1,1,1),\"models/sprops/misc/origin.mdl\",\"g:marker\")
+    HN++,HT[HN,table] = table(" + N12 + "," + N3 + ",vec(Wing_finlen1,0,0),ang(),vec(1,1,1),\"models/sprops/misc/origin.mdl\",\"g:marker\")
+    HN++,HT[HN,table] = table(" + N13 + "," + N4 + ",vec(Wing_finlen2,0,0),ang(),vec(1,1,1),\"models/sprops/misc/origin.mdl\",\"g:marker\")
+    HN++,HT[HN,table] = table(" + N14 + "," + N5 + ",vec(Wing_finlen1,0,0),ang(),vec(1,1,1),\"models/sprops/misc/origin.mdl\",\"g:marker\")
+    HN++,HT[HN,table] = table(" + N15 + "," + N6 + ",vec(Wing_finlen2,0,0),ang(),vec(1,1,1),\"models/sprops/misc/origin.mdl\",\"g:marker\")
+    HN++,HT[HN,table] = table(" + N16 + "," + P1 + ",vec(0,8,2),ang(),vec(1,1,1),\"models/sprops/misc/origin.mdl\",\"g:marker\")
+    HN++,HT[HN,table] = table(" + N17 + "," + P1 + ",vec(0,8,2),ang(),vec(1,1,1),\"models/sprops/misc/origin.mdl\",\"g:marker\")
+
+    #-- RIGHT WING
+    HN++,HT[HN,table] = table(" + (N1 + 17) + "," + P2 + ",vec(28,-8,2),ang(),vec(Wing_leglen1,12,12)/12,\"models/sprops/misc/bone_from_x.mdl\",\"g:bone\")
+    HN++,HT[HN,table] = table(" + (N2 + 17) + "," + (N1 + 17) + ",vec(Wing_leglen1,0,0),ang(),vec(Wing_leglen2,12,12)/12,\"models/sprops/misc/bone_from_x.mdl\",\"g:bone\")
+    HN++,HT[HN,table] = table(" + (N3 + 17) + "," + (N2 + 17) + ",vec(Wing_leglen2,0,0),ang(),vec(2,2,0.01),\"models/hunter/plates/plate16x16.mdl\",\"g:wingskin\",array(vec(0,0,0.25),vec(0,0,-1)," + (N2 + 17) + ",vec(0,-0.25,0),vec(0,1,0)," + (N3 + 17) + ",vec(0,-0.25,0),vec(0,1,0)," + (N4 + 17) + ",vec(0,0,-0.25),vec(0,0,1)," + (N11 + 17) + "))
+    HN++,HT[HN,table] = table(" + (N4 + 17) + "," + (N3 + 17) + ",vec(Wing_finlen1,0,0),ang(0,15,0),vec(Wing_finlen2,8,8)/12,\"models/sprops/misc/bone_from_x.mdl\",\"g:bone\")
+    HN++,HT[HN,table] = table(" + (N5 + 17) + "," + (N2 + 17) + ",vec(Wing_leglen2,0,0),ang(),vec(2,2,0.01),\"models/hunter/plates/plate16x16.mdl\",\"g:wingskin\",array(vec(0,0.25,0),vec(0,-1,0)," + (N3 + 17) + ",vec(0,-0.25,0),vec(0,1,0)," + (N5 + 17) + ",vec(0,0,-0.25),vec(0,0,1)," + (N12 + 17) + "))
+    HN++,HT[HN,table] = table(" + (N6 + 17) + "," + (N5 + 17) + ",vec(Wing_finlen1,0,0),ang(0,15,0),vec(2,2,0.01),\"models/hunter/plates/plate16x16.mdl\",\"g:wingskin\",array(vec(0,0.25,0),vec(0,-1,0)," + (N4 + 17) + ",vec(0,-0.25,0),vec(0,1,0)," + (N6 + 17) + ",vec(0,0,0.25),vec(0,0,-1)," + (N12 + 17) + ",vec(0,0,-0.25),vec(0,0,1)," + (N13 + 17) + "))
+    HN++,HT[HN,table] = table(" + (N7 + 17) + "," + (N2 + 17) + ",vec(Wing_leglen2,0,0),ang(),vec(2,2,0.01),\"models/hunter/plates/plate16x16.mdl\",\"g:wingskin\",array(vec(0,0.25,0),vec(0,-1,0)," + (N5 + 17) + ",vec(0,-0.25,0),vec(0,1,0)," + (N7 + 17) + ",vec(0,0,-0.25),vec(0,0,1)," + (N14 + 17) + "))
+    HN++,HT[HN,table] = table(" + (N8 + 17) + "," + (N7 + 17) + ",vec(Wing_finlen1,0,0),ang(0,15,0),vec(2,2,0.01),\"models/hunter/plates/plate16x16.mdl\",\"g:wingskin\",array(vec(0,0.25,0),vec(0,-1,0)," + (N6 + 17) + ",vec(0,-0.25,0),vec(0,1,0)," + (N8 + 17) + ",vec(0,0,0.25),vec(0,0,-1)," + (N14 + 17) + ",vec(0,0,-0.25),vec(0,0,1)," + (N15 + 17) + "))
+    HN++,HT[HN,table] = table(" + (N9 + 17) + "," + P2 + ",vec(28,-8,2),ang(),vec(2,2,0.01),\"models/hunter/plates/plate16x16.mdl\",\"g:wingskin\",array(vec(0,0,0.25),vec(0,0,-1)," + (N1 + 17) + ",vec(0,0.25,0),vec(0,-1,0)," + (N9 + 17) + ",vec(0,0,0.25),vec(0,0,-1)," + (N11 + 17) + "))
+    HN++,HT[HN,table] = table(" + (N10 + 17) + "," + P2 + ",vec(28,-8,2),ang(),vec(2,2,0.01),\"models/hunter/plates/plate16x16.mdl\",\"g:wingskin\",array(vec(0,0.25,0),vec(0,-1,0)," + (N10 + 17) + ",vec(0,0,-0.25),vec(0,0,1)," + (N16 + 17) + ",vec(0,0,-0.25),vec(0,0,1)," + (N17 + 17) + "))
+    HN++,HT[HN,table] = table(" + (N11 + 17) + "," + (N1 + 17) + ",vec(Wing_leglen1,0,0),ang(),vec(1,1,1),\"models/sprops/misc/origin.mdl\",\"g:marker\")
+    HN++,HT[HN,table] = table(" + (N12 + 17) + "," + (N3 + 17) + ",vec(Wing_finlen1,0,0),ang(),vec(1,1,1),\"models/sprops/misc/origin.mdl\",\"g:marker\")
+    HN++,HT[HN,table] = table(" + (N13 + 17) + "," + (N4 + 17) + ",vec(Wing_finlen2,0,0),ang(),vec(1,1,1),\"models/sprops/misc/origin.mdl\",\"g:marker\")
+    HN++,HT[HN,table] = table(" + (N14 + 17) + "," + (N5 + 17) + ",vec(Wing_finlen1,0,0),ang(),vec(1,1,1),\"models/sprops/misc/origin.mdl\",\"g:marker\")
+    HN++,HT[HN,table] = table(" + (N15 + 17) + "," + (N6 + 17) + ",vec(Wing_finlen2,0,0),ang(),vec(1,1,1),\"models/sprops/misc/origin.mdl\",\"g:marker\")
+    HN++,HT[HN,table] = table(" + (N16 + 17) + "," + P1 + ",vec(0,-8,2),ang(),vec(1,1,1),\"models/sprops/misc/origin.mdl\",\"g:marker\")
+    HN++,HT[HN,table] = table(" + (N17 + 17) + "," + P1 + ",vec(0,-8,2),ang(),vec(1,1,1),\"models/sprops/misc/origin.mdl\",\"g:marker\")
+    "
+
+IDs = "
+    #[
+        INDEX MANAGER
+
+        -This is useful for offseting the indexes into negatives,so you can control the holos from another chip
+          without having to respawn the entire hologram contraption over and over
+
+        -If you want to do that,set matching INDEX_OFFSET variables in both the spawn and control chip,this section goes in the control chip,then
+         and call the define function (after the holos are spawned)
+    ]#
+
+    INDEX_OFFSET = 0
+
+    function void define() {
+        N" + N1 + " = " + N1 + " + INDEX_OFFSET
+        N" + N2 + " = " + N2 + " + INDEX_OFFSET
+        N" + N3 + " = " + N3 + " + INDEX_OFFSET
+        N" + N4 + " = " + N4 + " + INDEX_OFFSET
+        N" + N5 + " = " + N5 + " + INDEX_OFFSET
+        N" + N6 + " = " + N6 + " + INDEX_OFFSET
+        N" + N7 + " = " + N7 + " + INDEX_OFFSET
+        N" + N8 + " = " + N8 + " + INDEX_OFFSET
+        N" + N9 + " = " + N9 + " + INDEX_OFFSET
+        N" + N10 + " = " + N10 + " + INDEX_OFFSET
+        N" + N11 + " = " + N11 + " + INDEX_OFFSET
+        N" + N12 + " = " + N12 + " + INDEX_OFFSET
+        N" + N13 + " = " + N13 + " + INDEX_OFFSET
+        N" + N14 + " = " + N14 + " + INDEX_OFFSET
+        N" + N15 + " = " + N15 + " + INDEX_OFFSET
+        N" + N16 + " = " + N16 + " + INDEX_OFFSET
+        N" + N17 + " = " + N17 + " + INDEX_OFFSET
+        N" + (N1 + 17) + " = " + (N1 + 17) + " + INDEX_OFFSET
+        N" + (N2 + 17) + " = " + (N2 + 17) + " + INDEX_OFFSET
+        N" + (N3 + 17) + " = " + (N3 + 17) + " + INDEX_OFFSET
+        N" + (N4 + 17) + " = " + (N4 + 17) + " + INDEX_OFFSET
+        N" + (N5 + 17) + " = " + (N5 + 17) + " + INDEX_OFFSET
+        N" + (N6 + 17) + " = " + (N6 + 17) + " + INDEX_OFFSET
+        N" + (N7 + 17) + " = " + (N7 + 17) + " + INDEX_OFFSET
+        N" + (N8 + 17) + " = " + (N8 + 17) + " + INDEX_OFFSET
+        N" + (N9 + 17) + " = " + (N9 + 17) + " + INDEX_OFFSET
+        N" + (N10 + 17) + " = " + (N10 + 17) + " + INDEX_OFFSET
+        N" + (N11 + 17) + " = " + (N11 + 17) + " + INDEX_OFFSET
+        N" + (N12 + 17) + " = " + (N12 + 17) + " + INDEX_OFFSET
+        N" + (N13 + 17) + " = " + (N13 + 17) + " + INDEX_OFFSET
+        N" + (N14 + 17) + " = " + (N14 + 17) + " + INDEX_OFFSET
+        N" + (N15 + 17) + " = " + (N15 + 17) + " + INDEX_OFFSET
+        N" + (N16 + 17) + " = " + (N16 + 17) + " + INDEX_OFFSET
+        N" + (N17 + 17) + " = " + (N17 + 17) + " + INDEX_OFFSET
+
+        H" + N1 + " = holoEntity(N" + N1 + ")
+        H" + N2 + " = holoEntity(N" + N2 + ")
+        H" + N3 + " = holoEntity(N" + N3 + ")
+        H" + N4 + " = holoEntity(N" + N4 + ")
+        H" + N5 + " = holoEntity(N" + N5 + ")
+        H" + N6 + " = holoEntity(N" + N6 + ")
+        H" + N7 + " = holoEntity(N" + N7 + ")
+        H" + N8 + " = holoEntity(N" + N8 + ")
+        H" + N9 + " = holoEntity(N" + N9 + ")
+        H" + N10 + " = holoEntity(N" + N10 + ")
+        H" + N11 + " = holoEntity(N" + N11 + ")
+        H" + N12 + " = holoEntity(N" + N12 + ")
+        H" + N13 + " = holoEntity(N" + N13 + ")
+        H" + N14 + " = holoEntity(N" + N14 + ")
+        H" + N15 + " = holoEntity(N" + N15 + ")
+        H" + N16 + " = holoEntity(N" + N16 + ")
+        H" + N17 + " = holoEntity(N" + N17 + ")
+        H" + (N1 + 17) + " = holoEntity(N" + (N1 + 17) + ")
+        H" + (N2 + 17) + " = holoEntity(N" + (N2 + 17) + ")
+        H" + (N3 + 17) + " = holoEntity(N" + (N3 + 17) + ")
+        H" + (N4 + 17) + " = holoEntity(N" + (N4 + 17) + ")
+        H" + (N5 + 17) + " = holoEntity(N" + (N5 + 17) + ")
+        H" + (N6 + 17) + " = holoEntity(N" + (N6 + 17) + ")
+        H" + (N7 + 17) + " = holoEntity(N" + (N7 + 17) + ")
+        H" + (N8 + 17) + " = holoEntity(N" + (N8 + 17) + ")
+        H" + (N9 + 17) + " = holoEntity(N" + (N9 + 17) + ")
+        H" + (N10 + 17) + " = holoEntity(N" + (N10 + 17) + ")
+        H" + (N11 + 17) + " = holoEntity(N" + (N11 + 17) + ")
+        H" + (N12 + 17) + " = holoEntity(N" + (N12 + 17) + ")
+        H" + (N13 + 17) + " = holoEntity(N" + (N13 + 17) + ")
+        H" + (N14 + 17) + " = holoEntity(N" + (N14 + 17) + ")
+        H" + (N15 + 17) + " = holoEntity(N" + (N15 + 17) + ")
+        H" + (N16 + 17) + " = holoEntity(N" + (N16 + 17) + ")
+        H" + (N17 + 17) + " = holoEntity(N" + (N17 + 17) + ")
+
+        Pelvis = holoEntity(" + P1 + ")
+        Torso = holoEntity(" + P2 + ")
+    }
+
+    timer(\"doSpawn\",100)
+    runOnLast(1)\n"
+
+local Code = "
+elseif (last()) {
+    holoDeleteAll(1)
+}
+elseif (clk(\"doSpawn\")) {
+    timer(\"doSpawn\",15)
+    if (ST == 0) {
+        while (perf(99) & holoCanCreate() & HS < HN) {
+            HS++
+            local INFO_mdl = HT[HS,table]
+            local Index = INFO_mdl[1,number] + INDEX_OFFSET
+            local Parent = holoEntity(INFO_mdl[2,number] + INDEX_OFFSET) ?: entity()
+            holoCreate(Index,Parent:toWorld(INFO_mdl[3,vector]),INFO_mdl[5,vector],Parent:toWorld(INFO_mdl[4,angle]))
+            holoModel(Index,INFO_mdl[6,string])
+            holoParent(Index,Parent)
+        }
+        if (HS == HN) { HS = 0,ST++ }
+    }
+    else {
+        while (perf(99) & HS < HN) {
+            HS++
+            local INFO_mdl = HT[HS,table]
+            local Index = INFO_mdl[1,number] + INDEX_OFFSET
+            if (INFO_mdl:count() > 6) {
+                for (N = 7,INFO_mdl:count()) {
+                    local Clips = INFO_mdl[N,array]
+                    if (Clips) {
+                        for (I = 1,Clips:count(),3) {
+                            holoClipEnabled(Index,ceil(I / 3),1)
+                            holoClip(Index,ceil(I / 3),Clips[I,vector],Clips[I + 1,vector],holoEntity(Clips[I + 2,number] + INDEX_OFFSET))
+                            CN++
+                        }
+                    }
+                }
+            }
+        }
+        if (HS >= HN) {
+            stoptimer(\"doSpawn\")
+            printColor(
+                vec(255,255,255),\"filename: \",vec(155,255,0),entity():getName(),
+                vec(255,255,255),\"\\nholocount: \",vec(155,255,0),HN,
+                vec(255,255,255),\"\\nclipcount: \",vec(155,255,0),CN)
+
+            F_dir = vec(1,0,0)
+            R_dir = vec(0,-1,0)
+            U_dir = vec(0,0,1)
+
+            QRN90 = qRotation(R_dir,-90)
+
+            Wing_apoint1 = vec(Wing_finlen2,0,0)
+            Wing_apoint2 = vec(Wing_finlen2/2,0,0)
+
+            define()
+
+            timer(\"main\",100)
+        }
+    }
+}"
+
+local Main = "
+if (clk(\"main\")) {
+    timer(\"main\",60)
+
+    Dt = curtime() - Ct
+    Ct = curtime()
+
+    if (Dt > 1) {
+        exit()
+    }
+
+    local Mode = 0
+
+    #-- FLAP MODE
+    if (Mode == 0) {
+        Dot_up = 0 #Movedir:forward():dot(U_dir)
+        Dot_rg = 0 #Lookdir:dot(Movedir:right())
+
+        Powerstroke = 1 #clamp((W ?: abs(Dot_up))*(Movespeed != MaxSpeed) - Powerstroke,-abs(Dot_up + 0.5)*Dt,abs(Dot_up + 0.5)*Dt)
+        Overspeed = 0   #max(0,Movespeed - 1000)/500
+
+        local Div = 2/3
+        Wing_perc = (1 - Div)*Wing_perc + Div*abs(clamp(Powerstroke*5,-1,1))
+        Wing_rate = (1 - Div)*Wing_rate + Div*(0.5 + sin(Wing_time*360 + 180)*0.25 + max(Powerstroke,0)*0.5)
+        Wing_time += Wing_rate*Wing_perc*Dt
+
+        local CosT = cos(Wing_time*360)*Wing_perc
+        local SinT = sin(Wing_time*360)*Wing_perc
+        local SinL = SinT*0.5 + 0.5
+        local CosL = CosT*0.5 + 0.5
+
+        local WingStretch1 = 30*(1 - SinL) + 100*SinL
+        local WingStretch2 = WingStretch1 + 20*(1 - SinL) + 40*SinL
+        local WingStretch3 = WingStretch2 + 20*(1 - SinL) + 40*SinL
+
+        #-- LEFT
+        holoAng(N" + N1 + ",(quat(Torso:toWorld(ang(Dot_up*45 - Dot_rg*15*Overspeed,0,0)))*qRotation(U_dir,SinL*45)*qRotation(F_dir,((1 - CosL)*47 + 160*CosL) - Dot_rg*15)*qRotation(R_dir,(-(1 - CosL)*90 - 45*CosL))):toAngle())
+        holoAng(N" + N2 + ",H" + N1 + ":toWorld(ang((-(1 - SinL)*90 - 15*SinL),0,(-(1 - SinL)*45 + 45*SinL))))
+
+        holoAng(N" + N3 + ",H" + N2 + ":toWorld(ang(WingStretch1,180,90)))
+        holoAng(N" + N5 + ",H" + N2 + ":toWorld(ang(WingStretch2,180,90)))
+        holoAng(N" + N7 + ",H" + N2 + ":toWorld(ang(WingStretch3,180,90)))
+
+        #-- RIGHT
+        holoAng(N" + (N1+17) + ",(quat(Torso:toWorld(ang(Dot_up*45 - Dot_rg*15*Overspeed,0,0)))*qRotation(U_dir,-SinL*45)*qRotation(F_dir,-((1 - CosL)*47+ 160*CosL) + Dot_rg*15)*qRotation(R_dir,(-(1 - CosL)*90 - 45*CosL))):toAngle())
+        holoAng(N" + (N2+17) + ",H" + (N1+17) + ":toWorld(ang((-(1 - SinL)*90 - 15*SinL),0,-(-(1 - SinL)*45 + 45*SinL))))
+
+        holoAng(N" + (N3+17) + ",H" + (N2+17) + ":toWorld(ang(WingStretch1,180,90)))
+        holoAng(N" + (N5+17) + ",H" + (N2+17) + ":toWorld(ang(WingStretch2,180,90)))
+        holoAng(N" + (N7+17) + ",H" + (N2+17) + ":toWorld(ang(WingStretch3,180,90)))
+    }
+
+    #-- LEG MODE
+    if (Mode == 1) {
+        local Dot_rg = 0
+
+        #-- LEFT
+        local GPS = Torso:toWorld(vec(40,40,-40))
+        local LDir = Torso:toLocalAxis(GPS - H" + N1 + ":pos())
+        local Len = min(LDir:length(),Wing_leglen1 + Wing_leglen2 - 0.01)
+        holoAng(N" + N1 + ",Torso:toWorld((quat(LDir,U_dir)*qRotation(F_dir,atan(LDir:y(),LDir:x()) + abs(Dot_rg*10) + 30)*qRotation(R_dir,-acos((Len^2 + Wing_leglen1^2 - Wing_leglen2^2)/(2*Len*Wing_leglen1)))):toAngle()))
+        holoAng(N" + N2 + ",H" + N1 + ":toWorld(ang(acos((Wing_leglen2^2 + Wing_leglen1^2 - Len^2)/(2*Wing_leglen2*Wing_leglen1)) + 180,0,0)))
+        holoAng(N" + N3 + ",H" + N2 + ":toWorld(ang(15,180,90)))
+        holoAng(N" + N5 + ",H" + N2 + ":toWorld(ang(25,180,90)))
+        holoAng(N" + N7 + ",H" + N2 + ":toWorld(ang(35,180,90)))
+
+        #-- RIGHT
+        GPS = Torso:toWorld(vec(40,-40,-40))
+        LDir = Torso:toLocalAxis(GPS - H" + (N1+17) + ":pos())
+        Len = min(LDir:length(),Wing_leglen1 + Wing_leglen2 - 0.01)
+        holoAng(N" + (N1+17) + ",Torso:toWorld((quat(LDir,U_dir)*qRotation(F_dir,atan(LDir:y(),LDir:x()) - abs(Dot_rg*10) - 30)*qRotation(R_dir,-acos((Len^2 + Wing_leglen1^2 - Wing_leglen2^2)/(2*Len*Wing_leglen1)))):toAngle()))
+        holoAng(N" + (N2+17) + ",H" + (N1+17) + ":toWorld(ang(acos((Wing_leglen2^2 + Wing_leglen1^2 - Len^2)/(2*Wing_leglen2*Wing_leglen1)) + 180,0,0)))
+        holoAng(N" + (N3+17) + ",H" + (N2+17) + ":toWorld(ang(15,180,90)))
+        holoAng(N" + (N5+17) + ",H" + (N2+17) + ":toWorld(ang(25,180,90)))
+        holoAng(N" + (N7+17) + ",H" + (N2+17) + ":toWorld(ang(35,180,90)))
+    }
+
+    local PFdir = Pelvis:forward()
+
+    #-- LEFT WING CLIPS
+    local TUdir = H" + N2 + ":up()
+    holoAng(N" + N11 + ",quat(H" + N13 + ":pos() - H" + N11 + ":pos(),H" + N2 + ":forward()):toAngle())
+    holoAng(N" + N12 + ",quat(H" + N6 + ":pos() - H" + N12 + ":pos(),TUdir):toAngle())
+    holoAng(N" + N13 + ",quat(H" + N15 + ":pos() - H" + N13 + ":pos(),TUdir):toAngle())
+    holoAng(N" + N14 + ",quat(H" + N8 + ":pos() - H" + N14 + ":pos(),TUdir):toAngle())
+    holoAng(N" + N15 + ",quat(H" + N8 + ":toWorld(Wing_apoint1) - H" + N15 + ":pos(),TUdir):toAngle())
+
+    local Pos1 = H" + N9 + ":pos()
+    local Pos3 = H" + N13 + ":pos()
+    holoAng(N" + N9 + ",(quat((H" + N2 + ":pos() - Pos1):cross(Pos3 - Pos1),quat(Pos1 - Pos3,PFdir):forward())*QRN90):toAngle())
+
+    Pos1 = H" + N10 + ":pos()
+    Pos3 = H" + N13 + ":pos()
+    holoAng(N" + N10 + ",(quat((H" + N16 + ":pos() - Pos1):cross(Pos3 - Pos1),quat(Pos1 - Pos3,PFdir):forward())*QRN90):toAngle())
+    holoAng(N" + N16 + ",quat(H" + N9 + ":toWorld(Wing_apoint2) - H" + N16 + ":pos(),PFdir):toAngle())
+    holoAng(N" + N17 + ",quat(H" + N10 + ":pos() - H" + N17 + ":pos(),H" + N16 + ":forward()):toAngle())
+
+    #-- RIGHT WING CLIPS
+    TUdir = H" + (N2+17) + ":up()
+    holoAng(N" + (N11+17) + ",quat(H" + (N13+17) + ":pos() - H" + (N11+17) + ":pos(),H" + (N2+17) + ":forward()):toAngle())
+    holoAng(N" + (N12+17) + ",quat(H" + (N6+17) + ":pos() - H" + (N12+17) + ":pos(),TUdir):toAngle())
+    holoAng(N" + (N13+17) + ",quat(H" + (N15+17) + ":pos() - H" + (N13+17) + ":pos(),TUdir):toAngle())
+    holoAng(N" + (N14+17) + ",quat(H" + (N8+17) + ":pos() - H" + (N14+17) + ":pos(),TUdir):toAngle())
+    holoAng(N" + (N15+17) + ",quat(H" + (N8+17) + ":toWorld(Wing_apoint1) - H" + (N15+17) + ":pos(),TUdir):toAngle())
+
+    Pos1 = H" + (N9+17) + ":pos()
+    Pos3 = H" + (N13+17) + ":pos()
+    holoAng(N" + (N9+17) + ",(quat((H" + (N2+17) + ":pos() - Pos1):cross(Pos3 - Pos1),quat(Pos1 - Pos3,PFdir):forward())*QRN90):toAngle())
+
+    Pos1 = H" + (N10+17) + ":pos()
+    Pos3 = H" + (N13+17) + ":pos()
+    holoAng(N" + (N10+17) + ",(quat((H" + (N16+17) + ":pos() - Pos1):cross(Pos3 - Pos1),quat(Pos1 - Pos3,PFdir):forward())*QRN90):toAngle())
+    holoAng(N" + (N16+17) + ",quat(H" + (N9+17) + ":toWorld(Wing_apoint2) - H" + (N16+17) + ":pos(),PFdir):toAngle())
+    holoAng(N" + (N17+17) + ",quat(H" + (N10+17) + ":pos() - H" + (N17+17) + ":pos(),H" + (N16+17) + ":forward()):toAngle())
+}
+"
+
+Persists = format("@persist [HN CN HS ST INDEX_OFFSET] [HT]:table\n@persist [N%d N%d N%d N%d N%d N%d N%d N%d N%d N%d N%d N%d N%d N%d N%d N%d N%d]\n",N1,N2,N3,N4,N5,N6,N7,N8,N9,N10,N11,N12,N13,N14,N15,N16,N17)
+Persists += format("@persist [N%d N%d N%d N%d N%d N%d N%d N%d N%d N%d N%d N%d N%d N%d N%d N%d N%d]\n",N1+17,N2+17,N3+17,N4+17,N5+17,N6+17,N7+17,N8+17,N9+17,N10+17,N11+17,N12+17,N13+17,N14+17,N15+17,N16+17,N17+17)
+Persists += format("@persist [H%d H%d H%d H%d H%d H%d H%d H%d H%d H%d H%d H%d H%d H%d H%d H%d H%d]:entity\n",N1,N2,N3,N4,N5,N6,N7,N8,N9,N10,N11,N12,N13,N14,N15,N16,N17)
+Persists += format("@persist [H%d H%d H%d H%d H%d H%d H%d H%d H%d H%d H%d H%d H%d H%d H%d H%d H%d]:entity\n",N1+17,N2+17,N3+17,N4+17,N5+17,N6+17,N7+17,N8+17,N9+17,N10+17,N11+17,N12+17,N13+17,N14+17,N15+17,N16+17,N17+17)
+Persists += "@persist [Pelvis Torso]:entity [Wing_leglen1 Wing_leglen2 Wing_finlen1 Wing_finlen2]\n"
+Persists += "@persist [Dt Ct] [Wing_perc Wing_rate Wing_time] [F_dir R_dir U_dir Wing_apoint1 Wing_apoint2]:vector [QRN90]:quaternion\n"
+Persists += "@trigger none\n\n"
+
+String = Persists + "if (first()) {" + Holo + IDs + "}" + Code + Main
+
+fileWrite(">e2shared/temp.txt",String)
+printColor(vec(155,255,0),"SCRIPT SAVED TO ",vec(255,255,255),"<e2shared/temp.txt>")

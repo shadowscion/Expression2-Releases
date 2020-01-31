@@ -166,8 +166,8 @@ IDs = "
         H" + (N16 + 17) + " = holoEntity(N" + (N16 + 17) + ")
         H" + (N17 + 17) + " = holoEntity(N" + (N17 + 17) + ")
 
-        Pelvis = holoEntity(" + P1 + ")
-        Torso = holoEntity(" + P2 + ")
+        Pelvis = holoEntity(" + P1 + " + INDEX_OFFSET)
+        Torso = holoEntity(" + P2 + " + INDEX_OFFSET)
     }
 
     timer(\"doSpawn\",100)

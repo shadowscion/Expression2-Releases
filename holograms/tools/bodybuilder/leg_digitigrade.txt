@@ -5,7 +5,7 @@
 ]#
 
 #-- SETTINGS
-INDEX_START = 50
+INDEX_START = 150
 
 P1 = 1 #-- pelvis index
 
@@ -72,7 +72,7 @@ IDs = "
         H" + N7 + " = holoEntity(N" + N7 + ")
         H" + N8 + " = holoEntity(N" + N8 + ")
 
-        Pelvis = holoEntity(" + P1 + ")
+        Pelvis = holoEntity(" + P1 + " + INDEX_OFFSET)
     }
 
     timer(\"doSpawn\",100)

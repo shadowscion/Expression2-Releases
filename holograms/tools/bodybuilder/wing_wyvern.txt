@@ -1,16 +1,14 @@
 @name holograms/tools/bodybuilder/wing_wyvern
 
+#[
+    Spawn this chip and it will generate the usable file in the e2shared folder
+]#
 
 #-- SETTINGS
 INDEX_START = 50
 
 P1 = 1 #-- pelvis index
 P2 = 2 #-- torso index
-
-Wing_leglen1 = 61
-Wing_leglen2 = 61
-Wing_finlen1 = 58
-Wing_finlen2 = 116
 
 
 #-- NO TOUCHY

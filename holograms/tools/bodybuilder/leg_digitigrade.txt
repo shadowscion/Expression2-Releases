@@ -1,0 +1,201 @@
+@name holograms/tools/bodybuilder/leg_digitigrade
+
+#[
+    Spawn this chip and it will generate the usable file in the e2shared folder
+]#
+
+#-- SETTINGS
+INDEX_START = 50
+
+P1 = 1 #-- pelvis index
+
+
+#-- NO TOUCHY
+N1 = 1 + INDEX_START
+N2 = 2 + INDEX_START
+N3 = 3 + INDEX_START
+N4 = 4 + INDEX_START
+N5 = 5 + INDEX_START
+N6 = 6 + INDEX_START
+N7 = 7 + INDEX_START
+N8 = 8 + INDEX_START
+
+Holo = "
+    Leg_len1 = 48
+    Leg_len2 = Leg_len1*0.9
+    Leg_len3 = Leg_len2*0.9
+
+    #-- PELVIS
+    HN++,HT[HN,table] = table(" + P1 + ",0,vec(),ang(),vec(2.5,3,3),\"models/sprops/misc/bone_from_x.mdl\",\"g:bone\")
+
+    #-- LEFT LEG
+    HN++,HT[HN,table] = table(" + N1 + "," + P1 + ",vec(0,12,0),ang(),vec(Leg_len1,12,12)/12,\"models/sprops/misc/bone_from_x.mdl\",\"g:bone\")
+    HN++,HT[HN,table] = table(" + N2 + "," + N1 + ",vec(Leg_len1,0,0),ang(),vec(Leg_len2,11,11)/12,\"models/sprops/misc/bone_from_x.mdl\",\"g:bone\")
+    HN++,HT[HN,table] = table(" + N3 + "," + N2 + ",vec(Leg_len2,0,0),ang(),vec(Leg_len3,10,10)/12,\"models/sprops/misc/bone_from_x.mdl\",\"g:bone\")
+    HN++,HT[HN,table] = table(" + N4 + "," + N3 + ",vec(Leg_len3,0,0),ang(),vec(Leg_len3/2,10,5)/12,\"models/sprops/misc/bone_from_x.mdl\",\"g:bone\")
+
+    #-- RIGHT LEG
+    HN++,HT[HN,table] = table(" + N5 + "," + P1 + ",vec(0,-12,0),ang(),vec(Leg_len1,12,12)/12,\"models/sprops/misc/bone_from_x.mdl\",\"g:bone\")
+    HN++,HT[HN,table] = table(" + N6 + "," + N5 + ",vec(Leg_len1,0,0),ang(),vec(Leg_len2,11,11)/12,\"models/sprops/misc/bone_from_x.mdl\",\"g:bone\")
+    HN++,HT[HN,table] = table(" + N7 + "," + N6 + ",vec(Leg_len2,0,0),ang(),vec(Leg_len3,10,10)/12,\"models/sprops/misc/bone_from_x.mdl\",\"g:bone\")
+    HN++,HT[HN,table] = table(" + N8 + "," + N7 + ",vec(Leg_len3,0,0),ang(),vec(Leg_len3/2,10,5)/12,\"models/sprops/misc/bone_from_x.mdl\",\"g:bone\")
+"
+IDs = "
+    #[
+        INDEX MANAGER
+
+        -This is useful for offseting the indexes into negatives,so you can control the holos from another chip
+          without having to respawn the entire hologram contraption over and over
+
+        -If you want to do that,set matching INDEX_OFFSET variables in both the spawn and control chip,this section goes in the control chip,then
+         and call the define function (after the holos are spawned)
+    ]#
+
+    INDEX_OFFSET = 0
+
+    function void define() {
+        N" + N1 + " = " + N1 + " + INDEX_OFFSET
+        N" + N2 + " = " + N2 + " + INDEX_OFFSET
+        N" + N3 + " = " + N3 + " + INDEX_OFFSET
+        N" + N4 + " = " + N4 + " + INDEX_OFFSET
+        N" + N5 + " = " + N5 + " + INDEX_OFFSET
+        N" + N6 + " = " + N6 + " + INDEX_OFFSET
+        N" + N7 + " = " + N7 + " + INDEX_OFFSET
+        N" + N8 + " = " + N8 + " + INDEX_OFFSET
+
+        H" + N1 + " = holoEntity(N" + N1 + ")
+        H" + N2 + " = holoEntity(N" + N2 + ")
+        H" + N3 + " = holoEntity(N" + N3 + ")
+        H" + N4 + " = holoEntity(N" + N4 + ")
+        H" + N5 + " = holoEntity(N" + N5 + ")
+        H" + N6 + " = holoEntity(N" + N6 + ")
+        H" + N7 + " = holoEntity(N" + N7 + ")
+        H" + N8 + " = holoEntity(N" + N8 + ")
+
+        Pelvis = holoEntity(" + P1 + ")
+    }
+
+    timer(\"doSpawn\",100)
+    runOnLast(1)\n"
+
+local Code = "
+elseif (last()) {
+    holoDeleteAll(1)
+}
+elseif (clk(\"doSpawn\")) {
+    timer(\"doSpawn\",15)
+    if (ST == 0) {
+        while (perf(99) & holoCanCreate() & HS < HN) {
+            HS++
+            local INFO_mdl = HT[HS,table]
+            local Index = INFO_mdl[1,number] + INDEX_OFFSET
+            local Parent = holoEntity(INFO_mdl[2,number] + INDEX_OFFSET) ?: entity()
+            holoCreate(Index,Parent:toWorld(INFO_mdl[3,vector]),INFO_mdl[5,vector],Parent:toWorld(INFO_mdl[4,angle]))
+            holoModel(Index,INFO_mdl[6,string])
+            holoParent(Index,Parent)
+        }
+        if (HS == HN) { HS = 0,ST++ }
+    }
+    else {
+        while (perf(99) & HS < HN) {
+            HS++
+            local INFO_mdl = HT[HS,table]
+            local Index = INFO_mdl[1,number] + INDEX_OFFSET
+            if (INFO_mdl:count() > 6) {
+                for (N = 7,INFO_mdl:count()) {
+                    local Clips = INFO_mdl[N,array]
+                    if (Clips) {
+                        for (I = 1,Clips:count(),3) {
+                            holoClipEnabled(Index,ceil(I / 3),1)
+                            holoClip(Index,ceil(I / 3),Clips[I,vector],Clips[I + 1,vector],holoEntity(Clips[I + 2,number] + INDEX_OFFSET))
+                            CN++
+                        }
+                    }
+                }
+            }
+        }
+        if (HS >= HN) {
+            stoptimer(\"doSpawn\")
+            printColor(
+                vec(255,255,255),\"filename: \",vec(155,255,0),entity():getName(),
+                vec(255,255,255),\"\\nholocount: \",vec(155,255,0),HN,
+                vec(255,255,255),\"\\nclipcount: \",vec(155,255,0),CN)
+
+            F_dir = vec(1,0,0)
+            R_dir = vec(0,-1,0)
+            U_dir = vec(0,0,1)
+
+            define()
+
+            timer(\"main\",100)
+        }
+    }
+}"
+
+local Main = "
+if (clk(\"main\")) {
+    timer(\"main\",60)
+
+    #-- LEFT LEG
+    local LDir = Pelvis:toLocalAxis(GPSL - H" + N1 + ":pos())
+    holoAng(N" + N1 + ",Pelvis:toWorld((quat(LDir,U_dir)*qRotation(F_dir,atan(LDir:y(),LDir:x()))*qRotation(R_dir,clamp(1 - LDir:length()/(Leg_len1 + Leg_len2 + Leg_len3),0,1)*90)):toAngle()))
+    LDir = H" + N1 + ":toLocalAxis(GPSL - H" + N2 + ":pos())
+    local LDis = min(LDir:length(),Leg_len2 + Leg_len3 - 0.01)
+    holoAng(N" + N2 + ",H" + N1 + ":toWorld(ang(atan(LDir:x(),LDir:z()) + acos((LDis^2 + Leg_len2^2 - Leg_len3^2)/(2*LDis*Leg_len2)) - 90,0,0)))
+    holoAng(N" + N3 + ",H" + N2 + ":toWorld(ang(acos((Leg_len3^2 + Leg_len2^2 - LDis^2)/(2*Leg_len3*Leg_len2)) + 180,0,0)))
+    holoAng(N" + N4 + ",Pelvis:angles())
+
+    #-- RIGHT LEG
+    LDir = Pelvis:toLocalAxis(GPSR - H" + N5 + ":pos())
+    holoAng(N" + N5 + ",Pelvis:toWorld((quat(LDir,U_dir)*qRotation(F_dir,atan(LDir:y(),LDir:x()))*qRotation(R_dir,clamp(1 - LDir:length()/(Leg_len1 + Leg_len2 + Leg_len3),0,1)*90)):toAngle()))
+    LDir = H" + N5 + ":toLocalAxis(GPSR - H" + N6 + ":pos())
+    LDis = min(LDir:length(),Leg_len2 + Leg_len3 - 0.01)
+    holoAng(N" + N6 + ",H" + N5 + ":toWorld(ang(atan(LDir:x(),LDir:z()) + acos((LDis^2 + Leg_len2^2 - Leg_len3^2)/(2*LDis*Leg_len2)) - 90,0,0)))
+    holoAng(N" + N7 + ",H" + N6 + ":toWorld(ang(acos((Leg_len3^2 + Leg_len2^2 - LDis^2)/(2*Leg_len3*Leg_len2)) + 180,0,0)))
+    holoAng(N" + N8 + ",Pelvis:angles())
+}"
+
+Persists = format("@inputs [GPSL GPSR]:vector\n@persist [HN CN HS ST INDEX_OFFSET] [HT]:table [F_dir R_dir U_dir]:vector [Leg_len1 Leg_len2 Leg_len3]\n@persist [N%d N%d N%d N%d N%d N%d N%d N%d] [H%d H%d H%d H%d H%d H%d H%d H%d Pelvis]:entity\n\n",N1,N2,N3,N4,N5,N6,N7,N8,N1,N2,N3,N4,N5,N6,N7,N8)
+
+String = Persists + "if (first()) {" + Holo + IDs + "}" + Code + Main
+
+fileWrite(">e2shared/temp.txt",String)
+printColor(vec(155,255,0),"SCRIPT SAVED TO ",vec(255,255,255),"<e2shared/temp.txt>")
+
+
+#[
+@inputs GPS:vector
+@outputs LDif
+@persist Leg_len1 Leg_len2 Leg_len3
+@trigger none
+
+if (first()) {
+    Leg_len1 = 48
+    Leg_len2 = Leg_len1*0.9
+    Leg_len3 = Leg_len2*0.9
+
+    function holoCreate(N,P,Pos:vector,Scale:vector,Mdl:string) {
+        local Parent = holoEntity(P) ?: entity()
+        holoCreate(N,Parent:toWorld(Pos),Scale,Parent:angles())
+        holoModel(N,Mdl)
+        holoParent(N,Parent)
+    }
+
+    holoCreate(1,0,vec(0,20,0),vec(Leg_len1,12,12)/12,"models/sprops/misc/bone_from_x.mdl")
+    holoCreate(2,1,vec(Leg_len1,0,0),vec(Leg_len2,12,12)/12,"models/sprops/misc/bone_from_x.mdl")
+    holoCreate(3,2,vec(Leg_len2,0,0),vec(Leg_len3,12,12)/12,"models/sprops/misc/bone_from_x.mdl")
+}
+
+interval(60)
+
+U_dir = vec(0,0,1)
+F_dir = vec(1,0,0)
+R_dir = vec(0,-1,0)
+
+local LDir = Pelvis:toLocalAxis(GPS - H1:pos())
+holoAng(N1,Pelvis:toWorld((quat(LDir,U_dir)*qRotation(F_dir,atan(LDir:y(),LDir:x()))*qRotation(R_dir,clamp(1 - LDir:length()/(Leg_len1 + Leg_len2 + Leg_len3),0,1)*90)):toAngle()))
+LDir = H1:toLocalAxis(GPS - H2:pos())
+local LDis = min(LDir:length(),Leg_len2 + Leg_len3 - 0.01)
+holoAng(N2,H2:toWorld(ang(atan(LDir:x(),LDir:z()) + acos((LDis^2 + Leg_len2^2 - Leg_len3^2)/(2*LDis*Leg_len2)) - 90,0,0)))
+holoAng(N3,H3:toWorld(ang(acos((Leg_len3^2 + Leg_len2^2 - LDis^2)/(2*Leg_len3*Leg_len2)) + 180,0,0)))
+]#

@@ -1,0 +1,48 @@
+@name e2shared/gvc
+@persist Manifest:array [Github Path URL Data]:string Status
+@trigger none
+
+#[
+    This will download and save the latest version of my scripts to the data/expression2/e2shared folder
+]#
+
+if (first()) {
+    Github = "https://raw.githubusercontent.com/shadowscion/Expression2-Releases/master/e2shared/"
+    Manifest = array(
+        "holograms/tools/bodybuilder/leg_digitigrade",
+        "holograms/tools/bodybuilder/leg_unguligrade",
+        "holograms/tools/bodybuilder/wing_wyvern"
+    )
+    runOnHTTP(1)
+    interval(15)
+}
+if (clk()) {
+    interval(15)
+    if (Status == 0 & Manifest:count()) {
+        if (httpCanRequest()) {
+            Path = Manifest:popString()   
+            URL = format("%s%s.txt",Github,Path)
+            httpRequest(URL)
+            Status++
+            print(_HUD_PRINTCONSOLE,format("GVC-> %s requested", Path))
+        }
+    }
+    if (Status == 2) {
+        if (fileCanWrite()) {
+            fileWrite(">e2shared/" + Path + ".txt",Data)
+            print(_HUD_PRINTCONSOLE,format("GVC-> %s written", Path))
+            Status = 0
+            if (Manifest:count() == 0) {
+                print("GVC-> all files fetched")
+                selfDestruct()    
+            }
+        }
+    }
+}
+if (httpClk()) {
+    if (httpSuccess()) {
+        print(_HUD_PRINTCONSOLE,format("GVC-> %s received", Path))
+        Data = httpData()
+        Status++
+    }
+}

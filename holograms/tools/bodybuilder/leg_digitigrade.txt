@@ -5,7 +5,7 @@
 ]#
 
 #-- SETTINGS
-INDEX_START = 150
+INDEX_START = 9
 
 P1 = 1 #-- pelvis index
 
@@ -155,47 +155,9 @@ if (clk(\"main\")) {
     holoAng(N" + N8 + ",Pelvis:angles())
 }"
 
-Persists = format("@inputs [GPSL GPSR]:vector\n@persist [HN CN HS ST INDEX_OFFSET] [HT]:table [F_dir R_dir U_dir]:vector [Leg_len1 Leg_len2 Leg_len3]\n@persist [N%d N%d N%d N%d N%d N%d N%d N%d] [H%d H%d H%d H%d H%d H%d H%d H%d Pelvis]:entity\n\n",N1,N2,N3,N4,N5,N6,N7,N8,N1,N2,N3,N4,N5,N6,N7,N8)
+Persists = format("@inputs [GPSL GPSR]:vector\n@persist [HN CN HS ST INDEX_OFFSET] [HT]:table [F_dir R_dir U_dir]:vector\n@persist [N%d N%d N%d N%d N%d N%d N%d N%d] [H%d H%d H%d H%d H%d H%d H%d H%d Pelvis]:entity [Leg_len1 Leg_len2 Leg_len3]\n@trigger none\n\n",N1,N2,N3,N4,N5,N6,N7,N8,N1,N2,N3,N4,N5,N6,N7,N8)
 
 String = Persists + "if (first()) {" + Holo + IDs + "}" + Code + Main
 
-fileWrite(">e2shared/temp.txt",String)
-printColor(vec(155,255,0),"SCRIPT SAVED TO ",vec(255,255,255),"<e2shared/temp.txt>")
-
-
-#[
-@inputs GPS:vector
-@outputs LDif
-@persist Leg_len1 Leg_len2 Leg_len3
-@trigger none
-
-if (first()) {
-    Leg_len1 = 48
-    Leg_len2 = Leg_len1*0.9
-    Leg_len3 = Leg_len2*0.9
-
-    function holoCreate(N,P,Pos:vector,Scale:vector,Mdl:string) {
-        local Parent = holoEntity(P) ?: entity()
-        holoCreate(N,Parent:toWorld(Pos),Scale,Parent:angles())
-        holoModel(N,Mdl)
-        holoParent(N,Parent)
-    }
-
-    holoCreate(1,0,vec(0,20,0),vec(Leg_len1,12,12)/12,"models/sprops/misc/bone_from_x.mdl")
-    holoCreate(2,1,vec(Leg_len1,0,0),vec(Leg_len2,12,12)/12,"models/sprops/misc/bone_from_x.mdl")
-    holoCreate(3,2,vec(Leg_len2,0,0),vec(Leg_len3,12,12)/12,"models/sprops/misc/bone_from_x.mdl")
-}
-
-interval(60)
-
-U_dir = vec(0,0,1)
-F_dir = vec(1,0,0)
-R_dir = vec(0,-1,0)
-
-local LDir = Pelvis:toLocalAxis(GPS - H1:pos())
-holoAng(N1,Pelvis:toWorld((quat(LDir,U_dir)*qRotation(F_dir,atan(LDir:y(),LDir:x()))*qRotation(R_dir,clamp(1 - LDir:length()/(Leg_len1 + Leg_len2 + Leg_len3),0,1)*90)):toAngle()))
-LDir = H1:toLocalAxis(GPS - H2:pos())
-local LDis = min(LDir:length(),Leg_len2 + Leg_len3 - 0.01)
-holoAng(N2,H2:toWorld(ang(atan(LDir:x(),LDir:z()) + acos((LDis^2 + Leg_len2^2 - Leg_len3^2)/(2*LDis*Leg_len2)) - 90,0,0)))
-holoAng(N3,H3:toWorld(ang(acos((Leg_len3^2 + Leg_len2^2 - LDis^2)/(2*Leg_len3*Leg_len2)) + 180,0,0)))
-]#
+fileWrite(">e2shared/leg_digitigrade_temp.txt",String)
+printColor(vec(155,255,0),"SCRIPT SAVED TO ",vec(255,255,255),"<e2shared/leg_digitigrade_temp.txt>")

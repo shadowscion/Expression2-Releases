@@ -289,8 +289,7 @@ if (clk(\"main\")) {
         local Dot_rg = 0
 
         #-- LEFT
-        local GPS = Torso:toWorld(vec(40,40,-40))
-        local LDir = Torso:toLocalAxis(GPS - H" + N1 + ":pos())
+        local LDir = Torso:toLocalAxis(GPSWL - H" + N1 + ":pos())
         local Len = min(LDir:length(),Wing_leglen1 + Wing_leglen2 - 0.01)
         holoAng(N" + N1 + ",Torso:toWorld((quat(LDir,U_dir)*qRotation(F_dir,atan(LDir:y(),LDir:x()) + abs(Dot_rg*10) + 30)*qRotation(R_dir,-acos((Len^2 + Wing_leglen1^2 - Wing_leglen2^2)/(2*Len*Wing_leglen1)))):toAngle()))
         holoAng(N" + N2 + ",H" + N1 + ":toWorld(ang(acos((Wing_leglen2^2 + Wing_leglen1^2 - Len^2)/(2*Wing_leglen2*Wing_leglen1)) + 180,0,0)))
@@ -299,8 +298,7 @@ if (clk(\"main\")) {
         holoAng(N" + N7 + ",H" + N2 + ":toWorld(ang(35,180,90)))
 
         #-- RIGHT
-        GPS = Torso:toWorld(vec(40,-40,-40))
-        LDir = Torso:toLocalAxis(GPS - H" + (N1+17) + ":pos())
+        LDir = Torso:toLocalAxis(GPSWR - H" + (N1+17) + ":pos())
         Len = min(LDir:length(),Wing_leglen1 + Wing_leglen2 - 0.01)
         holoAng(N" + (N1+17) + ",Torso:toWorld((quat(LDir,U_dir)*qRotation(F_dir,atan(LDir:y(),LDir:x()) - abs(Dot_rg*10) - 30)*qRotation(R_dir,-acos((Len^2 + Wing_leglen1^2 - Wing_leglen2^2)/(2*Len*Wing_leglen1)))):toAngle()))
         holoAng(N" + (N2+17) + ",H" + (N1+17) + ":toWorld(ang(acos((Wing_leglen2^2 + Wing_leglen1^2 - Len^2)/(2*Wing_leglen2*Wing_leglen1)) + 180,0,0)))
@@ -349,15 +347,15 @@ if (clk(\"main\")) {
 }
 "
 
-Persists = format("@persist [HN CN HS ST INDEX_OFFSET] [HT]:table\n@persist [N%d N%d N%d N%d N%d N%d N%d N%d N%d N%d N%d N%d N%d N%d N%d N%d N%d]\n",N1,N2,N3,N4,N5,N6,N7,N8,N9,N10,N11,N12,N13,N14,N15,N16,N17)
+Persists = format("@inputs [GPSWL GPSWR]:vector\n@persist [HN CN HS ST INDEX_OFFSET] [HT]:table [F_dir R_dir U_dir]:vector [Dt Ct]\n@persist [N%d N%d N%d N%d N%d N%d N%d N%d N%d N%d N%d N%d N%d N%d N%d N%d N%d]\n",N1,N2,N3,N4,N5,N6,N7,N8,N9,N10,N11,N12,N13,N14,N15,N16,N17)
 Persists += format("@persist [N%d N%d N%d N%d N%d N%d N%d N%d N%d N%d N%d N%d N%d N%d N%d N%d N%d]\n",N1+17,N2+17,N3+17,N4+17,N5+17,N6+17,N7+17,N8+17,N9+17,N10+17,N11+17,N12+17,N13+17,N14+17,N15+17,N16+17,N17+17)
 Persists += format("@persist [H%d H%d H%d H%d H%d H%d H%d H%d H%d H%d H%d H%d H%d H%d H%d H%d H%d]:entity\n",N1,N2,N3,N4,N5,N6,N7,N8,N9,N10,N11,N12,N13,N14,N15,N16,N17)
 Persists += format("@persist [H%d H%d H%d H%d H%d H%d H%d H%d H%d H%d H%d H%d H%d H%d H%d H%d H%d]:entity\n",N1+17,N2+17,N3+17,N4+17,N5+17,N6+17,N7+17,N8+17,N9+17,N10+17,N11+17,N12+17,N13+17,N14+17,N15+17,N16+17,N17+17)
 Persists += "@persist [Pelvis Torso]:entity [Wing_leglen1 Wing_leglen2 Wing_finlen1 Wing_finlen2]\n"
-Persists += "@persist [Dt Ct] [Wing_perc Wing_rate Wing_time] [F_dir R_dir U_dir Wing_apoint1 Wing_apoint2]:vector [QRN90]:quaternion\n"
+Persists += "@persist [Wing_perc Wing_rate Wing_time] [Wing_apoint1 Wing_apoint2]:vector [QRN90]:quaternion\n"
 Persists += "@trigger none\n\n"
 
 String = Persists + "if (first()) {" + Holo + IDs + "}" + Code + Main
 
-fileWrite(">e2shared/temp.txt",String)
-printColor(vec(155,255,0),"SCRIPT SAVED TO ",vec(255,255,255),"<e2shared/temp.txt>")
+fileWrite(">e2shared/wing_wyvern_temp.txt",String)
+printColor(vec(155,255,0),"SCRIPT SAVED TO ",vec(255,255,255),"<e2shared/wing_wyvern_temp.txt>")

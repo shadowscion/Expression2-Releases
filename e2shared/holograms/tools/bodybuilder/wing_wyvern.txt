@@ -1,11 +1,11 @@
-@name holograms/tools/bodybuilder/wing_wyvern
+@name e2shared/holograms/tools/bodybuilder/wing_wyvern
 
 #[
     Spawn this chip and it will generate the usable file in the e2shared folder
 ]#
 
 #-- SETTINGS
-INDEX_START = 50
+INDEX_START = 10
 
 P1 = 1 #-- pelvis index
 P2 = 2 #-- torso index
@@ -357,5 +357,5 @@ Persists += "@trigger none\n\n"
 
 String = Persists + "if (first()) {" + Holo + IDs + "}" + Code + Main
 
-fileWrite(">e2shared/wing_wyvern_temp.txt",String)
-printColor(vec(155,255,0),"SCRIPT SAVED TO ",vec(255,255,255),"<e2shared/wing_wyvern_temp.txt>")
+fileWrite(">e2shared/holograms/tools/bodybuilder/OUTPUT_wing_wyvern.txt",String)
+printColor(vec(155,255,0),"SCRIPT SAVED TO ",vec(255,255,255),"<e2shared/holograms/tools/bodybuilder/OUTPUT_wing_wyvern.txt>")

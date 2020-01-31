@@ -357,5 +357,5 @@ Persists += "@trigger none\n\n"
 
 String = Persists + "if (first()) {" + Holo + IDs + "}" + Code + Main
 
-fileWrite(">e2shared/holograms/tools/bodybuilder/OUTPUT_wing_wyvern.txt",String)
-printColor(vec(155,255,0),"SCRIPT SAVED TO ",vec(255,255,255),"<e2shared/holograms/tools/bodybuilder/OUTPUT_wing_wyvern.txt>")
+fileWrite(">e2shared/holograms/tools/bodybuilder/temp/OUTPUT_wing_wyvern.txt",String)
+printColor(vec(155,255,0),"SCRIPT SAVED TO ",vec(255,255,255),"<e2shared/holograms/tools/bodybuilder/temp/OUTPUT_wing_wyvern.txt>")

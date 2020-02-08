@@ -1,0 +1,91 @@
+@name hex_map
+@inputs 
+@outputs 
+@persist Holocount [Hex_radius Hex_rows Hex_cols Hex_gen] Hex_scale:vector Hex_map:table Scale ClickedN FindFilter:array
+@trigger none
+
+if (first()) {
+    Scale = 0.25
+    Hex_rows = 12
+    Hex_cols = 12
+    Hex_radius = 36
+    
+    Hex_radius *= Scale
+    Hex_scale = vec(Hex_radius - 1*Scale):setZ(1) / 12
+    Hex_map = table()
+    
+    function vector gridToWorld(X,Y) {
+        local XOff = Y % 2 == 0 ? Hex_radius*0.5*sqrt(3)*0.5 : 0
+        return vec(XOff + X*Hex_radius*0.5*sqrt(3),Y*Hex_radius*0.75,0)
+    }
+    
+    function vector linePlaneIntersection( Player:entity, PlanePos:vector, Normal:vector ) {
+        local LineP1 = Player:shootPos()
+        local LineP2 = LineP1 + Player:eye()
+    
+        local X = Normal:dot(PlanePos - LineP1) / Normal:dot(LineP2 - LineP1)
+        return LineP1 + X*(LineP2 - LineP1)
+    }
+
+    timer("generate",100)
+}
+if (clk("generate")) {
+    timer("generate",15)
+    while (perf() & Hex_gen < Hex_rows*Hex_cols) {
+        Hex_gen++    
+        local X = mod(Hex_gen - 1, Hex_cols)
+        local Y = floor((Hex_gen - 1) / Hex_rows)
+        Hex_map:pushTable(table(
+            "grid" = vec(X,Y,0),
+            "world" = gridToWorld(X,Y)
+        ))         
+    }
+    if (Hex_gen == Hex_rows*Hex_cols) {
+        stoptimer("generate")
+        timer("spawn",100)
+    }
+}
+
+if (clk("spawn")) {
+    timer("spawn",15)
+    while (perf() & holoCanCreate() & Holocount < Hex_map:count()) {
+        Holocount++
+        holoCreate(Holocount,entity():toWorld(Hex_map[Holocount,table]["world",vector]),Hex_scale,entity():angles(),vec(255,255,255),"hexagon")
+        holoParent(Holocount,entity())
+        FindFilter:pushEntity(holoEntity(Holocount))
+    }
+    if (Holocount == Hex_map:count()) {
+        stoptimer("spawn")
+        timer("main",100)
+    }
+}
+
+if (clk("main")) {
+    timer("main",40)
+    
+    local Player = owner()
+    local Click = Player:keyAttack2()
+    
+    if (changed(Click)) {
+        if (Click) {
+            local Clickpos = linePlaneIntersection(Player, entity():toWorld(vec(0, 0, 0)), entity():up())
+            
+            findIncludeEntities(FindFilter)
+            findInSphere(Clickpos, Hex_radius/2)
+            findSortByDistance(Clickpos)     
+            
+            ClickedN = holoIndex(find())
+            if (ClickedN) {
+                holoColor(ClickedN,vec(255,125,125))
+                soundPlay("on",0,"garrysmod/ui_click.wav")
+            }      
+        }    
+        else {
+            if (ClickedN) {
+                holoColor(ClickedN,vec(255,255,255))
+                soundPlay("off",0,"common/wpn_select.wav")
+                ClickedN = 0
+            }    
+        }
+    }
+}

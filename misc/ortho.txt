@@ -1,0 +1,15 @@
+# dunno if it's correct
+function vector orthonormalize(Normal:vector,Tangent:vector) {
+    local Normal = Normal:normalized()
+    local Tangent = Tangent:normalized()
+    return Tangent - Normal * Normal:dot(Tangent)
+}
+function vector orthonormalize(Normal:vector,Tangent:vector,Bitangent:vector) {
+    local Normal = Normal:normalized()
+    local Tangent = Tangent:normalized()
+    Tangent = Tangent - Normal * Normal:dot(Tangent)
+    if (Normal:cross(Tangent):dot(Bitangent) < 0) {
+        Tangent = -Tangent
+    }
+    return Tangent
+}

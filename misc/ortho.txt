@@ -1,3 +1,4 @@
+# https://docs.unity3d.com/ScriptReference/Vector3.OrthoNormalize.html
 # dunno if it's correct
 function vector orthonormalize(Normal:vector,Tangent:vector) {
     local Normal = Normal:normalized()

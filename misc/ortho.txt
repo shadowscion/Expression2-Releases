@@ -14,3 +14,6 @@ function vector orthonormalize(Normal:vector,Tangent:vector,Bitangent:vector) {
     }
     return Tangent
 }
+function number signedAngle([From To Axis]:vector) {
+    return acos(From:normalized():dot(To:normalized())) * sign(From:cross(To):dot(Axis))
+}

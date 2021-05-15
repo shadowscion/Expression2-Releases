@@ -17,19 +17,12 @@ function vector orthonormalize(Normal:vector,Tangent:vector,Bitangent:vector) {
 function number signedAngle([From To Axis]:vector) {
     return acos(From:normalized():dot(To:normalized())) * sign(From:cross(To):dot(Axis))
 }
-
 function vector ClosestPointOnPlane([PNormal PPosition Point]:vector) {
-
     local PNormal = PNormal:normalized()
-
     return Point - (PNormal * (PNormal:dot(Point) - PNormal:dot(PPosition)))
+}
 
-#}
-
-
-
-local function ClosestPointOnPlane(pnormal, pposition, point)
-	pnormal:Normalize()
-	return point - (pnormal * (pnormal:Dot(point) - pnormal:Dot(pposition)))
-end
-
+#local function ClosestPointOnPlane(pnormal, pposition, point)
+#	pnormal:Normalize()
+#	return point - (pnormal * (pnormal:Dot(point) - pnormal:Dot(pposition)))
+#end

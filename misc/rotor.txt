@@ -1,0 +1,28 @@
+@name rotor
+@inputs 
+@outputs Number:string
+@persist MaxCount Counter S
+@trigger 
+
+
+if (first()) {
+    MaxNumber = 16000
+    MaxCount  = MaxNumber:toString():length()
+    
+    for (I = 1, MaxCount) {
+        holoCreate(I, entity():toWorld(vec(0, I*2.75, 0)), vec(1))
+        holoModel(I, "models/sprops/misc/numberwheel.mdl")
+        holoParent(I, entity())
+    }
+}
+
+interval(10)
+
+Counter++
+if (changed(Counter)) {
+    Number = format("%0" + MaxCount + "d", Counter)
+    for (I = 1, MaxCount) {
+        local Angle = Number[I]:toNumber()
+        holoAng(I, entity():toWorld(ang(36 * Angle, 0, 0))) 
+    }
+}

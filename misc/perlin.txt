@@ -1,0 +1,52 @@
+@name perlin
+@inputs 
+@outputs 
+@persist Seed
+@trigger 
+
+#https://raw.githubusercontent.com/shaggyfox/lua_perlin2d/master/perlin2d.lua
+
+Seed = 22345129
+
+function number fade(T) {
+    return T*T*T*(T*(T*6 - 15) + 10)
+}
+function number lerp(A,B,T) {
+    return (1 - T)*A + T*B
+}
+function number int_noise(X) {
+    local X = bXor(bShl(X,13),X)
+    return (1.0 - bAnd((X * (X * X * 15731 + 789221) + 1376312589),0x7FFFFFFF) / 1073741824)   
+}
+function vector2 randsample(X,Y) {
+    return vec2(int_noise(Seed + Y*1000 + X),int_noise(Seed*2 + Y*1000 + X)):normalized()
+}
+function number perlin(X,Y) {
+    local X_f = floor(X)
+    local X_c = ceil(X)
+    local Y_f = floor(Y)
+    local Y_c = ceil(Y)
+    
+    local Vec_a = randsample(X_f,Y_f)
+    local Vec_b = randsample(X_c,Y_f)
+    local Vec_c = randsample(X_c,Y_c)
+    local Vec_d = randsample(X_f,Y_c)
+    
+    local Pos_a = vec2(X - X_f,Y - Y_f)
+    local Pos_b = vec2((X - X_f) - 1,Y - Y_f)
+    local Pos_c = vec2((X - X_f) - 1,(Y - Y_f) - 1)
+    local Pos_d = vec2(X - X_f,(Y - Y_f) - 1)
+    
+    local Dot_a = Vec_a:dot(Pos_a)
+    local Dot_b = Vec_b:dot(Pos_b)
+    local Dot_c = Vec_c:dot(Pos_c)
+    local Dot_d = Vec_d:dot(Pos_d)
+    
+    local Horizontal_t = fade(X - X_f)
+    local Vertical_t = fade(Y - Y_f)
+    
+    local Dot_ab = lerp(Dot_a,Dot_b,Horizontal_t)
+    local Dot_dc = lerp(Dot_d,Dot_c,Horizontal_t)
+    
+    return lerp(Dot_ab,Dot_dc,Vertical_t)   
+}

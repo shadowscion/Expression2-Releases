@@ -1,0 +1,128 @@
+@name hex_offsetcoord
+@inputs 
+@outputs 
+@persist [Build_ig Build_ih Build_col Build_row Build_size] [Build_grid Build_regionData]:table [Build_state] [Build_regionCount]
+@trigger 
+
+if (first()) {
+    function number manhattan(AX,AY,BX,BY) {
+        return abs(AX - BX) + abs(AY - BY)    
+    }
+    function number getCell(Col,Row,NumCol) {
+        return Col + Row*NumCol   
+    }
+    function number getCol(Cell,NumCol) {
+        return Cell % NumCol
+    }
+    function number getRow(Cell,NumCol) {
+        return floor(Cell / NumCol)
+    }
+    function array getNeighbors(Col,Row,NumCol) {
+        if (Row % 2 == 0) {
+            return array(getCell(Col,Row-1,NumCol),getCell(Col+1,Row-1,NumCol),getCell(Col-1,Row,NumCol),getCell(Col+1,Row,NumCol),getCell(Col,Row+1,NumCol),getCell(Col+1,Row+1,NumCol))
+        }
+        else {
+            return array(getCell(Col-1,Row-1,NumCol),getCell(Col,Row-1,NumCol),getCell(Col-1,Row,NumCol),getCell(Col+1,Row,NumCol),getCell(Col-1,Row+1,NumCol),getCell(Col,Row+1,NumCol))
+        }
+    }
+    function array getNeighbors(Cell,NumCol) {
+        return getNeighbors(Cell % NumCol,floor(Cell / NumCol),NumCol)
+    }     
+    function vector gridToWorld(Col,Row,HexSize) {
+        local Off = Row % 2 == 0 ? HexSize*0.5*sqrt(3)*0.5 : 0
+        return vec(Row*HexSize*0.75,Off + Col*HexSize*0.5*sqrt(3),6)
+    }
+    function buildGrid(NumCol,NumRow,HexSize) {
+        Build_ig = 0
+        Build_col = NumCol
+        Build_row = NumRow
+        Build_size = HexSize
+        Build_state = 0
+        Build_grid = table()
+        timer("buildgrid",15)
+    }
+    
+    buildGrid(32,32,12)
+}
+
+if (clk("buildgrid")) {
+    
+    timer("buildgrid",15)
+    
+    switch (Build_state) {
+        case 0,
+            local Iterations = Build_col*Build_row
+            while (Build_ig < Iterations & perf() & holoRemainingSpawns() > 0) {
+                local Col = Build_ig % Build_col
+                local Row = floor(Build_ig / Build_col)
+                local Cell = table(
+                    "inbounds" = Col > 0 & Col < Build_col - 1 & Row > 0 & Row < Build_row - 1,
+                    "cell" = Build_ig,
+                    "col" = Col,
+                    "row" = Row
+                )
+                if (Cell["inbounds",number]) {
+                    Build_ih++
+                    local H = holoCreate(Build_ih,entity():toWorld(gridToWorld(Col,Row,Build_size)),vec(Build_size/12),entity():toWorld(ang(0,90,0)),vec(255),"models/sprops/misc/hplane_inner.mdl")
+                    holoParent(Build_ih,entity())
+                    Cell["holo",entity] = H
+                }
+                Build_grid:pushTable(Cell)
+                Build_ig++
+            }
+            if (Build_ig == Iterations) {
+                Build_state++    
+            }
+        break
+        case 1,
+            Build_regionCount = (Build_col*Build_row) / 16
+            Build_regionData = table()
+            local Region_values = array()
+            for (I = 1, Build_regionCount) {
+                Region_values:pushNumber(I)
+            }
+            for (I = 1,Build_regionCount) {
+                local Col = randint(2,Build_col-1)
+                local Row = randint(1,Build_row-2)
+                local Val = Region_values:removeNumber(randint(1, Region_values:count()))
+                local Cell = getCell(Col,Row,Build_col)
+                Build_regionData:pushTable(table(
+                    "val" = Val,
+                    "col" = Col,
+                    "row" = Row,
+                    "parentCell" = Cell,
+                    "chilCells" = array()
+                ))
+                local H = Build_grid[Cell,table]["holo",entity]
+                holoColor(holoIndex(H),hsv2rgb((Val - 1) / Build_regionCount*360,0.95,0.95))
+            }
+            Build_ig = 0
+            Build_state++  
+        break
+        case 2,
+            local Iterations = Build_col*Build_row
+            while (Build_ig < Iterations & perf(50)) {
+                local Col = Build_ig % Build_col
+                local Row = floor(Build_ig / Build_col)
+     
+                local CheckThis = Build_regionData[1,table]
+                for (I = 2,Build_regionData:count()) {
+                    local CheckThat = Build_regionData[I,table]
+                    if (manhattan(Col,Row,CheckThis["col",number],CheckThis["row",number]) > manhattan(Col,Row,CheckThat["col",number],CheckThat["row",number])) {
+                        CheckThis = CheckThat
+                    }
+                }
+
+                local H = Build_grid[Build_ig,table]["holo",entity]
+                holoColor(holoIndex(H),hsv2rgb((CheckThis["val",number] - 1) / Build_regionCount*360,0.95,0.95))
+                
+                CheckThis["childCells",array]:pushNumber(Build_ig)
+
+                Build_ig++
+            }
+            if (Build_ig == Iterations) {
+                Build_state++    
+            }
+        break
+    }
+}

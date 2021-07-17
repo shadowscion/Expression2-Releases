@@ -1,0 +1,209 @@
+@name hex_voronoi
+@inputs 
+@outputs 
+@persist [Grid_x Grid_y Grid_hexSize] [Region_count] [Grid_rotations Region_table Region_stack]:table [Reset_s Reset_i] [P2M_1 P2M_2]:entity
+@trigger 
+
+if (first()) {
+    function number manhattan(AX,AY,BX,BY) {
+        return abs(AX - BX) + abs(AY - BY)    
+    }
+    function number getCell(X,Y,NumX) {
+        return X + Y*NumX   
+    }
+    function number getX(Cell,NumX) {
+        return Cell % NumX
+    }
+    function number getY(Cell,NumX) {
+        return floor(Cell / NumX)
+    }
+    function array getNeighbors(X,Y,NumX) {
+        if (Y % 2 == 0) {
+            return array(
+                getCell(X-1,Y,NumX),
+                getCell(X,Y-1,NumX),
+                getCell(X+1,Y-1,NumX),
+                getCell(X+1,Y,NumX),
+                getCell(X+1,Y+1,NumX),
+                getCell(X,Y+1,NumX)
+            )
+        }
+        else {
+            return array(
+                getCell(X-1,Y,NumX),
+                getCell(X-1,Y-1,NumX),
+                getCell(X,Y-1,NumX),
+                getCell(X+1,Y,NumX),
+                getCell(X,Y+1,NumX),
+                getCell(X-1,Y+1,NumX)
+            )
+        }
+    }
+    function vector gridToWorld(X,Y,Size) {
+        local Off = Y % 2 == 0 ? Size*0.5*sqrt(3)*0.5 : 0
+        return vec(Y*Size*0.75,Off + X*Size*sqrt(3)*0.5,1)
+    }
+    function resetGrid(X,Y,Size) {
+        P2M_1:p2mRemove()
+        P2M_2:p2mRemove()
+
+        Reset_i = 0
+        Reset_s = 0
+        
+        Grid_x = X
+        Grid_y = Y
+        Grid_hexSize = Size
+        
+        Region_count = min(32,Grid_x) #(Grid_x*Grid_y) / 16 + 2)
+        Region_stack = table()
+
+        local Region_values = array()
+        for (I = 1,Region_count) {
+            Region_values:pushNumber(I)
+        }
+                
+        for (I = 1,Region_count) {
+            Region_stack:pushTable(table(
+                "x" = randint(0,Grid_x),
+                "y" = randint(0,Grid_y),
+                "v" = Region_values:removeNumber(randint(1,Region_values:count())),
+                "cells" = array(),
+                "lookup" = table()
+            ))
+        }
+
+        timer("resetGrid",500)
+    }
+            
+    function number getHexBodygroup(S:string) {
+        local M = 0
+        local O = 1
+        for (Index = 0,5) {
+            local BG = S[Index + 1]:toNumber()
+            M = M + O*BG
+            O = O*4   
+        } 
+        return M 
+    }
+
+    resetGrid(32,32,12)
+}
+
+if (clk("resetGrid")) {
+    timer("resetGrid",15)
+    
+    switch (Reset_s) {
+        case 0,
+            local Iterations = Grid_x*Grid_y
+            while (Reset_i < Iterations & perf()) {
+                local X = Reset_i % Grid_x
+                local Y = floor(Reset_i / Grid_x)
+                
+                local Prev = Region_stack[1,table]
+                for (I = 2,Region_count) {
+                    local Next = Region_stack[I,table]
+                    if (abs(X - Prev["x",number]) + abs(Y - Prev["y",number]) > abs(X - Next["x",number]) + abs(Y - Next["y",number])) {
+                        Prev = Next
+                    }    
+                }
+ 
+                local Lookup = table(
+                    "neighbors" = getNeighbors(X,Y,Grid_x),
+                    "pos" = gridToWorld(X,Y,Grid_hexSize)
+                )
+                if (X == Prev["x",number] & Y == Prev["y",number]) {
+                    Lookup["capitol",number] = 1
+                }
+
+                Prev["lookup",table][Reset_i,table] = Lookup
+                Prev["cells",array]:pushNumber(Reset_i)
+
+                Reset_i++
+            }
+            if (Reset_i == Iterations) {
+                for (I = 1,Region_stack:count()) {
+                    if (Region_stack[I,table]["cells",array]:count() <= 3) {
+                        Region_stack:removeTable(I)
+                    }
+                }
+                for (J = 1,20) {
+                    local I = randint(1,Region_stack:count())
+                    if (Region_stack[I,table]["cells",array]:count() > 12) {
+                        Region_stack:removeTable(I)
+                        break
+                    }
+                }
+                if (Region_stack:count() % 2 != 0) {
+                    Region_stack:removeTable(randint(1,Region_stack:count()))
+                }
+                
+                local Keys = Region_stack:keys()
+                while (Keys:count()) {
+                    local Key = Keys:removeNumber(randint(1,Keys:count()))
+                    Region_stack[Key,table]["team",number] = Key % 2 == 0 ? 1 : 2 
+                }
+
+                Region_count = Region_stack:count()
+
+                P2M_1 = p2mCreate(Region_count,entity():pos(),entity():angles(),64)
+                P2M_2 = p2mCreate(Region_count,entity():pos(),entity():angles(),64)
+
+                Reset_i = 0
+                Reset_s++    
+            }
+        break
+        
+        case 1,
+            local Scale = vec(Grid_hexSize/12)
+            while (perf()) {
+                if (Reset_i == 0) {
+                    Region_table:pushTable(Region_stack:popTable())    
+                }
+
+                local RIndex = Region_table:count()
+                local RTable = Region_table[RIndex,table]
+                local RCells = RTable["cells",array]
+                
+                if (Reset_i == RCells:count()) {
+                    #P2M_1:p2mSetColor(RIndex,hsv2rgb((RTable["v",number] - 1) / Region_count*360,1,random(0.5,1)))
+                    P2M_1:p2mSetColor(RIndex,RTable["team",number] == 1 ? vec(179,127,254) : vec(179,255,1))
+                    P2M_1:p2mSetMaterial(RIndex,"models/debug/debugwhite")
+                    
+                    P2M_2:p2mSetColor(RIndex,vec())
+                    P2M_2:p2mSetMaterial(RIndex,"models/debug/debugwhite")
+                    
+                    Reset_i = 0
+                    if (Region_stack:count() == 0) {
+                        Reset_s++
+                        break  
+                    } 
+                }
+                else {
+                    Reset_i++
+                    
+                    local RData = RTable["lookup",table]
+                    local RCell = RData[RCells[Reset_i,number],table]
+ 
+                    P2M_1:p2mPushModel(RIndex,"models/sprops/misc/hexplane.mdl",RCell["pos",vector],ang(0,90,0),Scale)#RCell["scale",vector])
+                    
+                    local N = RCell["neighbors",array]
+                    local R = ""
+                    for (I = 1,6) {
+                        R += RData:exists(N[I,number]) ? 3 : 2
+                    }
+                    
+                    if (R != "333333") {
+                        P2M_2:p2mPushModel(RIndex,"models/sprops/misc/hexplane.mdl",RCell["pos",vector] + vec(0,0,0.25),ang(0,90,0),Scale,0,0,getHexBodygroup(R))
+                    }
+                }
+            }
+
+        break
+        
+        case 2,
+            P2M_1:p2mBuild()
+            P2M_2:p2mBuild()
+            Reset_s++
+        break
+    }
+}

@@ -1,0 +1,30 @@
+@name offset_aim
+@inputs 
+@outputs 
+@persist L1 L2
+
+if (first()) {
+    L1 = 4    #opp
+    L2 = 48    #adj
+
+    holoCreate( 1, entity():pos(), vec( 3, 3, L1 ) / 12 )
+    holoModel( 1, "models/sprops/misc/cube_from_z.mdl" )
+
+    holoCreate( 2, holoEntity( 1 ):toWorld( vec( 0, 0, L1 ) ), vec( L2, 2, 2 ) / 12 )
+    holoModel( 2, "models/sprops/misc/cube_from_x.mdl" )
+    holoParent( 2, 1 )
+    
+    holoCreate( 3 )
+    holoAlpha( 3, 50 )
+}
+
+interval( 60 )
+
+
+Target = entity():pos()
+Pivot  = holoEntity(1):pos()
+Length = ( holoEntity(1):toWorld( vec( 0, 0, L1 ) ) - Target ):length() # change adjacent side length based on target distance
+Offset = atan( L1, Length )
+
+holoAng( 1, ( Target - Pivot ):toAngle() + ang( Offset, 0, 0 ) )
+holoPos( 3, Target )

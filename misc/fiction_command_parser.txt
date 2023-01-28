@@ -1,0 +1,93 @@
+@name fiction_command_parser
+@inputs 
+@outputs 
+@persist 
+@trigger 
+@strict
+
+Prepositions = invert( array( "aboard", "about", "above", "across", "after", "against", "along", "amid", "among", "around", "as", "at", "before", "behind", "below", "beneath", "beside", "between", "beyond", "but", "by", "concerning", "considering", "despite", "down", "during", "except", "following", "for", "from", "in", "inside", "into", "like", "minus", "near", "next", "of", "off", "on", "onto", "opposite", "out", "outside", "over", "past", "per", "plus", "regarding", "round", "save", "since", "than", "through", "till", "to", "toward", "under", "underneath", "unlike", "until", "up", "upon", "versus", "via", "with", "within", "without" ) )
+Articles = invert( array( "a", "and", "the" ) )
+
+function table parse( Sentence:string ) {
+    local Words = array()
+    foreach ( K:number, V:array = Sentence:lower():gmatch( "%w+" ) ) {
+        Words[K, string] = V[1, string]
+    }
+    
+    local Verb = Words:removeString( 1 )
+    local Subject  = ""
+    local Object_direct = ""
+    local Object_indirect = ""
+    local Object_last = ""
+    local Prep_direct = ""
+    local Prep_indirect = ""
+    local Prep_last = ""
+
+    foreach ( _, Token:string = Words ) {
+        if ( Articles[Token, number] != 0 ) { continue }
+        
+        if ( Prepositions[Token, number] != 0 ) {
+            if ( Prep_last == "" ) { Prep_last = Token } else { Prep_last = Prep_last + " " + Token }
+            
+            if ( Subject == "" ) {
+                if ( Object_last != "" ) { 
+                    Subject = Object_last
+                }
+            }
+            elseif ( Object_direct == "" ) {
+                if ( Object_last != "" ) { 
+                    Object_direct = Object_last
+                }
+            }
+            Object_last = ""
+        }
+        else {
+            if ( Object_last == "" ) { Object_last = Token } else { Object_last = Object_last + " " + Token }
+            
+            if ( Prep_last != "" ) {
+                if ( Prep_direct == "" ) { Prep_direct = Prep_last } else { Prep_indirect = Prep_last }
+            }
+            
+            Prep_last = ""
+        }   
+    }
+    
+    if ( Prep_last != "" & Prep_direct == "" ) { Prep_direct = Prep_last }
+    if ( Object_direct == "" ) { 
+        Object_direct = Object_last
+    } 
+    elseif ( Object_last != Object_direct ) { 
+        Object_indirect = Object_last
+    }
+    
+    local S = table( "verb" = Verb )
+    
+    if ( Subject != "" ) { S["subject", string] = Subject }
+    if ( Prep_direct != "" ) { S["prep_direct", string] = Prep_direct }
+    if ( Object_direct != "" ) { S["object_direct", string] = Object_direct }
+    if ( Prep_indirect != "" ) { S["prep_indirect", string] = Prep_indirect }
+    if ( Object_indirect != "" ) { S["object_indirect", string] = Object_indirect }
+    
+    return S
+}
+
+function void parsePrint( Sentence:string ) {
+    local S = parse( Sentence )
+    local P = array( "------------------\n", vec( 255, 125, 0 ), Sentence, "\n" )
+
+    foreach ( _, Key:string = array( "verb", "subject", "prep_direct", "object_direct", "prep_indirect", "object_indirect" ) ) {
+        if ( S:exists( Key ) ) { 
+            P:pushVector( vec( 255, 255, 0 ) )
+            P:pushString( Key + ": " )
+            P:pushVector( vec( 255, 255, 255 ) )
+            P:pushString( S[Key, string] + "\n" )
+        }
+    }
+    
+    printColor( P )
+}
+
+parsePrint( "lift the smelly miniature troll out of the dirty water with the golden bucket" )
+parsePrint( "place the troll on the launchpad" )
+parsePrint( "yeet the troll into outer space with the gravity catapult" )
+
